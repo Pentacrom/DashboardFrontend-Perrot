@@ -23,24 +23,27 @@ function App() {
           <Route path="/" element={<InicioSesion />} />
 
           {/* Rutas del dashboard: se muestran con Sidebar y TopMenu */}
-          <Route path="/*" element={
-            <div className="flex h-screen w-screen">
-              <Sidebar />
-              <div className="flex flex-col flex-1">
-                <TopMenu />
-                <main className="p-4 flex-1 overflow-auto bg-white text-black">
-                  <Routes>
-                    <Route path="/home" element={<HomePage />} />
-                    <Route path="/ingresoServicios" element={<IngresoServicio />} />
-                    <Route path="/servicios" element={<VistaServicios />} />
-                    <Route path="/completar-entrega" element={<CompletarEntrega />} />
-                    <Route path="/valorizar-servicio" element={<ValorizarServicio />} />
-                    <Route path="/servicios-por-facturar" element={<ServiciosPorFacturar />} />
-                  </Routes>
-                </main>
+          <Route
+            path="/*"
+            element={
+              <div className="flex h-screen w-screen">
+                <Sidebar />
+                <div className="flex flex-col flex-1">
+                  <TopMenu />
+                  <main className="p-4 flex-1 overflow-auto bg-white text-black">
+                    <Routes>
+                      <Route path="/home" element={<HomePage />} />
+                      <Route path="/ingresoServicios" element={<IngresoServicio />} />
+                      <Route path="/servicios" element={<VistaServicios />} />
+                      <Route path="/completar-entrega" element={<CompletarEntrega />} />
+                      <Route path="/valorizar-servicio" element={<ValorizarServicio />} />
+                      <Route path="/servicios-por-facturar" element={<ServiciosPorFacturar />} />
+                    </Routes>
+                  </main>
+                </div>
               </div>
-            </div>
-          } />
+            }
+          />
         </Routes>
       </Router>
     </>
