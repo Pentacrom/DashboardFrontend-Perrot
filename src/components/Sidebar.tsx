@@ -22,7 +22,9 @@ const Sidebar: React.FC = () => {
       <nav className="p-4 flex-1 overflow-y-auto border-r border-gray-300 drop-shadow-md">
         {/* Sección Cliente */}
         <div>
-          <h2 className="font-bold uppercase border-b border-gray-300 pb-1">Cliente</h2>
+          <h2 className="font-bold uppercase border-b border-gray-300 pb-1">
+            Cliente
+          </h2>
           <ul className="mt-2 ml-4">
             <li>
               <NavLink to="/ingresoServicios" className={linkClasses}>
@@ -30,8 +32,8 @@ const Sidebar: React.FC = () => {
               </NavLink>
             </li>
             <li>
-              <NavLink to="/servicios" className={linkClasses}>
-                <span>Servicios</span>
+              <NavLink to="/servicios-pendientes" className={linkClasses}>
+                <span>Servicios pendientes</span>
               </NavLink>
             </li>
           </ul>
@@ -39,7 +41,9 @@ const Sidebar: React.FC = () => {
 
         {/* Sección Comercial */}
         <div className="mt-4">
-          <h2 className="font-bold uppercase border-b border-gray-300 pb-1">Comercial</h2>
+          <h2 className="font-bold uppercase border-b border-gray-300 pb-1">
+            Comercial
+          </h2>
           <ul className="mt-2 ml-4">
             <li>
               <NavLink to="/ingresoServicios" className={linkClasses}>
@@ -47,8 +51,13 @@ const Sidebar: React.FC = () => {
               </NavLink>
             </li>
             <li>
-              <NavLink to="/servicios" className={linkClasses}>
+              <NavLink to="/servicios-pendientes" className={linkClasses}>
                 <span>Servicios pendientes</span>
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/completar-servicio" className={linkClasses}>
+                <span>Completar servicio</span>
               </NavLink>
             </li>
           </ul>
@@ -56,11 +65,18 @@ const Sidebar: React.FC = () => {
 
         {/* Sección Torre de control */}
         <div className="mt-4">
-          <h2 className="font-bold uppercase border-b border-gray-300 pb-1">Torre de control</h2>
+          <h2 className="font-bold uppercase border-b border-gray-300 pb-1">
+            Torre de control
+          </h2>
           <ul className="mt-2 ml-4">
             <li>
               <NavLink to="/servicios" className={linkClasses}>
                 <span>Servicios</span>
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/servicios-test" className={linkClasses}>
+                <span>Servicios test</span>
               </NavLink>
             </li>
           </ul>
@@ -68,7 +84,9 @@ const Sidebar: React.FC = () => {
 
         {/* Sección Operaciones */}
         <div className="mt-4">
-          <h2 className="font-bold uppercase border-b border-gray-300 pb-1">Operaciones</h2>
+          <h2 className="font-bold uppercase border-b border-gray-300 pb-1">
+            Operaciones
+          </h2>
           <ul className="mt-2 ml-4">
             <li>
               <NavLink to="/completar-entrega" className={linkClasses}>
@@ -85,7 +103,9 @@ const Sidebar: React.FC = () => {
 
         {/* Sección Contabilidad */}
         <div className="mt-4">
-          <h2 className="font-bold uppercase border-b border-gray-300 pb-1">Contabilidad</h2>
+          <h2 className="font-bold uppercase border-b border-gray-300 pb-1">
+            Contabilidad
+          </h2>
           <ul className="mt-2 ml-4">
             <li>
               <NavLink to="/servicios-por-facturar" className={linkClasses}>

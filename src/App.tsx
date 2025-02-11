@@ -6,10 +6,13 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 // Páginas del dashboard
 import HomePage from './pages/HomePage';
 import IngresoServicio from "./pages/IngresoServicio";
-import VistaServicios from "./pages/VistaServicios";
+import VistaServiciosPendientes from "./pages/VistaServiciosPendientes";
 import CompletarEntrega from "./pages/CompletarEntrega";
 import ValorizarServicio from "./pages/ValorizarServicio";
 import ServiciosPorFacturar from "./pages/ServiciosPorFacturar";
+import CompletarServicio from "./pages/CompletarServicio";
+import VistaServicios from "./pages/VistaServicios";
+import VistaServiciosTest from "./pages/VistaServiciosTest";
 
 // Página de inicio de sesión
 import InicioSesion from "./pages/InicioSesion";
@@ -17,7 +20,7 @@ import InicioSesion from "./pages/InicioSesion";
 function App() {
   return (
     <>
-      <Router>
+      <Router basename="/DashboardFrontend-Perrot">
         <Routes>
           {/* Ruta para el inicio de sesión (fuera del dashboard) */}
           <Route path="/" element={<InicioSesion />} />
@@ -33,11 +36,33 @@ function App() {
                   <main className="p-4 flex-1 overflow-auto bg-white text-black">
                     <Routes>
                       <Route path="/home" element={<HomePage />} />
-                      <Route path="/ingresoServicios" element={<IngresoServicio />} />
+                      <Route
+                        path="/ingresoServicios"
+                        element={<IngresoServicio />}
+                      />
                       <Route path="/servicios" element={<VistaServicios />} />
-                      <Route path="/completar-entrega" element={<CompletarEntrega />} />
-                      <Route path="/valorizar-servicio" element={<ValorizarServicio />} />
-                      <Route path="/servicios-por-facturar" element={<ServiciosPorFacturar />} />
+                      <Route path="/servicios-test" element={<VistaServiciosTest />} />
+
+                      <Route
+                        path="/servicios-pendientes"
+                        element={<VistaServiciosPendientes />}
+                      />
+                      <Route
+                        path="/completar-entrega"
+                        element={<CompletarEntrega />}
+                      />
+                      <Route
+                        path="/valorizar-servicio"
+                        element={<ValorizarServicio />}
+                      />
+                      <Route
+                        path="/completar-servicio"
+                        element={<CompletarServicio />}
+                      />
+                      <Route
+                        path="/servicios-por-facturar"
+                        element={<ServiciosPorFacturar />}
+                      />
                     </Routes>
                   </main>
                 </div>

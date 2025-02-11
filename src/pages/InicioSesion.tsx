@@ -22,7 +22,9 @@ const InicioSesion: React.FC = () => {
             className="w-32 h-auto object-contain"
           />
         </div>
-        <h1 className="text-2xl font-bold text-black mb-6 text-center">Iniciar Sesión</h1>
+        <h1 className="text-2xl font-bold text-black mb-6 text-center">
+          Iniciar Sesión
+        </h1>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label htmlFor="usuario" className="block text-gray-700 mb-2">
@@ -48,7 +50,7 @@ const InicioSesion: React.FC = () => {
           </div>
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors"
+            className="w-full bg-gray-700 text-white py-2 rounded hover:bg-gray-800 transition-colors"
           >
             Iniciar Sesión
           </button>

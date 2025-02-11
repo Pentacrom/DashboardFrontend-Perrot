@@ -6,7 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   base: '/DashboardFrontend-Perrot/',
   plugins: [
-    react(),
-    tailwindcss()
+    tailwindcss(),
+    react()
   ]
 })
