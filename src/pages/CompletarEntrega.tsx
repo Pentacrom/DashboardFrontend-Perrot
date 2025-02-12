@@ -14,8 +14,11 @@ const CompletarEntrega: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Número de Servicio */}
           <div>
-            <label htmlFor="numeroServicio" className="block text-sm font-medium text-gray-700">
-              Número de Servicio
+            <label
+              htmlFor="numeroServicio"
+              className="block text-sm font-medium text-gray-700"
+            >
+              ODV
             </label>
             <input
               id="numeroServicio"
@@ -26,7 +29,10 @@ const CompletarEntrega: React.FC = () => {
           </div>
           {/* Destinatario */}
           <div>
-            <label htmlFor="destinatario" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="destinatario"
+              className="block text-sm font-medium text-gray-700"
+            >
               Destinatario
             </label>
             <input
@@ -38,7 +44,10 @@ const CompletarEntrega: React.FC = () => {
           </div>
           {/* Dirección de Entrega */}
           <div>
-            <label htmlFor="direccion" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="direccion"
+              className="block text-sm font-medium text-gray-700"
+            >
               Dirección de Entrega
             </label>
             <input
@@ -50,7 +59,10 @@ const CompletarEntrega: React.FC = () => {
           </div>
           {/* Fecha de Entrega */}
           <div>
-            <label htmlFor="fechaEntrega" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="fechaEntrega"
+              className="block text-sm font-medium text-gray-700"
+            >
               Fecha de Entrega
             </label>
             <input
@@ -61,7 +73,10 @@ const CompletarEntrega: React.FC = () => {
           </div>
           {/* Hora de Entrega */}
           <div>
-            <label htmlFor="horaEntrega" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="horaEntrega"
+              className="block text-sm font-medium text-gray-700"
+            >
               Hora de Entrega
             </label>
             <input
@@ -72,7 +87,10 @@ const CompletarEntrega: React.FC = () => {
           </div>
           {/* Observaciones */}
           <div className="md:col-span-2">
-            <label htmlFor="observaciones" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="observaciones"
+              className="block text-sm font-medium text-gray-700"
+            >
               Observaciones
             </label>
             <textarea

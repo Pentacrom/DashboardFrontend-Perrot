@@ -31,7 +31,9 @@ const TopMenu: React.FC = () => {
     <header className="w-full h-20 bg-white border-b border-gray-300 flex items-center px-6 text-black drop-shadow-bottom drop-shadow-md">
       {/* Sección Izquierda: Logo y Título */}
       <div className="flex items-center">
-        <span className="font-bold text-lg">Dashboard perrot</span>
+        <span className="font-bold text-lg">
+          Sistema Control de Operaciones Perrot
+        </span>
       </div>
 
       {/* Sección Derecha: Navegación */}

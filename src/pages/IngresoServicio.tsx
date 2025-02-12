@@ -12,17 +12,17 @@ const IngresoServicio: React.FC = () => {
       <h1 className="text-2xl font-bold mb-4">Ingreso de Servicios</h1>
 
       {/* Formulario de Ingreso de Servicios */}
-      <form 
-        onSubmit={handleSubmit} 
+      <form
+        onSubmit={handleSubmit}
         className="bg-white p-6 rounded shadow mb-8"
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label 
-              htmlFor="serviceNumber" 
+            <label
+              htmlFor="serviceNumber"
               className="block text-sm font-medium text-gray-700"
             >
-              Número de Servicio
+              ODV
             </label>
             <input
               id="serviceNumber"
@@ -32,8 +32,8 @@ const IngresoServicio: React.FC = () => {
             />
           </div>
           <div>
-            <label 
-              htmlFor="client" 
+            <label
+              htmlFor="client"
               className="block text-sm font-medium text-gray-700"
             >
               Cliente
@@ -46,8 +46,8 @@ const IngresoServicio: React.FC = () => {
             />
           </div>
           <div>
-            <label 
-              htmlFor="origin" 
+            <label
+              htmlFor="origin"
               className="block text-sm font-medium text-gray-700"
             >
               Origen
@@ -60,8 +60,8 @@ const IngresoServicio: React.FC = () => {
             />
           </div>
           <div>
-            <label 
-              htmlFor="destination" 
+            <label
+              htmlFor="destination"
               className="block text-sm font-medium text-gray-700"
             >
               Destino
@@ -74,8 +74,8 @@ const IngresoServicio: React.FC = () => {
             />
           </div>
           <div>
-            <label 
-              htmlFor="date" 
+            <label
+              htmlFor="date"
               className="block text-sm font-medium text-gray-700"
             >
               Fecha de Servicio
@@ -87,8 +87,8 @@ const IngresoServicio: React.FC = () => {
             />
           </div>
           <div>
-            <label 
-              htmlFor="serviceType" 
+            <label
+              htmlFor="serviceType"
               className="block text-sm font-medium text-gray-700"
             >
               Tipo de Servicio
@@ -120,7 +120,7 @@ const IngresoServicio: React.FC = () => {
           <thead>
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                N° Servicio
+                ODV
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 Cliente

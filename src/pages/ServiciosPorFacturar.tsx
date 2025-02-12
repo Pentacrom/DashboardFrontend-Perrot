@@ -9,7 +9,7 @@ const ServiciosPorFacturar: React.FC = () => {
           <thead>
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                N° Servicio
+                ODV
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 Cliente

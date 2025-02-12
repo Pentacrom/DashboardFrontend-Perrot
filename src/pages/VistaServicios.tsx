@@ -59,7 +59,7 @@ const VistaServicios: React.FC = () => {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Servicios</h1>
+      <h1 className="text-2xl font-bold mb-4">Datos de entrega</h1>
 
       {/* Leyenda de indicadores de estado */}
       <div className="mb-4">
@@ -86,7 +86,7 @@ const VistaServicios: React.FC = () => {
           <thead>
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                N° Servicio
+                ODV
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 Cliente

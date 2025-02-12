@@ -50,7 +50,7 @@ const CompletarServicio: React.FC = () => {
               htmlFor="serviceId"
               className="block text-sm font-medium text-gray-700"
             >
-              ID del Servicio
+              ODV
             </label>
             <input
               id="serviceId"

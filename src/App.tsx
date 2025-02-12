@@ -13,6 +13,7 @@ import ServiciosPorFacturar from "./pages/ServiciosPorFacturar";
 import CompletarServicio from "./pages/CompletarServicio";
 import VistaServicios from "./pages/VistaServicios";
 import VistaServiciosTest from "./pages/VistaServiciosTest";
+import ConsultaServicio from "./pages/ConsultaServicio";
 
 // Página de inicio de sesión
 import InicioSesion from "./pages/InicioSesion";
@@ -41,7 +42,10 @@ function App() {
                         element={<IngresoServicio />}
                       />
                       <Route path="/servicios" element={<VistaServicios />} />
-                      <Route path="/servicios-test" element={<VistaServiciosTest />} />
+                      <Route
+                        path="/servicios-test"
+                        element={<VistaServiciosTest />}
+                      />
 
                       <Route
                         path="/servicios-pendientes"
@@ -62,6 +66,11 @@ function App() {
                       <Route
                         path="/servicios-por-facturar"
                         element={<ServiciosPorFacturar />}
+                      />
+
+                      <Route
+                        path="/consulta-servicio"
+                        element={<ConsultaServicio/>}
                       />
                     </Routes>
                   </main>
