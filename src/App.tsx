@@ -14,7 +14,7 @@ import CompletarServicio from "./pages/CompletarServicio";
 import VistaServicios from "./pages/VistaServicios";
 import VistaServiciosTest from "./pages/VistaServiciosTest";
 import ConsultaServicio from "./pages/ConsultaServicio";
-
+import InformeServicio from "./pages/InformeServicios"
 // Página de inicio de sesión
 import InicioSesion from "./pages/InicioSesion";
 
@@ -70,7 +70,11 @@ function App() {
 
                       <Route
                         path="/consulta-servicio"
-                        element={<ConsultaServicio/>}
+                        element={<ConsultaServicio />}
+                      />
+                      <Route
+                        path="/informe-servicio"
+                        element={<InformeServicio />}
                       />
                     </Routes>
                   </main>

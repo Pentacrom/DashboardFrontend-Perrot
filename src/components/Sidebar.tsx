@@ -114,11 +114,16 @@ const Sidebar: React.FC = () => {
             </li>
           </ul>
         </div>
-        <div className="mt-4">
+        <div className="mt-4 border-t border-gray-300 pt-1">
           <ul className="mt-2 ml-4">
             <li>
               <NavLink to="/consulta-servicio" className={linkClasses}>
                 <span>Consulta de servicio</span>
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/informe-servicio" className={linkClasses}>
+                <span>Informe de servicio</span>
               </NavLink>
             </li>
           </ul>
