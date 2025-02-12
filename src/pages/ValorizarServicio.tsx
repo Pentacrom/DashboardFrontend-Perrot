@@ -121,22 +121,6 @@ const ValorizarServicio: React.FC = () => {
               className="mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
-          {/* Costo del Servicio */}
-          <div>
-            <label
-              htmlFor="costo"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Costo del Servicio
-            </label>
-            <input
-              id="costo"
-              type="number"
-              placeholder="Ej. 10000"
-              className="mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
           {/* Sección para agregar la lista de valores */}
           <div className="md:col-span-2 border-t pt-4">
             <h2 className="text-xl font-semibold mb-2">Agregar Valores</h2>

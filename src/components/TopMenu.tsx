@@ -33,6 +33,20 @@ const TopMenu: React.FC = () => {
     navigate("/");
   };
 
+  const handleVerPerfil = () => {
+    // Navega a la página de perfil
+    console.log("Ver perfil");
+    setIsOpen(false);
+    navigate("/profile");
+  };
+
+  const handleCambiarContrasena = () => {
+    // Navega a la página para cambiar contraseña
+    console.log("Cambiar contraseña");
+    setIsOpen(false);
+    navigate("/change-password");
+  };
+
   return (
     <header className="w-full h-20 bg-white border-b border-gray-300 flex items-center px-6 text-black drop-shadow-md">
       {/* Sección Izquierda: Logo y Título */}
@@ -56,6 +70,18 @@ const TopMenu: React.FC = () => {
         {isOpen && (
           <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded shadow-md">
             <ul className="py-1">
+              <li
+                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                onClick={handleVerPerfil}
+              >
+                Ver perfil
+              </li>
+              <li
+                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                onClick={handleCambiarContrasena}
+              >
+                Cambiar contraseña
+              </li>
               <li
                 className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                 onClick={handleLogout}
