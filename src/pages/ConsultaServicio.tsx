@@ -1,6 +1,5 @@
 import React from "react";
-import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
+import * as XLSX from "xlsx";
 
 interface Servicio {
   id: string; // ODV
@@ -44,36 +43,61 @@ const servicio: Servicio = {
 };
 
 const ConsultaServicio: React.FC = () => {
-  const handleDownloadPDF = async () => {
-    const element = document.getElementById("informe");
-    if (!element) return;
+  // Función para generar y descargar el Excel
+  const handleDownloadExcel = () => {
+    // Definimos la matriz de datos con encabezados y en el orden deseado
+    const data = [
+      ["Campo", "Valor"],
+      ["ODV", servicio.id],
+      ["Cliente", servicio.cliente],
+      ["Origen", servicio.origen],
+      ["Destino", servicio.destino],
+      ["Fecha", servicio.fecha],
+      ["Tipo", servicio.tipo],
+      ["Estado", servicio.estado],
+      ["Zona (destino de la carga)", servicio.zona],
+      ["Zona portuaria (Puerto involucrado)", servicio.zonaPortuaria],
+      ["PAIS (Procedencia o destino carga)", servicio.pais],
+      ["Naviera (nombre naviera)", servicio.naviera],
+      ["Nave (Nombre nave)", servicio.nave],
+      ["TIPO (Tipo contenedor)", servicio.tipoContenedor],
+      ["Contenedor Bulto (ID Contenedor)", servicio.contenedorBulto],
+      ["Sello (Sello contenedor)", servicio.sello],
+      ["Producto (Tipo Producto)", servicio.producto],
+      ["Observación", servicio.observacion],
+    ];
 
-    try {
-      // Capturamos el contenedor "informe" y forzamos el fondo blanco
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-      });
-      const imgData = canvas.toDataURL("image/png");
+    // Convertimos la matriz a una hoja de cálculo
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
 
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-      pdf.save("informe_servicio.pdf");
-    } catch (error) {
-      console.error("Error al generar el PDF:", error);
+    // Aplicamos un estilo al encabezado (primera fila) para que tenga fondo amarillo.
+    // Nota: El soporte de estilos puede variar según el entorno y la versión de SheetJS.
+    if (worksheet["A1"]) {
+      worksheet["A1"].s = { fill: { fgColor: { rgb: "FFFF00" } } };
     }
+    if (worksheet["B1"]) {
+      worksheet["B1"].s = { fill: { fgColor: { rgb: "FFFF00" } } };
+    }
+
+    // Creamos un libro de trabajo y agregamos la hoja
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Servicio");
+
+    // Escribimos el archivo Excel, activando el soporte para estilos
+    XLSX.writeFile(workbook, "informe_servicio.xlsx", {
+      bookType: "xlsx",
+      cellStyles: true,
+    });
   };
 
   return (
-    <div className="min-h-screen bg-white p-6">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen min-w-max rounded-2xl drop-shadow-sm bg-white p-6">
+      <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-center mb-8">
           Consulta de Servicio
         </h1>
-        {/* Contenedor de datos a exportar */}
-        <div id="informe" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Contenedor de datos organizados en un grid responsive */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 justify-items-stretch">
           <div className="border-b border-gray-300 pb-2">
             <p className="text-sm font-semibold text-gray-600">ODV:</p>
             <p className="text-lg text-gray-800">{servicio.id}</p>
@@ -161,13 +185,13 @@ const ConsultaServicio: React.FC = () => {
             <p className="text-lg text-gray-800">{servicio.observacion}</p>
           </div>
         </div>
-        {/* Botón para descargar el informe como PDF */}
+        {/* Botón para descargar el informe en Excel */}
         <div className="mt-8 text-center">
           <button
-            onClick={handleDownloadPDF}
-            className="px-6 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            onClick={handleDownloadExcel}
+            className="px-6 py-3 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
           >
-            Descargar Informe
+            Descargar Informe en Excel
           </button>
         </div>
       </div>
