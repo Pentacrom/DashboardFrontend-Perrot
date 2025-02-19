@@ -51,13 +51,11 @@ const Sidebar: React.FC = () => {
               </NavLink>
             </li>
             <li>
-              <NavLink to="/servicios-pendientes" className={linkClasses}>
+              <NavLink
+                to="/comercial/servicios-pendientes"
+                className={linkClasses}
+              >
                 <span>Servicios pendientes</span>
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/completar-servicio" className={linkClasses}>
-                <span>Completar servicio</span>
               </NavLink>
             </li>
           </ul>
@@ -88,6 +86,14 @@ const Sidebar: React.FC = () => {
             Operaciones
           </h2>
           <ul className="mt-2 ml-4">
+            <li>
+              <NavLink
+                to="/operaciones/servicios-pendientes"
+                className={linkClasses}
+              >
+                <span>Servicios pendientes</span>
+              </NavLink>
+            </li>
             <li>
               <NavLink to="/completar-entrega" className={linkClasses}>
                 <span>Completar datos de entrega</span>

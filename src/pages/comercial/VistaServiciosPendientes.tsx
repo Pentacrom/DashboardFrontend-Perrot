@@ -1,13 +1,13 @@
-// VistaServiciosTest.tsx
+// VistaServiciosPendientes.tsx
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import ListWithSearch, {
   Column,
   SearchFilter,
   CheckboxFilterGroup,
-} from "../components/ListWithSearch";
-import { estadoStyles, badgeTextColor } from "../config/estadoConfig";
+  DropdownOption,
+} from "../../components/ListWithSearch";
 
-// Definición del tipo Service
 interface Service {
   id: string;
   cliente: string;
@@ -15,10 +15,8 @@ interface Service {
   destino: string;
   fecha: string;
   tipo: string;
-  estado: string;
 }
 
-// Datos de ejemplo
 const services: Service[] = [
   {
     id: "001",
@@ -27,7 +25,6 @@ const services: Service[] = [
     destino: "Valparaíso",
     fecha: "2025-02-10",
     tipo: "Transporte",
-    estado: "por procesar",
   },
   {
     id: "002",
@@ -36,7 +33,6 @@ const services: Service[] = [
     destino: "Antofagasta",
     fecha: "2025-02-11",
     tipo: "Entrega express",
-    estado: "en proceso",
   },
   {
     id: "003",
@@ -45,38 +41,9 @@ const services: Service[] = [
     destino: "La Serena",
     fecha: "2025-02-12",
     tipo: "Almacenaje",
-    estado: "por facturar",
-  },
-  {
-    id: "004",
-    cliente: "Empresa D",
-    origen: "Iquique",
-    destino: "Arica",
-    fecha: "2025-02-13",
-    tipo: "Transporte",
-    estado: "facturado",
-  },
-  {
-    id: "005",
-    cliente: "Empresa E",
-    origen: "Antofagasta",
-    destino: "Rancagua",
-    fecha: "2025-02-14",
-    tipo: "Logística",
-    estado: "completado",
-  },
-  {
-    id: "006",
-    cliente: "Empresa F",
-    origen: "Puerto Montt",
-    destino: "Osorno",
-    fecha: "2025-02-15",
-    tipo: "Entrega regular",
-    estado: "cancelado",
   },
 ];
 
-// Definición de columnas
 const columns: Column<Service>[] = [
   { label: "ODV", key: "id", sortable: true },
   { label: "Cliente", key: "cliente", sortable: true },
@@ -84,10 +51,8 @@ const columns: Column<Service>[] = [
   { label: "Destino", key: "destino", sortable: true },
   { label: "Fecha", key: "fecha", sortable: true },
   { label: "Tipo", key: "tipo", sortable: true },
-  { label: "Estado", key: "estado", sortable: true },
 ];
 
-// Filtros de búsqueda
 const searchFilters: SearchFilter<Service>[] = [
   { label: "ODV", key: "id", type: "text", placeholder: "Ingrese ODV" },
   {
@@ -96,43 +61,39 @@ const searchFilters: SearchFilter<Service>[] = [
     type: "text",
     placeholder: "Ingrese Cliente",
   },
-  { label: "Fecha Desde", key: "fecha", type: "date" , comparator: "gte"},
+  { label: "Fecha Desde", key: "fecha", type: "date", comparator: "gte" },
   { label: "Fecha Hasta", key: "fecha", type: "date", comparator: "lte" },
 ];
 
-// Filtro de checkbox para el campo "estado"
+
 const checkboxFilterGroups: CheckboxFilterGroup<Service>[] = [
-  {
-    label: "Estados",
-    key: "estado",
-    options: [
-      "por procesar",
-      "en proceso",
-      "por facturar",
-      "facturado",
-      "completado",
-      "cancelado",
-    ],
-  },
+  // Puedes agregar grupos de filtros si lo necesitas, o dejarlo vacío.
 ];
 
-const VistaServiciosTest: React.FC = () => {
+const VistaServiciosPendientes: React.FC = () => {
+  const navigate = useNavigate();
+
+  // Opción del dropdown para cada fila: Completar servicio
+  const dropdownOptions: DropdownOption<Service>[] = [
+    {
+      label: "Completar servicio",
+      onClick: (service) => {
+        navigate("/completar-servicio", { state: { service } });
+      },
+    },
+  ];
+
   return (
     <ListWithSearch<Service>
       data={services}
       columns={columns}
       searchFilters={searchFilters}
       checkboxFilterGroups={checkboxFilterGroups}
+      dropdownOptions={dropdownOptions}
       onDownloadExcel={() => alert("Descarga de Excel (stub)")}
-      // Modo "row": se aplica el color a toda la fila según el estado
-      colorConfig={{
-        field: "estado",
-        bgMapping: estadoStyles,
-        textMapping: badgeTextColor,
-        mode: "row",
-      }}
+      onSearch={() => alert("Buscar (stub)")}
     />
   );
 };
 
-export default VistaServiciosTest;
+export default VistaServiciosPendientes;

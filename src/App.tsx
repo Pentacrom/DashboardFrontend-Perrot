@@ -7,6 +7,8 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import HomePage from './pages/HomePage';
 import IngresoServicio from "./pages/IngresoServicio";
 import VistaServiciosPendientes from "./pages/VistaServiciosPendientes";
+import ServiciosPendientesComercial from "./pages/comercial/VistaServiciosPendientes";
+import ServiciosPendientesOperacion from "./pages/operaciones/VistaServiciosPendientes";
 import CompletarEntrega from "./pages/CompletarEntrega";
 import ValorizarServicio from "./pages/ValorizarServicio";
 import ServiciosPorFacturar from "./pages/ServiciosPorFacturar";
@@ -50,6 +52,14 @@ function App() {
                       <Route
                         path="/servicios-pendientes"
                         element={<VistaServiciosPendientes />}
+                      />
+                      <Route
+                        path="/comercial/servicios-pendientes"
+                        element={<ServiciosPendientesComercial />}
+                      />
+                      <Route
+                        path="/operaciones/servicios-pendientes"
+                        element={<ServiciosPendientesOperacion />}
                       />
                       <Route
                         path="/completar-entrega"

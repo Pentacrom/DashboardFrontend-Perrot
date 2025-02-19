@@ -1,36 +1,84 @@
-import React from 'react';
+// IngresoServicio.tsx
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import ListWithSearch, {
+  Column,
+  DropdownOption,
+} from "../components/ListWithSearch";
+
+interface Service {
+  id: string;
+  cliente: string;
+  origen: string;
+  destino: string;
+  fecha: string;
+  tipo: string;
+}
+
+const createdServices: Service[] = [
+  {
+    id: "001",
+    cliente: "Empresa A",
+    origen: "Santiago",
+    destino: "Valparaíso",
+    fecha: "2025-02-10",
+    tipo: "Transporte",
+  },
+  {
+    id: "002",
+    cliente: "Empresa B",
+    origen: "Concepción",
+    destino: "Antofagasta",
+    fecha: "2025-02-11",
+    tipo: "Entrega express",
+  },
+  {
+    id: "003",
+    cliente: "Empresa C",
+    origen: "Temuco",
+    destino: "La Serena",
+    fecha: "2025-02-12",
+    tipo: "Almacenaje",
+  },
+];
+
+const columns: Column<Service>[] = [
+  { label: "ODV", key: "id", sortable: true },
+  { label: "Cliente", key: "cliente", sortable: true },
+  { label: "Origen", key: "origen", sortable: true },
+  { label: "Destino", key: "destino", sortable: true },
+  { label: "Fecha", key: "fecha", sortable: true },
+  { label: "Tipo", key: "tipo", sortable: true },
+];
 
 const IngresoServicio: React.FC = () => {
+  const navigate = useNavigate();
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Aquí podrías implementar la lógica de envío
+    // Implementa aquí la lógica para enviar el servicio ingresado.
   };
+
+  // Opción para el dropdown en cada fila: Completar servicio
+  const dropdownOptions: DropdownOption<Service>[] = [
+    {
+      label: "Completar servicio",
+      onClick: (service) => {
+        navigate("/completar-servicio", { state: { service } });
+      },
+    },
+  ];
 
   return (
     <div className="p-6">
-      {/* Título de la página */}
       <h1 className="text-2xl font-bold mb-4">Ingreso de Servicios</h1>
 
-      {/* Formulario de Ingreso de Servicios */}
+      {/* Formulario de Ingreso */}
       <form
         onSubmit={handleSubmit}
         className="bg-white p-6 rounded shadow mb-8"
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label
-              htmlFor="serviceNumber"
-              className="block text-sm font-medium text-gray-700"
-            >
-              ODV
-            </label>
-            <input
-              id="serviceNumber"
-              type="text"
-              placeholder="Ej. 001"
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
           <div>
             <label
               htmlFor="client"
@@ -113,60 +161,18 @@ const IngresoServicio: React.FC = () => {
         </div>
       </form>
 
-      {/* Vista de Servicios Creados (Datos de ejemplo) */}
-      <h2 className="text-xl font-bold mb-4">Servicios Creados</h2>
-      <div className="bg-white p-6 rounded shadow overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead>
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                ODV
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Cliente
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Origen
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Destino
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Fecha
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Tipo
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            <tr>
-              <td className="px-6 py-4 whitespace-nowrap">001</td>
-              <td className="px-6 py-4 whitespace-nowrap">Empresa A</td>
-              <td className="px-6 py-4 whitespace-nowrap">Santiago</td>
-              <td className="px-6 py-4 whitespace-nowrap">Valparaíso</td>
-              <td className="px-6 py-4 whitespace-nowrap">2025-02-10</td>
-              <td className="px-6 py-4 whitespace-nowrap">Transporte</td>
-            </tr>
-            <tr>
-              <td className="px-6 py-4 whitespace-nowrap">002</td>
-              <td className="px-6 py-4 whitespace-nowrap">Empresa B</td>
-              <td className="px-6 py-4 whitespace-nowrap">Concepción</td>
-              <td className="px-6 py-4 whitespace-nowrap">Antofagasta</td>
-              <td className="px-6 py-4 whitespace-nowrap">2025-02-11</td>
-              <td className="px-6 py-4 whitespace-nowrap">Entrega express</td>
-            </tr>
-            <tr>
-              <td className="px-6 py-4 whitespace-nowrap">003</td>
-              <td className="px-6 py-4 whitespace-nowrap">Empresa C</td>
-              <td className="px-6 py-4 whitespace-nowrap">Temuco</td>
-              <td className="px-6 py-4 whitespace-nowrap">La Serena</td>
-              <td className="px-6 py-4 whitespace-nowrap">2025-02-12</td>
-              <td className="px-6 py-4 whitespace-nowrap">Almacenaje</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      {/* Título para la lista */}
+      <h2 className="text-xl font-bold mb-4 text-center">Servicios Creados</h2>
+      {/* Lista sin filtros (los arrays se pasan vacíos) */}
+      <ListWithSearch<Service>
+        data={createdServices}
+        columns={columns}
+        searchFilters={[]}
+        checkboxFilterGroups={[]}
+        dropdownOptions={dropdownOptions}
+        onDownloadExcel={() => alert("Descarga de Excel (stub)")}
+        onSearch={() => alert("Buscar (stub)")}
+      />
     </div>
   );
 };
