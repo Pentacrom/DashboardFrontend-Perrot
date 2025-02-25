@@ -1,4 +1,5 @@
 import React from "react";
+import { useSearchParams, Link } from "react-router-dom";
 
 interface Servicio {
   id: string; // ODV
@@ -41,14 +42,16 @@ const servicio: Servicio = {
   observacion: "Servicio urgente. Se requiere entrega rápida.",
 };
 
-const ConsultaServicio: React.FC = () => {
-  // Función para generar y descargar el Excel
+const DetalleServicio: React.FC = () => {
+  // Usamos useSearchParams para leer el parámetro "facturable"
+  const [searchParams] = useSearchParams();
+  const isFacturable = searchParams.get("facturable") === "true";
 
   return (
     <div className="min-h-screen min-w-max rounded-2xl drop-shadow-sm bg-white p-6">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-center mb-8">
-          Consulta de Servicio
+          Detalle de Servicio
         </h1>
         {/* Contenedor de datos organizados en un grid responsive */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 justify-items-stretch">
@@ -139,9 +142,19 @@ const ConsultaServicio: React.FC = () => {
             <p className="text-lg text-gray-800">{servicio.observacion}</p>
           </div>
         </div>
+        {isFacturable && (
+          <div className="mt-6 text-center">
+            <Link
+              to={`/facturar-servicio`}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            >
+              Facturar Servicio
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-export default ConsultaServicio;
+export default DetalleServicio;

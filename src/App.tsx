@@ -5,7 +5,8 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 // Páginas del dashboard
 import HomePage from './pages/HomePage';
-import IngresoServicio from "./pages/IngresoServicio";
+import IngresoServicioCliente from "./pages/cliente/IngresoServicio";
+import IngresoServicioComercial from "./pages/comercial/IngresoServicio";
 import VistaServiciosPendientes from "./pages/VistaServiciosPendientes";
 import ServiciosPendientesComercial from "./pages/comercial/VistaServiciosPendientes";
 import ServiciosPendientesOperacion from "./pages/operaciones/VistaServiciosPendientes";
@@ -13,10 +14,14 @@ import CompletarEntrega from "./pages/CompletarEntrega";
 import ValorizarServicio from "./pages/ValorizarServicio";
 import ServiciosPorFacturar from "./pages/ServiciosPorFacturar";
 import CompletarServicio from "./pages/CompletarServicio";
-import VistaServicios from "./pages/VistaServicios";
+import VistaServicios from "./pages/torreDeControl/VistaServicios";
 import VistaServiciosTest from "./pages/VistaServiciosTest";
-import ConsultaServicio from "./pages/ConsultaServicio";
+import DetalleServicio from "./pages/DetalleServicio";
 import InformeServicio from "./pages/InformeServicios"
+import FacturarServicio from "./pages/FacturarServicio";
+import ModificarServicio from "./pages/ModificarServicio";
+import NuevoServicio from "./pages/NuevoServicio";
+
 // Página de inicio de sesión
 import InicioSesion from "./pages/InicioSesion";
 
@@ -40,8 +45,12 @@ function App() {
                     <Routes>
                       <Route path="/home" element={<HomePage />} />
                       <Route
-                        path="/ingresoServicios"
-                        element={<IngresoServicio />}
+                        path="/cliente/ingresoServicios"
+                        element={<IngresoServicioCliente />}
+                      />
+                      <Route
+                        path="/comercial/ingresoServicios"
+                        element={<IngresoServicioComercial />}
                       />
                       <Route path="/servicios" element={<VistaServicios />} />
                       <Route
@@ -79,12 +88,24 @@ function App() {
                       />
 
                       <Route
-                        path="/consulta-servicio"
-                        element={<ConsultaServicio />}
+                        path="/detalle-servicio"
+                        element={<DetalleServicio />}
                       />
                       <Route
                         path="/informe-servicio"
                         element={<InformeServicio />}
+                      />
+                      <Route
+                        path="/facturar-servicio"
+                        element={<FacturarServicio />}
+                      />
+                      <Route
+                        path="/modificar-servicio"
+                        element={<ModificarServicio />}
+                      />
+                      <Route
+                        path="/nuevo-servicio"
+                        element={<NuevoServicio />}
                       />
                     </Routes>
                   </main>

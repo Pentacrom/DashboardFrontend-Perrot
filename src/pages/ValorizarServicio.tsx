@@ -5,6 +5,7 @@ interface ValorItem {
   subitem: string;
   tipo: "venta" | "costo";
   valor: string;
+  observacion: string; // Nuevo campo
 }
 
 const itemsOptions: { [key: string]: string[] } = {
@@ -13,7 +14,6 @@ const itemsOptions: { [key: string]: string[] } = {
   "Servicios a la carga": ["Escolta", "Extracobertura", "Cuadrilla", "Grua"],
 };
 
-// Función para formatear el valor como moneda (pesos) con el signo $
 const formatPesos = (value: string): string => {
   const numberValue = parseFloat(value);
   if (isNaN(numberValue)) return "";
@@ -31,54 +31,43 @@ const ValorizarServicio: React.FC = () => {
     subitem: itemsOptions["Transporte"]?.[0] ?? "",
     tipo: "venta",
     valor: "",
+    observacion: "", // Inicializamos la observación
   });
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Aquí implementa la lógica para valorizar el servicio
     console.log("Servicio valorado");
     console.log("Valores:", valores);
   };
 
   const handleCurrentValorChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     if (name === "item") {
-      // Al cambiar el item, se actualiza el subitem por defecto
       setCurrentValor((prev) => ({
         ...prev,
         item: value,
-        subitem: itemsOptions[value]?.[0] ?? "", // Aseguramos que sea string
+        subitem: itemsOptions[value]?.[0] ?? "",
       }));
-    } else if (name === "subitem") {
+    } else {
       setCurrentValor((prev) => ({
         ...prev,
-        subitem: value,
-      }));
-    } else if (name === "tipo") {
-      setCurrentValor((prev) => ({
-        ...prev,
-        tipo: value as "venta" | "costo",
-      }));
-    } else if (name === "valor") {
-      setCurrentValor((prev) => ({
-        ...prev,
-        valor: value,
+        [name]: value,
       }));
     }
   };
 
   const handleAddValor = () => {
     if (currentValor.valor.trim() === "") {
-      // Se puede agregar una validación o mostrar un error si el valor está vacío
       return;
     }
     setValores((prev) => [...prev, currentValor]);
-    // Se resetea el campo "valor" para seguir agregando más elementos
+    // Reseteamos solo los campos de valor y observación para seguir agregando
     setCurrentValor((prev) => ({
       ...prev,
       valor: "",
+      observacion: "",
     }));
   };
 
@@ -103,7 +92,8 @@ const ValorizarServicio: React.FC = () => {
               id="numeroServicio"
               type="text"
               placeholder="Ej. 001"
-              className="mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className="mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-blue-500 disabled:bg-gray-200 focus:border-blue-500"
+              disabled
             />
           </div>
           {/* Cliente */}
@@ -122,7 +112,7 @@ const ValorizarServicio: React.FC = () => {
             />
           </div>
           {/* Sección para agregar la lista de valores */}
-          <div className="md:col-span-2 border-t pt-4">
+          <div className="md:col-span-2 border-t border-b border-gray-200 py-4">
             <h2 className="text-xl font-semibold mb-2">Agregar Valores</h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
               {/* Select de Item */}
@@ -217,6 +207,24 @@ const ValorizarServicio: React.FC = () => {
                   className="mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
+              {/* Input de Observación (por cada valor agregado) */}
+              <div className="md:col-span-4">
+                <label
+                  htmlFor="observacion"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Observación
+                </label>
+                <textarea
+                  id="observacion"
+                  name="observacion"
+                  placeholder="Observación para este valor"
+                  value={currentValor.observacion}
+                  onChange={handleCurrentValorChange}
+                  className="mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  rows={2}
+                ></textarea>
+              </div>
             </div>
             <div className="mt-4">
               <button
@@ -232,21 +240,25 @@ const ValorizarServicio: React.FC = () => {
                 <h3 className="text-lg font-medium">Valores Agregados</h3>
                 <ul className="mt-2">
                   {valores.map((valorItem, index) => (
-                    <li
-                      key={index}
-                      className="flex items-center justify-between p-2 border-b"
-                    >
-                      <span>
-                        {valorItem.item} - {valorItem.subitem} -{" "}
-                        {valorItem.tipo} - {formatPesos(valorItem.valor)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveValor(index)}
-                        className="text-white bg-red-600 hover:text-red-800"
-                      >
-                        Eliminar
-                      </button>
+                    <li key={index} className="flex flex-col p-2 border-b">
+                      <div className="flex items-center justify-between">
+                        <span>
+                          {valorItem.item} - {valorItem.subitem} -{" "}
+                          {valorItem.tipo} - {formatPesos(valorItem.valor)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveValor(index)}
+                          className="text-white bg-red-600 hover:text-red-800 px-2 py-1 rounded"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                      {valorItem.observacion && (
+                        <p className="text-sm italic mt-1">
+                          Observación: {valorItem.observacion}
+                        </p>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -254,24 +266,9 @@ const ValorizarServicio: React.FC = () => {
             )}
           </div>
 
-          {/* Campo Observación (antes "Descripción del Servicio") */}
-          <div className="md:col-span-2">
-            <label
-              htmlFor="observacion"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Observación
-            </label>
-            <textarea
-              id="observacion"
-              name="observacion"
-              placeholder="Detalles adicionales sobre el servicio"
-              className="mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              rows={4}
-            ></textarea>
-          </div>
+          {/* Si antes se usaba el textarea global para observaciones del servicio,
+              se elimina o se reutiliza según se requiera */}
         </div>
-        {/* Botón de envío */}
         <div className="mt-6">
           <button
             type="submit"

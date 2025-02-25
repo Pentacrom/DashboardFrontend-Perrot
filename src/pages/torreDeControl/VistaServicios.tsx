@@ -1,37 +1,13 @@
-// VistaServiciosPendientes.tsx
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import ListWithSearch, {
   Column,
   SearchFilter,
   CheckboxFilterGroup,
-  DropdownOption,
-  DropdownOptionsType,
 } from "../../components/ListWithSearch";
+import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
 
-// Actualiza los mapeos de colores para incluir los nuevos estados
-const updatedEstadoStyles: Record<string, string> = {
-  "por procesar": "bg-red-500",
-  "en proceso": "bg-purple-500",
-  "por facturar": "bg-orange-500",
-  facturado: "bg-blue-500",
-  completado: "bg-green-500",
-  cancelado: "bg-yellow-500",
-  "por valorizar": "bg-indigo-500",
-  "por completar": "bg-teal-500",
-};
-
-const updatedBadgeTextColor: Record<string, string> = {
-  "por procesar": "text-white",
-  "en proceso": "text-white",
-  "por facturar": "text-white",
-  facturado: "text-white",
-  completado: "text-white",
-  cancelado: "text-black",
-  "por valorizar": "text-white",
-  "por completar": "text-white",
-};
-
+// Definición del tipo Service
 interface Service {
   id: string;
   cliente: string;
@@ -42,6 +18,7 @@ interface Service {
   estado: string;
 }
 
+// Datos de ejemplo
 const services: Service[] = [
   {
     id: "001",
@@ -104,7 +81,7 @@ const services: Service[] = [
     destino: "Santiago",
     fecha: "2025-02-16",
     tipo: "Transporte",
-    estado: "por valorizar",
+    estado: "por procesar",
   },
   {
     id: "008",
@@ -113,7 +90,7 @@ const services: Service[] = [
     destino: "Concepción",
     fecha: "2025-02-17",
     tipo: "Almacenaje",
-    estado: "por completar",
+    estado: "en proceso",
   },
 ];
 
@@ -135,7 +112,7 @@ const searchFilters: SearchFilter<Service>[] = [
     type: "text",
     placeholder: "Ingrese Cliente",
   },
-  { label: "Fecha Desde", key: "fecha", type: "date", comparator: "gte" },
+  { label: "Fecha Desde", key: "fecha", type: "date" , comparator: "gte"},
   { label: "Fecha Hasta", key: "fecha", type: "date", comparator: "lte" },
 ];
 
@@ -150,39 +127,12 @@ const checkboxFilterGroups: CheckboxFilterGroup<Service>[] = [
       "facturado",
       "completado",
       "cancelado",
-      "por valorizar",
-      "por completar",
     ],
   },
 ];
 
-const VistaServiciosPendientes: React.FC = () => {
+const VistaServicios: React.FC = () => {
   const navigate = useNavigate();
-
-  // Función para obtener las opciones del dropdown para cada fila
-  const dropdownOptions = (service: Service): DropdownOption<Service>[] => {
-    const options: DropdownOption<Service>[] = [];
-    if (service.estado === "por valorizar") {
-      options.push({
-        label: "Valorizar servicio",
-        onClick: (service) =>
-          navigate("/valorizar-servicio", { state: { service } }),
-      });
-    } else if (service.estado === "por completar") {
-      options.push({
-        label: "Completar servicio",
-        onClick: (service) =>
-          navigate("/completar-servicio", { state: { service } }),
-      });
-    }
-    // Todas las filas tendrán también la opción "Ver detalle"
-    options.push({
-      label: "Ver detalle",
-      onClick: (service) =>
-        navigate("/detalle-servicio", { state: { service } }),
-    });
-    return options;
-  };
 
   return (
     <ListWithSearch<Service>
@@ -190,19 +140,27 @@ const VistaServiciosPendientes: React.FC = () => {
       columns={columns}
       searchFilters={searchFilters}
       checkboxFilterGroups={checkboxFilterGroups}
-      dropdownOptions={dropdownOptions as DropdownOptionsType<Service>}
       onDownloadExcel={() => alert("Descarga de Excel (stub)")}
-      onSearch={() => alert("Buscar (stub)")}
-      // Configuración de colores: se asignan colores a la celda "estado"
+      // Modo "cell": solo se colorea la celda del estado
       colorConfig={{
         field: "estado",
-        bgMapping: updatedEstadoStyles,
-        textMapping: updatedBadgeTextColor,
+        bgMapping: estadoStyles,
+        textMapping: badgeTextColor,
         mode: "cell",
       }}
-      filterTitle="Filtros de búsqueda"
+      // Dropdown con opción "Ver detalle" que navega a "/consulta-servicio"
+      dropdownOptions={[
+        {
+          label: "Ver detalle",
+          onClick: () => navigate("/detalle-servicio"),
+        },
+        {
+          label: "Agregar Seguimiento",
+          onClick: () => navigate("/agregar-seguimiento-servicio"),
+        },
+      ]}
     />
   );
 };
 
-export default VistaServiciosPendientes;
+export default VistaServicios;

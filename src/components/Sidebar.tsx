@@ -1,15 +1,15 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React from "react";
+import { NavLink } from "react-router-dom";
 import LogoPerrot from "../assets/perrot-logo.png";
 
 const Sidebar: React.FC = () => {
   // Función para definir las clases de cada enlace según si está activo.
   const linkClasses = ({ isActive }: { isActive: boolean }) =>
-    "flex items-center justify-between text-black py-1 rounded group cursor-pointer " +
+    "flex items-center justify-between text-black px-2 py-1 rounded group cursor-pointer " +
     (isActive ? "bg-gray-300" : "hover:bg-gray-200");
 
   return (
-    <aside className="w-64 h-screen text-black bg-white flex flex-col z-2">
+    <aside className="w-72 h-screen text-black bg-white flex flex-col z-2">
       {/* Logo en la parte superior */}
       <div className="h-20 flex justify-center bg-gray-100 border-b border-gray-300">
         <img
@@ -27,7 +27,7 @@ const Sidebar: React.FC = () => {
           </h2>
           <ul className="mt-2 ml-4">
             <li>
-              <NavLink to="/ingresoServicios" className={linkClasses}>
+              <NavLink to="/cliente/ingresoServicios" className={linkClasses}>
                 <span>Ingreso de servicios</span>
               </NavLink>
             </li>
@@ -46,7 +46,7 @@ const Sidebar: React.FC = () => {
           </h2>
           <ul className="mt-2 ml-4">
             <li>
-              <NavLink to="/ingresoServicios" className={linkClasses}>
+              <NavLink to="/comercial/ingresoServicios" className={linkClasses}>
                 <span>Ingreso de servicios</span>
               </NavLink>
             </li>
@@ -94,16 +94,6 @@ const Sidebar: React.FC = () => {
                 <span>Servicios pendientes</span>
               </NavLink>
             </li>
-            <li>
-              <NavLink to="/completar-entrega" className={linkClasses}>
-                <span>Completar datos de entrega</span>
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/valorizar-servicio" className={linkClasses}>
-                <span>Valorizar servicio</span>
-              </NavLink>
-            </li>
           </ul>
         </div>
 
@@ -122,11 +112,6 @@ const Sidebar: React.FC = () => {
         </div>
         <div className="mt-4 border-t border-gray-300 pt-1">
           <ul className="mt-2 ml-4">
-            <li>
-              <NavLink to="/consulta-servicio" className={linkClasses}>
-                <span>Consulta de servicio</span>
-              </NavLink>
-            </li>
             <li>
               <NavLink to="/informe-servicio" className={linkClasses}>
                 <span>Informe de servicio</span>

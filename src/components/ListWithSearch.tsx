@@ -1,11 +1,4 @@
-// ListWithSearch.tsx
-import {
-  useState,
-  useMemo,
-  useEffect,
-  useRef,
-  ChangeEvent,
-} from "react";
+import { useState, useMemo, useEffect, useRef, ChangeEvent } from "react";
 import ReactDOM from "react-dom";
 
 export interface Column<T> {
@@ -68,6 +61,12 @@ export interface ListWithSearchProps<T> {
   dropdownOptions?: DropdownOptionsType<T>;
   /** Título para la sección de filtros, se muestra centrado arriba */
   filterTitle?: string;
+  /** Título para la tabla */
+  tableTitle?: string;
+  /** Botón o elementos custom globales, se muestran encima de la tabla */
+  globalButtons?: React.ReactNode;
+  /** Función que recibe el item y retorna un array de botones custom (por fila) */
+  customButtons?: (item: T) => React.ReactNode[];
 }
 
 function ListWithSearch<T extends Record<string, any>>({
@@ -82,6 +81,9 @@ function ListWithSearch<T extends Record<string, any>>({
   colorConfig,
   dropdownOptions = [],
   filterTitle,
+  tableTitle,
+  globalButtons,
+  customButtons,
 }: ListWithSearchProps<T>) {
   // Estado para cada filtro de búsqueda (inputs de texto o fecha)
   const [searchValues, setSearchValues] = useState<Record<string, string>>(
@@ -255,7 +257,6 @@ function ListWithSearch<T extends Record<string, any>>({
     (searchFilters && searchFilters.length > 0) ||
     (checkboxFilterGroups && checkboxFilterGroups.length > 0);
 
-  // Determinar si la cabecera de acciones se debe mostrar: si al menos una fila tiene opciones.
   const headerDropdownVisible = data.some((item) => {
     const opts =
       typeof dropdownOptions === "function"
@@ -263,6 +264,8 @@ function ListWithSearch<T extends Record<string, any>>({
         : dropdownOptions;
     return opts && opts.length > 0;
   });
+  const customButtonsProvided = typeof customButtons === "function";
+  const extraColumnVisible = headerDropdownVisible || customButtonsProvided;
 
   return (
     <div className="p-6 relative">
@@ -363,6 +366,13 @@ function ListWithSearch<T extends Record<string, any>>({
         </div>
       )}
 
+      {tableTitle && (
+        <h3 className="text-lg font-bold mb-4 text-center">{tableTitle}</h3>
+      )}
+
+      {/* Render global custom buttons, si se proporcionan */}
+      {globalButtons && <div className="mb-4 text-right">{globalButtons}</div>}
+
       {colorConfig && (
         <div className="flex flex-wrap items-center mb-4">
           {Object.keys(colorConfig.bgMapping).map((key) => (
@@ -394,13 +404,13 @@ function ListWithSearch<T extends Record<string, any>>({
                   </th>
                 ))
                 .concat(
-                  headerDropdownVisible
+                  extraColumnVisible
                     ? [
                         <th
-                          key="dropdownActions"
+                          key="actions"
                           className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
                         >
-                          Opciones
+                          Acciones
                         </th>,
                       ]
                     : []
@@ -416,85 +426,106 @@ function ListWithSearch<T extends Record<string, any>>({
                 const textClass = colorConfig.textMapping[value] || "";
                 rowClass = `${bgClass} ${textClass}`;
               }
-              // Calculamos las opciones para la fila actual
               const rowOptions =
                 typeof dropdownOptions === "function"
                   ? dropdownOptions(item)
                   : dropdownOptions;
               return (
                 <tr key={idx} className={rowClass}>
-                  {columns.map((col) => (
-                    <td
-                      key={col.key as string}
-                      className="px-6 py-4 whitespace-nowrap"
-                    >
-                      {colorConfig &&
-                      colorConfig.mode === "cell" &&
-                      col.key === colorConfig.field ? (
-                        <span
-                          className={`${
-                            colorConfig.bgMapping[String(item[col.key])] || ""
-                          } ${
-                            colorConfig.textMapping[String(item[col.key])] || ""
-                          } px-2 inline-flex text-xs leading-5 font-semibold rounded-full`}
-                        >
-                          {String(item[col.key])}
-                        </span>
-                      ) : (
-                        String(item[col.key])
-                      )}
-                    </td>
-                  ))}
-                  {headerDropdownVisible && rowOptions.length > 0 && (
-                    <td className="px-6 py-4 whitespace-nowrap relative">
-                      <button
-                        ref={(el) => {
-                          dropdownButtonRefs.current[idx] = el;
-                        }}
-                        onClick={() =>
-                          setOpenDropdownRow((prev) =>
-                            prev === idx ? null : idx
-                          )
-                        }
-                        className="p-2 rounded hover:bg-gray-200"
+                  {columns
+                    .map((col) => (
+                      <td
+                        key={col.key as string}
+                        className="px-6 py-4 whitespace-nowrap"
                       >
-                        ⋮
-                      </button>
-                      {openDropdownRow === idx &&
-                        dropdownButtonRefs.current[idx] &&
-                        ReactDOM.createPortal(
-                          <div
-                            ref={dropdownRef}
-                            className="bg-white border rounded shadow-lg z-50 flex flex-col"
-                            style={{
-                              position: "fixed",
-                              top:
-                                dropdownButtonRefs.current[
-                                  idx
-                                ]!.getBoundingClientRect().bottom + 4,
-                              left: dropdownButtonRefs.current[
-                                idx
-                              ]!.getBoundingClientRect().left,
-                              width: "12rem",
-                            }}
+                        {colorConfig &&
+                        colorConfig.mode === "cell" &&
+                        col.key === colorConfig.field ? (
+                          <span
+                            className={`${
+                              colorConfig.bgMapping[String(item[col.key])] || ""
+                            } ${
+                              colorConfig.textMapping[String(item[col.key])] ||
+                              ""
+                            } px-2 inline-flex text-xs leading-5 font-semibold rounded-full`}
                           >
-                            {rowOptions.map((option, dIdx) => (
-                              <button
-                                key={dIdx}
-                                onClick={() => {
-                                  option.onClick(item!);
-                                  setOpenDropdownRow(null);
-                                }}
-                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                              >
-                                {option.label}
-                              </button>
-                            ))}
-                          </div>,
-                          document.body
+                            {String(item[col.key])}
+                          </span>
+                        ) : (
+                          String(item[col.key])
                         )}
-                    </td>
-                  )}
+                      </td>
+                    ))
+                    .concat(
+                      extraColumnVisible
+                        ? [
+                            <td
+                              key="actions"
+                              className="px-6 py-4 whitespace-nowrap relative"
+                            >
+                              {headerDropdownVisible &&
+                                rowOptions.length > 0 && (
+                                  <button
+                                    ref={(el) => {
+                                      dropdownButtonRefs.current[idx] = el;
+                                    }}
+                                    onClick={() =>
+                                      setOpenDropdownRow((prev) =>
+                                        prev === idx ? null : idx
+                                      )
+                                    }
+                                    className="p-2 rounded hover:bg-gray-200"
+                                  >
+                                    ⋮
+                                  </button>
+                                )}
+                              {customButtonsProvided &&
+                                customButtons(item).map((btn, index) => (
+                                  <span
+                                    key={index}
+                                    className="ml-2 inline-block"
+                                  >
+                                    {btn}
+                                  </span>
+                                ))}
+                              {headerDropdownVisible &&
+                                openDropdownRow === idx &&
+                                dropdownButtonRefs.current[idx] &&
+                                ReactDOM.createPortal(
+                                  <div
+                                    ref={dropdownRef}
+                                    className="bg-white border rounded shadow-lg z-50 flex flex-col"
+                                    style={{
+                                      position: "fixed",
+                                      top:
+                                        dropdownButtonRefs.current[
+                                          idx
+                                        ]!.getBoundingClientRect().bottom + 4,
+                                      left: dropdownButtonRefs.current[
+                                        idx
+                                      ]!.getBoundingClientRect().left,
+                                      width: "12rem",
+                                    }}
+                                  >
+                                    {rowOptions.map((option, dIdx) => (
+                                      <button
+                                        key={dIdx}
+                                        onClick={() => {
+                                          option.onClick(item!);
+                                          setOpenDropdownRow(null);
+                                        }}
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                      >
+                                        {option.label}
+                                      </button>
+                                    ))}
+                                  </div>,
+                                  document.body
+                                )}
+                            </td>,
+                          ]
+                        : []
+                    )}
                 </tr>
               );
             })}
@@ -502,7 +533,7 @@ function ListWithSearch<T extends Record<string, any>>({
               <tr>
                 <td
                   className="px-6 py-4 text-center text-gray-500"
-                  colSpan={columns.length + (headerDropdownVisible ? 1 : 0)}
+                  colSpan={columns.length + (extraColumnVisible ? 1 : 0)}
                 >
                   No se encontraron resultados.
                 </td>
