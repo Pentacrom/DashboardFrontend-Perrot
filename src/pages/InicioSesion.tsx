@@ -1,14 +1,74 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import LogoPerrot from '../assets/perrot-logo.png'; // Asegúrate de que la ruta sea correcta
+import React, { useState, useContext } from "react";
+import { useNavigate } from "react-router-dom";
+import LogoPerrot from "../assets/perrot-logo.png";
+import { AuthContext } from "../context/AuthContext"; // Ajusta la ruta según tu estructura
+
+// Usuarios de prueba
+const testUsers = [
+  {
+    username: "cliente",
+    password: "cliente123",
+    roles: ["cliente"],
+    userName: "Cliente Test",
+  },
+  {
+    username: "comercial",
+    password: "comercial123",
+    roles: ["comercial"],
+    userName: "Comercial Test",
+  },
+  {
+    username: "torre",
+    password: "torre123",
+    roles: ["torre de control"],
+    userName: "Torre Test",
+  },
+  {
+    username: "operaciones",
+    password: "operaciones123",
+    roles: ["operaciones"],
+    userName: "Operaciones Test",
+  },
+  {
+    username: "contabilidad",
+    password: "contabilidad123",
+    roles: ["contabilidad"],
+    userName: "Contabilidad Test",
+  },
+  {
+    username: "administracion",
+    password: "administracion123",
+    roles: ["administracion"],
+    userName: "Administracion Test",
+  },
+];
 
 const InicioSesion: React.FC = () => {
   const navigate = useNavigate();
+  const { setAuth } = useContext(AuthContext);
+
+  const [usuario, setUsuario] = useState("");
+  const [contrasena, setContrasena] = useState("");
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Sin validaciones, simplemente se redirige al dashboard (ruta "/")
-    navigate('/home');
+
+    const user = testUsers.find(
+      (u) => u.username === usuario && u.password === contrasena
+    );
+
+    if (user) {
+      // Actualizar el contexto con el perfil del usuario
+      setAuth({
+        hasAccess: true,
+        roles: user.roles,
+        userName: user.userName,
+      });
+      // Redirigir al dashboard o home
+      navigate("/home");
+    } else {
+      alert("Credenciales incorrectas");
+    }
   };
 
   return (
@@ -35,6 +95,8 @@ const InicioSesion: React.FC = () => {
               type="text"
               placeholder="Ingresa tu usuario"
               className="w-full p-2 border border-gray-300 rounded"
+              value={usuario}
+              onChange={(e) => setUsuario(e.target.value)}
             />
           </div>
           <div className="mb-4">
@@ -46,6 +108,8 @@ const InicioSesion: React.FC = () => {
               type="password"
               placeholder="Ingresa tu contraseña"
               className="w-full p-2 border border-gray-300 rounded"
+              value={contrasena}
+              onChange={(e) => setContrasena(e.target.value)}
             />
           </div>
           <button

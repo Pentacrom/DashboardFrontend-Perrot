@@ -41,7 +41,7 @@ const ServiciosPorFacturar: React.FC = () => {
   const navigate = useNavigate();
 
   // Función dropdownOptions que recibe el item y retorna una opción que incluye el parámetro facturable
-  const dropdownOptions = (item: Service) => [
+  const dropdownOptions = () => [
     {
       label: "Detalle",
       onClick: () => navigate(`/detalle-servicio?facturable=true`),

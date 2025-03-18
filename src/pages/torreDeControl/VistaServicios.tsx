@@ -146,7 +146,7 @@ const VistaServicios: React.FC = () => {
         field: "estado",
         bgMapping: estadoStyles,
         textMapping: badgeTextColor,
-        mode: "cell",
+        mode: "row",
       }}
       // Dropdown con opción "Ver detalle" que navega a "/consulta-servicio"
       dropdownOptions={[

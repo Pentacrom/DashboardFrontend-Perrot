@@ -1,11 +1,10 @@
-// VistaServiciosPendientes.tsx
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import ListWithSearch, {
   Column,
   SearchFilter,
   CheckboxFilterGroup,
-  DropdownOption,
+  DropdownOption
 } from "../components/ListWithSearch";
 
 interface Service {
