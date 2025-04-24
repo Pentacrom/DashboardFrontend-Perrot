@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ListWithSearch, {
   Column,
@@ -8,43 +8,23 @@ import ListWithSearch, {
 
 interface Service {
   id: string;
-  cliente: string;
+  // ya no necesitamos "cliente"
   origen: string;
   destino: string;
   fecha: string;
   tipo: string;
 }
 
-const initialServices: Service[] = [
-  {
-    id: "001",
-    cliente: "Empresa A",
-    origen: "Santiago",
-    destino: "Valparaíso",
-    fecha: "2025-02-10",
-    tipo: "Transporte",
-  },
-  {
-    id: "002",
-    cliente: "Empresa B",
-    origen: "Concepción",
-    destino: "Antofagasta",
-    fecha: "2025-02-11",
-    tipo: "Entrega express",
-  },
-  {
-    id: "003",
-    cliente: "Empresa C",
-    origen: "Temuco",
-    destino: "La Serena",
-    fecha: "2025-02-12",
-    tipo: "Almacenaje",
-  },
-];
+interface DatosCatalogo {
+  Operación: { codigo: number; nombre: string }[];
+  Zona: { codigo: number; nombre: string }[];
+  Zona_portuaria: { codigo: number; nombre: string }[];
+  Tipo_contenedor: { codigo: number; nombre: string }[];
+}
 
 const columns: Column<Service>[] = [
-  { label: "ODV", key: "id", sortable: true },
-  { label: "Cliente", key: "cliente", sortable: true },
+  { label: "ID", key: "id", sortable: true },
+  // cliente eliminado
   { label: "Origen", key: "origen", sortable: true },
   { label: "Destino", key: "destino", sortable: true },
   { label: "Fecha", key: "fecha", sortable: true },
@@ -52,18 +32,8 @@ const columns: Column<Service>[] = [
 ];
 
 const searchFilters: SearchFilter<Service>[] = [
-  {
-    label: "ODV",
-    key: "id",
-    type: "text",
-    placeholder: "Buscar ODV",
-  },
-  {
-    label: "Cliente",
-    key: "cliente",
-    type: "text",
-    placeholder: "Buscar cliente",
-  },
+  { label: "ID", key: "id", type: "text", placeholder: "Buscar ID" },
+  // filtro de cliente eliminado
   {
     label: "Origen",
     key: "origen",
@@ -80,15 +50,40 @@ const searchFilters: SearchFilter<Service>[] = [
 
 const IngresoServicio: React.FC = () => {
   const navigate = useNavigate();
-  const [services, setServices] = useState<Service[]>(initialServices);
+  const [services, setServices] = useState<Service[]>([]);
+  const [catalogo, setCatalogo] = useState<DatosCatalogo | null>(null);
+
+  useEffect(() => {
+    // opcional: cargar catálogo
+    fetch("/api/Tablas/Get-ingreso-servicio")
+      .then((res) => res.json())
+      .then((data: DatosCatalogo) => setCatalogo(data))
+      .catch((err) => console.error("Error cargando catálogo:", err));
+
+    // listar servicios
+    fetch("/api/Servicio/Servicios")
+      .then((res) => res.json())
+      .then((data: any[]) =>
+        setServices(
+          data.map((item) => ({
+            id: item.idSolicitud?.toString() ?? "",
+            // ahora origen = producto (antes lo poníamos en cliente)
+            origen: item.producto ?? "",
+            destino: item.nZonaPortuaria ?? "",
+            fecha: item.fechaSol ? item.fechaSol.slice(0, 10) : "",
+            tipo: item.nombreTipoOperacion ?? "",
+          }))
+        )
+      )
+      .catch((err) => console.error("Error listando servicios:", err));
+  }, []);
 
   const handleDeleteService = (id: string) => {
-    if (window.confirm(`¿Estás seguro de eliminar el servicio ${id}?`)) {
-      setServices((prev) => prev.filter((service) => service.id !== id));
+    if (window.confirm(`¿Eliminar servicio ${id}?`)) {
+      setServices((prev) => prev.filter((s) => s.id !== id));
     }
   };
 
-  // Opciones del dropdown para cada servicio.
   const dropdownOptions = (): DropdownOption<Service>[] => [
     {
       label: "Completar servicio",
