@@ -1,290 +1,356 @@
-import React, { useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
-const CompletarServicio: React.FC = () => {
-  const [formData, setFormData] = useState({
-    serviceId: "000001", // Valor por defecto, desactivado
-    zona: "",
-    zonaPortuaria: "",
-    pais: "",
-    naviera: "",
-    nave: "",
-    tipo: "",
-    contenedorBulto: "",
+interface Item {
+  codigo: number;
+  nombre: string;
+}
+interface Catalogos {
+  Operación: Item[];
+  Zona: Item[];
+  Zona_portuaria: Item[];
+  Tipo_contenedor: Item[];
+  acciones: Item[];
+  empresas: Item[];
+}
+interface Centro {
+  codigo: number;
+  nombre: string;
+  cliente: number;
+}
+type Punto = {
+  idLugar: number;
+  accion: number;
+  estado: number;
+  eta: string;
+};
+
+const mockCatalogos: Catalogos = {
+  Operación: [
+    { codigo: 1, nombre: "EXPORTACIÓN" },
+    { codigo: 2, nombre: "IMPORTACIÓN" },
+    { codigo: 3, nombre: "NACIONAL" },
+    { codigo: 4, nombre: "TRENADA" },
+    { codigo: 5, nombre: "REUTILIZACIÓN" },
+    { codigo: 6, nombre: "RETORNO" },
+    { codigo: 7, nombre: "LOCAL" },
+  ],
+  Zona: [
+    { codigo: 1, nombre: "SUR" },
+    { codigo: 2, nombre: "CENTRO" },
+    { codigo: 3, nombre: "NORTE" },
+  ],
+  Zona_portuaria: [
+    { codigo: 1, nombre: "SAI" },
+    { codigo: 2, nombre: "VAP" },
+    { codigo: 3, nombre: "CNL" },
+    { codigo: 4, nombre: "LQN" },
+    { codigo: 5, nombre: "SVE" },
+    { codigo: 6, nombre: "SCL" },
+  ],
+  Tipo_contenedor: [
+    { codigo: 1, nombre: "20 DV" },
+    { codigo: 2, nombre: "20 FR" },
+    { codigo: 3, nombre: "20 OT" },
+    { codigo: 4, nombre: "20 RF" },
+    { codigo: 5, nombre: "40 DV" },
+    { codigo: 6, nombre: "40 FR" },
+    { codigo: 7, nombre: "40 HC" },
+    { codigo: 8, nombre: "40 NOR" },
+    { codigo: 9, nombre: "40 OT" },
+    { codigo: 10, nombre: "40 RF" },
+    { codigo: 11, nombre: "LCL / MAQUINARIA" },
+  ],
+  acciones: [
+    { codigo: 1, nombre: "retirar container vacío" },
+    { codigo: 2, nombre: "retirar container cargado" },
+    { codigo: 3, nombre: "dejar container vacío" },
+    { codigo: 4, nombre: "dejar container cargado" },
+    { codigo: 5, nombre: "almacenar contenido" },
+    { codigo: 6, nombre: "llenar container" },
+    { codigo: 7, nombre: "vaciar container" },
+  ],
+  empresas: [
+    { codigo: 1, nombre: "Perrot1" },
+    { codigo: 2, nombre: "Perrot2" },
+  ],
+};
+
+const mockCentros: Centro[] = [
+  { codigo: 1, nombre: "Centro A", cliente: 1 },
+  { codigo: 2, nombre: "Centro B", cliente: 1 },
+  { codigo: 3, nombre: "Centro C", cliente: 2 },
+  { codigo: 4, nombre: "Centro D", cliente: 2 },
+];
+
+const mockPaises: Item[] = [
+  { codigo: 1, nombre: "Chile" },
+  { codigo: 2, nombre: "Argentina" },
+  { codigo: 3, nombre: "Perú" },
+];
+
+const STORAGE = {
+  enviados: "serviciosEnviados",
+  borradores: "serviciosBorradores",
+};
+
+interface Payload {
+  id: number;
+  form: any;
+  puntos: Punto[];
+  enviado?: boolean;
+}
+
+const ModificarServicio: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const [form, setForm] = useState<any>({
+    cliente: 0,
+    tipoOperacion: 0,
+    origen: 0,
+    destino: 0,
+    pais: 0,
+    fechaSol: "",
+    tipoContenedor: 0,
+    zonaPortuaria: 0,
+    kilos: 0,
+    precioCarga: 0,
+    temperatura: 0,
+    idCCosto: 0,
+    guia: "",
+    tarjeton: "",
+    maquina: "",
     sello: "",
-    producto: "",
+    nave: 0,
     observacion: "",
+    interchange: "",
+    rcNoDevolucion: 0,
+    odv: "",
+    documentoPorContenedor: "",
   });
+  const [puntos, setPuntos] = useState<Punto[]>([]);
 
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
-  ) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  useEffect(() => {
+    // cargar todos los guardados
+    const arr: Payload[] = [
+      ...JSON.parse(localStorage.getItem(STORAGE.enviados) || "[]"),
+      ...JSON.parse(localStorage.getItem(STORAGE.borradores) || "[]"),
+    ];
+    const payload = arr.find(p => p.id.toString() === id);
+    if (!payload) {
+      alert("Servicio no encontrado");
+      navigate(-1);
+      return;
+    }
+    setForm(payload.form);
+    setPuntos(payload.puntos);
+  }, [id, navigate]);
+
+  const upd = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const val = e.target.type === "number" ? Number(e.target.value) : e.target.value;
+    setForm({ ...form, [k]: val });
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const opt = (arr: Item[]) =>
+    arr.map(i => (
+      <option key={i.codigo} value={i.codigo}>
+        {i.nombre}
+      </option>
+    ));
+
+  const centrosFiltrados = mockCentros.filter(c => c.cliente === form.cliente);
+  const origenOptions = form.tipoOperacion === 2 ? mockCatalogos.Zona_portuaria : form.tipoOperacion === 1 ? centrosFiltrados : [];
+  const destinoOptions = form.tipoOperacion === 1 ? mockCatalogos.Zona_portuaria : form.tipoOperacion === 2 ? centrosFiltrados : [];
+
+  const addPunto = () =>
+    setPuntos([...puntos, { idLugar: 0, accion: 0, estado: 1, eta: "" }]);
+  const updatePunto = (idx: number, key: keyof Punto, val: any) =>
+    setPuntos(puntos.map((p, i) => (i === idx ? { ...p, [key]: val } : p)));
+  const removePunto = (idx: number) => setPuntos(puntos.filter((_, i) => i !== idx));
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) setForm({ ...form, documentoPorContenedor: `/uploads/${f.name}` });
+  };
+
+  const handleUpdate = (e: React.FormEvent) => {
     e.preventDefault();
-    // Aquí podrías implementar la lógica de envío de datos
-    console.log("Datos enviados:", formData);
+    if (!formRef.current?.checkValidity()) {
+      formRef.current.reportValidity();
+      return;
+    }
+    const updateStorage = (key: keyof typeof STORAGE) => {
+      const list: Payload[] = JSON.parse(localStorage.getItem(STORAGE[key]) || "[]");
+      const idx = list.findIndex(p => p.id.toString() === id);
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], form, puntos };
+        localStorage.setItem(STORAGE[key], JSON.stringify(list));
+      }
+    };
+    updateStorage("enviados");
+    updateStorage("borradores");
+    alert("Servicio actualizado");
+    navigate("/comercial/ingresoServicios");
   };
 
   return (
     <div className="p-6">
-      {/* Título de la página */}
-      <h1 className="text-2xl font-bold mb-4">Completar Servicio</h1>
-
-      {/* Formulario de Completar Servicio */}
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white p-6 rounded shadow mb-8"
-      >
-        {/* Grid responsive: 1 columna en móviles, 2 en md y 3 en lg */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Campo: ID del Servicio (desactivado, valor por defecto) */}
-          <div className="lg:col-span-3">
-            <label
-              htmlFor="serviceId"
-              className="block text-sm font-medium text-gray-700"
-            >
-              ODV
-            </label>
-            <input
-              id="serviceId"
-              name="serviceId"
-              type="text"
-              value={formData.serviceId}
-              disabled
-              className="mt-1 block w-full border-gray-300 bg-gray-100 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          {/* Campo: Zona (destino de la carga) */}
+      <h1 className="text-2xl font-bold mb-2">Completar servicio #{id}</h1>
+      <form ref={formRef} onSubmit={handleUpdate} className="space-y-6 bg-white p-6 shadow rounded">
+        {/* Cliente y Operación */}
+        <div className="grid md:grid-cols-2 gap-4">
           <div>
-            <label
-              htmlFor="zona"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Zona (destino de la carga)
-            </label>
-            <select
-              id="zona"
-              name="zona"
-              value={formData.zona}
-              onChange={handleChange}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-              required
-            >
-              <option value="">Seleccione una zona</option>
-              <option value="Norte">Norte</option>
-              <option value="Sur">Sur</option>
-              <option value="Centro">Centro</option>
+            <label className="block text-sm font-medium">Cliente *</label>
+            <select className="input" value={form.cliente} onChange={upd("cliente")} >
+              <option value={0}>—</option>
+              {opt(mockCatalogos.empresas)}
             </select>
           </div>
-
-          {/* Campo: Zona portuaria (Puerto involucrado) */}
           <div>
-            <label
-              htmlFor="zonaPortuaria"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Zona portuaria (Puerto involucrado)
-            </label>
-            <select
-              id="zonaPortuaria"
-              name="zonaPortuaria"
-              value={formData.zonaPortuaria}
-              onChange={handleChange}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-              required
-            >
-              <option value="">Seleccione un puerto</option>
-              <option value="LQN">LQN</option>
-              <option value="SAI">SAI</option>
-              <option value="VAP">VAP</option>
-              <option value="SVE">SVE</option>
+            <label className="block text-sm font-medium">Tipo de operación *</label>
+            <select className="input" value={form.tipoOperacion} onChange={upd("tipoOperacion")} >
+              <option value={0}>—</option>
+              {opt(mockCatalogos.Operación)}
             </select>
-          </div>
-
-          {/* Campo: PAIS (Procedencia o destino carga) */}
-          <div>
-            <label
-              htmlFor="pais"
-              className="block text-sm font-medium text-gray-700"
-            >
-              PAIS (Procedencia o destino carga)
-            </label>
-            <input
-              id="pais"
-              name="pais"
-              type="text"
-              value={formData.pais}
-              onChange={handleChange}
-              placeholder="Ingrese el país"
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-              required
-            />
-          </div>
-
-          {/* Campo: Naviera (nombre naviera) */}
-          <div>
-            <label
-              htmlFor="naviera"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Naviera (nombre naviera)
-            </label>
-            <select
-              id="naviera"
-              name="naviera"
-              value={formData.naviera}
-              onChange={handleChange}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-              required
-            >
-              <option value="">Seleccione una naviera</option>
-              <option value="MSC">MSC</option>
-              <option value="CMA CGM">CMA CGM</option>
-              <option value="MAERSK">MAERSK</option>
-            </select>
-          </div>
-
-          {/* Campo: Nave (Nombre nave) */}
-          <div>
-            <label
-              htmlFor="nave"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Nave (Nombre nave)
-            </label>
-            <select
-              id="nave"
-              name="nave"
-              value={formData.nave}
-              onChange={handleChange}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-              required
-            >
-              <option value="">Seleccione una nave</option>
-              <option value="MSC BARI">MSC BARI</option>
-              <option value="MSC JAPAN">MSC JAPAN</option>
-              <option value="JPO PISCES">JPO PISCES</option>
-              <option value="CALLAO EXPRESS">CALLAO EXPRESS</option>
-            </select>
-          </div>
-
-          {/* Campo: TIPO (Tipo contenedor) */}
-          <div>
-            <label
-              htmlFor="tipo"
-              className="block text-sm font-medium text-gray-700"
-            >
-              TIPO (Tipo contenedor)
-            </label>
-            <select
-              id="tipo"
-              name="tipo"
-              value={formData.tipo}
-              onChange={handleChange}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-              required
-            >
-              <option value="">Seleccione un tipo</option>
-              <option value="40HC">40HC</option>
-              <option value="20 DV">20 DV</option>
-              <option value="40 RF">40 RF</option>
-            </select>
-          </div>
-
-          {/* Campo: Contenedor Bulto (ID Contenedor) */}
-          <div>
-            <label
-              htmlFor="contenedorBulto"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Contenedor Bulto (ID Contenedor)
-            </label>
-            <input
-              id="contenedorBulto"
-              name="contenedorBulto"
-              type="text"
-              value={formData.contenedorBulto}
-              onChange={handleChange}
-              placeholder="Ingrese ID del contenedor"
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-              required
-            />
-          </div>
-
-          {/* Campo: Sello (Sello contenedor) */}
-          <div>
-            <label
-              htmlFor="sello"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Sello (Sello contenedor)
-            </label>
-            <input
-              id="sello"
-              name="sello"
-              type="text"
-              value={formData.sello}
-              onChange={handleChange}
-              placeholder="Ingrese el sello del contenedor"
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-              required
-            />
-          </div>
-
-          {/* Campo: Producto (Tipo Producto) */}
-          <div>
-            <label
-              htmlFor="producto"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Producto (Tipo Producto)
-            </label>
-            <input
-              id="producto"
-              name="producto"
-              type="text"
-              value={formData.producto}
-              onChange={handleChange}
-              placeholder="Ingrese el tipo de producto"
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-              required
-            />
-          </div>
-
-          {/* Campo: Observación (ocupa el ancho completo en pantallas grandes) */}
-          <div className="lg:col-span-3">
-            <label
-              htmlFor="observacion"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Observación
-            </label>
-            <textarea
-              id="observacion"
-              name="observacion"
-              value={formData.observacion}
-              onChange={handleChange}
-              placeholder="Ingrese cualquier observación"
-              rows={4}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            />
           </div>
         </div>
 
-        <div className="mt-6">
-          <button
-            type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-          >
-            Enviar
+        {/* Origen / Destino */}
+        {form.cliente > 0 && form.tipoOperacion > 0 && (
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium">Origen *</label>
+              <select className="input" value={form.origen} onChange={upd("origen")} >
+                <option value={0}>—</option>
+                {opt(origenOptions as Item[])}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Destino *</label>
+              <select className="input" value={form.destino} onChange={upd("destino")} >
+                <option value={0}>—</option>
+                {opt(destinoOptions as Item[])}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Resto de campos */}
+        {form.cliente > 0 && form.tipoOperacion > 0 && (
+          <>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium">ODV *</label>
+                <input className="input" value={form.odv} onChange={upd("odv")}  />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">País *</label>
+                <select className="input" value={form.pais} onChange={upd("pais")} >
+                  <option value={0}>—</option>
+                  {opt(mockPaises)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Fecha de servicio *</label>
+                <input type="date" className="input" value={form.fechaSol} onChange={upd("fechaSol")}  />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Tipo de contenedor *</label>
+                <select className="input" value={form.tipoContenedor} onChange={upd("tipoContenedor")} >
+                  <option value={0}>—</option>
+                  {opt(mockCatalogos.Tipo_contenedor)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Kilos *</label>
+                <input type="number" className="input" value={form.kilos} onChange={upd("kilos")}  />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Precio de Carga *</label>
+                <input type="number" className="input" value={form.precioCarga} onChange={upd("precioCarga")}  />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Temperatura *</label>
+                <input type="number" className="input" value={form.temperatura} onChange={upd("temperatura")}  />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Guía</label>
+                <input className="input" value={form.guia} onChange={upd("guia")} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Tarjetón</label>
+                <input className="input" value={form.tarjeton} onChange={upd("tarjeton")} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Máquina</label>
+                <input className="input" value={form.maquina} onChange={upd("maquina")} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Sello</label>
+                <input className="input" value={form.sello} onChange={upd("sello")} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Nave *</label>
+                <input type="number" className="input" value={form.nave} onChange={upd("nave")}  />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium">Observación</label>
+                <textarea className="input w-full h-24" value={form.observacion} onChange={upd("observacion")} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Interchange</label>
+                <input className="input" value={form.interchange} onChange={upd("interchange")} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">RC No Devolución *</label>
+                <input type="number" className="input" value={form.rcNoDevolucion} onChange={upd("rcNoDevolucion")}  />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Documento por Contenedor</label>
+                <input type="file" onChange={handleFileChange} />
+              </div>
+            </div>
+
+            <section className="space-y-4">
+              <h2 className="text-lg font-semibold">Puntos del recorrido</h2>
+              {puntos.map((p, idx) => (
+                <div key={idx} className="grid md:grid-cols-4 gap-2 items-center">
+                  <select className="input" value={p.idLugar} onChange={e => updatePunto(idx, "idLugar", +e.target.value)}>
+                    <option value={0}>Lugar</option>
+                    {opt(destinoOptions as Item[])}
+                  </select>
+                  <select className="input" value={p.accion} onChange={e => updatePunto(idx, "accion", +e.target.value)}>
+                    <option value={0}>Acción</option>
+                    {opt(mockCatalogos.acciones)}
+                  </select>
+                  <input
+                    type="datetime-local"
+                    className="input"
+                    placeholder="Hora estimada de llegada"
+                    value={p.eta}
+                    onChange={e => updatePunto(idx, "eta", e.target.value)}
+                    
+                  />
+                  <button type="button" onClick={() => removePunto(idx)} className="px-2 py-1 bg-red-600 text-white rounded">
+                    X
+                  </button>
+                </div>
+              ))}
+              <button type="button" onClick={addPunto} className="btn-primary">
+                Añadir punto
+              </button>
+            </section>
+          </>
+        )}
+
+        <div className="flex gap-4">
+          <button type="submit" className="btn-primary">
+            Actualizar
+          </button>
+          <button type="button" onClick={() => navigate(-1)} className="btn-secondary">
+            Cancelar
           </button>
         </div>
       </form>
@@ -292,4 +358,4 @@ const CompletarServicio: React.FC = () => {
   );
 };
 
-export default CompletarServicio;
+export default ModificarServicio;

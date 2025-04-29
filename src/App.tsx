@@ -19,7 +19,7 @@ import VistaServiciosTest from "./pages/VistaServiciosTest";
 import DetalleServicio from "./pages/DetalleServicio";
 import InformeServicio from "./pages/InformeServicios";
 import FacturarServicio from "./pages/FacturarServicio";
-import ModificarServicio from "./pages/ModificarServicio";
+import ModificarServicio from "./pages/CompletarServicio";
 import NuevoServicio from "./pages/NuevoServicio";
 
 // Inicio de sesión
@@ -99,11 +99,11 @@ function App() {
                         element={<FacturarServicio />}
                       />
                       <Route
-                        path="/modificar-servicio"
-                        element={<ModificarServicio />}
+                        path="/comercial/modificar-servicio/:id"
+                        element={<NuevoServicio />}
                       />
                       <Route
-                        path="/nuevo-servicio"
+                        path="/comercial/nuevo-servicio"
                         element={<NuevoServicio />}
                       />
                     </Routes>
