@@ -40,7 +40,7 @@ const SeguimientoServicio: React.FC = () => {
   }, [id]);
 
   const lookupLugar = (code: number) => {
-    const inPort = mockCatalogos.Zona_portuaria.find((z) => z.codigo === code);
+    const inPort = mockCatalogos.Lugares.find((z) => z.id === code);
     if (inPort) return inPort.nombre;
     const centro = mockCentros.find((c) => c.codigo === code);
     return centro ? centro.nombre : code.toString();

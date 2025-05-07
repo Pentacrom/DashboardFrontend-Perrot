@@ -5,13 +5,20 @@ export interface Item {
   nombre: string;
 }
 
+export interface Lugar{
+  id: number;
+  nombre: string;
+  tipo: TipoLugar;
+  cliente?: number;
+}
 export interface Catalogos {
   Operación: Item[];
   Zona: Item[];
-  Zona_portuaria: Item[];
+  Lugares: Lugar[];
   Tipo_contenedor: Item[];
   acciones: Item[];
   empresas: Item[];
+  proveedores_extras: Item[];
 }
 
 export interface Centro {
@@ -55,7 +62,8 @@ export interface FormState {
   documentoPorContenedor: string;
 }
 
-export type EstadoServicio = 'Pendiente' | 'En Proceso' | 'Por facturar' | 'Completado' | 'Sin Asignar' | 'Falso Flete' ;
+export type EstadoServicio = 'Pendiente' | 'En Proceso' | 'Por facturar' | 'Completado' | 'Sin Asignar' | 'Falso Flete';
+export type TipoLugar = 'Zona Portuaria' | 'Centro' | 'Proveedor'
 
 export interface ValorFactura {
   id: string;
@@ -96,17 +104,20 @@ export const mockCatalogos: Catalogos = {
     { codigo: 2, nombre: "CENTRO" },
     { codigo: 3, nombre: "NORTE" },
   ],
-  Zona_portuaria: [
-    { codigo: 1, nombre: "SAI" },
-    { codigo: 2, nombre: "VAP" },
-    { codigo: 3, nombre: "CNL" },
-    { codigo: 4, nombre: "LQN" },
-    { codigo: 5, nombre: "SVE" },
-    { codigo: 6, nombre: "SCL" },
-    { codigo: 7, nombre: "proveedor porteo 1" },
-    { codigo: 8, nombre: "proveedor porteo 2" },
-    { codigo: 9, nombre: "proveedor almacenaje 1" },
-    { codigo: 9, nombre: "proveedor almacenaje 2" },
+  Lugares: [
+    { id: 1, nombre: "SAI", tipo: "Zona Portuaria" },
+    { id: 2, nombre: "VAP", tipo: "Zona Portuaria" },
+    { id: 3, nombre: "CNL", tipo: "Zona Portuaria" },
+    { id: 4, nombre: "LQN", tipo: "Zona Portuaria" },
+    { id: 5, nombre: "SVE", tipo: "Zona Portuaria" },
+    { id: 6, nombre: "SCL", tipo: "Zona Portuaria" },
+    { id: 10, nombre: "Proveedor 1", tipo: "Proveedor" },
+    { id: 11, nombre: "Proveedor 2", tipo: "Proveedor" },
+    { id: 12, nombre: "Proveedor 3", tipo: "Proveedor" },
+    { id: 1, nombre: "Centro A", tipo: "Centro", cliente: 1 },
+    { id: 2, nombre: "Centro B", tipo: "Centro", cliente: 1 },
+    { id: 3, nombre: "Centro C", tipo: "Centro", cliente: 2 },
+    { id: 4, nombre: "Centro D", tipo: "Centro", cliente: 2 },
   ],
   Tipo_contenedor: [
     { codigo: 1, nombre: "20 DV" },
@@ -135,6 +146,11 @@ export const mockCatalogos: Catalogos = {
   empresas: [
     { codigo: 1, nombre: "Perrot1" },
     { codigo: 2, nombre: "Perrot2" },
+  ],
+  proveedores_extras: [
+    { codigo: 0, nombre: "Proveedor 1" },
+    { codigo: 1, nombre: "Proveedor 2" },
+    { codigo: 2, nombre: "Proveedor 3" },
   ],
 };
 

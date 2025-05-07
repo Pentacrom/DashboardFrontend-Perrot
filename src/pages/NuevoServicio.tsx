@@ -14,7 +14,9 @@ import {
   useServiceDrafts,
   Payload,
   valoresPorDefecto,
-  ValorFactura
+  ValorFactura,
+  Lugar,
+
 } from "../utils/ServiceDrafts";
 import { ArrowDown } from "lucide-react";
 
@@ -99,23 +101,40 @@ const NuevoServicio: React.FC = () => {
     []
   );
 
+    const optLugar = useCallback(
+      (arr?: Lugar[]) =>
+        arr?.map((i) => (
+          <option key={i.id} value={i.id}>
+            {i.nombre}
+          </option>
+        )),
+      []
+    );
+  
+
   // Filtrado de catálogos según cliente y operación
   const centrosFiltrados = mockCentros.filter(
     (c) => c.cliente === form.cliente
   );
-  const origenOptions =
-    form.tipoOperacion === 2
-      ? mockCatalogos.Zona_portuaria
-      : form.tipoOperacion === 1
-      ? centrosFiltrados
-      : [];
-  const destinoOptions =
-    form.tipoOperacion === 1
-      ? mockCatalogos.Zona_portuaria
-      : form.tipoOperacion === 2
-      ? centrosFiltrados
-      : [];
-  const puntosOptions = [...mockCatalogos.Zona_portuaria, ...centrosFiltrados];
+
+  const ZonasPortuarias = mockCatalogos.Lugares.filter(
+    (c) => c.tipo == "Zona Portuaria"
+  )
+
+const origenOptions =
+  form.tipoOperacion === 2
+    ? ZonasPortuarias // cuando tipoOperacion===2
+    : form.tipoOperacion === 1
+    ? centrosFiltrados // cuando tipoOperacion===1
+    : []; // en cualquier otro caso
+
+const destinoOptions =
+  form.tipoOperacion === 1
+    ? ZonasPortuarias // cuando tipoOperacion===1
+    : form.tipoOperacion === 2
+    ? centrosFiltrados // cuando tipoOperacion===2
+    : [];
+
 
   // Determina el estado previo del camión antes de cada punto
   const estadosPrevios = puntos.map((_, idx) => {
@@ -267,7 +286,7 @@ function generarValoresDesdePuntos(puntos: Punto[]): ValorFactura[] {
         monto: def.monto,
         impuesto: 0,
         fechaEmision: hoy, // ahora TypeScript no reclama
-        tipo: "venta",
+        tipo: "costo",
         codigo: p.accion.toString(),
       };
     });
@@ -335,7 +354,7 @@ function generarValoresDesdePuntos(puntos: Punto[]): ValorFactura[] {
                 required
               >
                 <option value={0}>—</option>
-                {opt(origenOptions as Item[])}
+                {optLugar(origenOptions as Lugar[])}
               </select>
             </div>
             <div>
@@ -347,7 +366,7 @@ function generarValoresDesdePuntos(puntos: Punto[]): ValorFactura[] {
                 required
               >
                 <option value={0}>—</option>
-                {opt(destinoOptions as Item[])}
+                {optLugar(destinoOptions as Lugar[])}
               </select>
             </div>
           </div>
@@ -535,7 +554,7 @@ function generarValoresDesdePuntos(puntos: Punto[]): ValorFactura[] {
                         required
                       >
                         <option value={0}>Seleccione un lugar</option>
-                        {opt(puntosOptions)}
+                        {optLugar(mockCatalogos.Lugares)}
                       </select>
                     </div>
                     <div>

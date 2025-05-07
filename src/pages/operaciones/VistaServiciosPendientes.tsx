@@ -13,7 +13,8 @@ import {
   Payload,
   mockCatalogos,
   saveOrUpdateSent,
-  EstadoServicio
+  EstadoServicio,
+  Lugar,
 } from "../../utils/ServiceDrafts";
 import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
 import { AsignarChoferMovilModal } from "../operaciones/AsignarChoferMovilModal";
@@ -26,7 +27,7 @@ interface ServiceRow {
   destino: string;
   fecha: string;
   tipo: string;
-  estado: string;
+  estado: EstadoServicio;
   raw: Payload;
 }
 
@@ -45,7 +46,7 @@ const columns: CustomColumn<ServiceRow>[] = [
     label: "Estado",
     key: "estado",
     sortable: true,
-    render: (value: string) => (
+    render: (value: EstadoServicio) => (
       <span
         className={`
           px-2 py-1 rounded-full text-xs font-medium
@@ -84,61 +85,70 @@ const VistaServiciosPendientes: React.FC = () => {
   const openConfirmFalsoFlete = (id: string) => setConfirmFalsoFleteId(id);
   const closeConfirmFalsoFlete = () => setConfirmFalsoFleteId(null);
 
-const confirmarFalsoFlete = () => {
-  if (!confirmFalsoFleteId) return;
+  const confirmarFalsoFlete = () => {
+    if (!confirmFalsoFleteId) return;
 
-  setRows((prev) =>
-    prev.map((r) =>
-      r.id === confirmFalsoFleteId
-        ? {
-            ...r,
-            estado: "Falso Flete",
-            raw: { ...r.raw, estado: "Falso Flete" as EstadoServicio },
-          }
-        : r
-    )
-  );
+    setRows((prev) =>
+      prev.map((r) =>
+        r.id === confirmFalsoFleteId
+          ? {
+              ...r,
+              estado: "Falso Flete",
+              raw: { ...r.raw, estado: "Falso Flete" },
+            }
+          : r
+      )
+    );
 
-  // Persistir cambio
-  const drafts = loadDrafts();
-  const sent = loadSent();
-
-  const idNum = Number(confirmFalsoFleteId);
-  const foundInDrafts = drafts.find((s) => s.id === idNum);
-  const foundInSent = sent.find((s) => s.id === idNum);
-
-  const updatedService = {
-    ...(foundInDrafts || foundInSent)!,
-    estado: "Falso Flete" as EstadoServicio,
-  };
-
-  saveOrUpdateSent(updatedService); // Puedes usar saveOrUpdateDraft si prefieres distinguir
-
-  closeConfirmFalsoFlete();
-};
-
-  useEffect(() => {
-    const lookup = (arr: { codigo: number; nombre: string }[], code: number) =>
-      arr.find((x) => x.codigo === code)?.nombre || code.toString();
-
+    // Persistir cambio
     const drafts = loadDrafts();
     const sent = loadSent();
+    const idNum = Number(confirmFalsoFleteId);
+    const foundInDrafts = drafts.find((s) => s.id === idNum);
+    const foundInSent = sent.find((s) => s.id === idNum);
+    const updatedService = {
+      ...(foundInDrafts || foundInSent)!,
+      estado: "Falso Flete" as EstadoServicio,
+    };
+    saveOrUpdateSent(updatedService);
 
-    const filtered = [...drafts, ...sent];
+    closeConfirmFalsoFlete();
+  };
 
-    const mapped = filtered.map((p) => {
+  useEffect(() => {
+    // Lookup para catálogos con `codigo`
+    const lookupCodigo = (
+      arr: { codigo: number; nombre: string }[],
+      code: number
+    ) => arr.find((x) => x.codigo === code)?.nombre || code.toString();
+
+    // Lookup para Lugares por `id`
+    const lookupLugar = (arr: Lugar[], id: number) =>
+      arr.find((x) => x.id === id)?.nombre || id.toString();
+
+    // Zonas portuarias extraídas de Lugares
+    const zonasPortuarias = mockCatalogos.Lugares.filter(
+      (l) => l.tipo === "Zona Portuaria"
+    );
+
+    // Combina borradores y enviados
+    const all = [...loadDrafts(), ...loadSent()];
+
+    // Mapear a filas
+    const mapped: ServiceRow[] = all.map((p) => {
       const f = p.form;
       const tipoOp = f.tipoOperacion;
-      const clienteName = lookup(mockCatalogos.empresas, f.cliente);
+      const clienteName = lookupCodigo(mockCatalogos.empresas, f.cliente);
       const origenName =
         tipoOp === 2
-          ? lookup(mockCatalogos.Zona_portuaria, f.origen)
-          : lookup(mockCatalogos.Zona, f.origen);
+          ? lookupLugar(zonasPortuarias, f.origen)
+          : lookupCodigo(mockCatalogos.Zona, f.origen);
       const destinoName =
         tipoOp === 1
-          ? lookup(mockCatalogos.Zona_portuaria, f.destino)
-          : lookup(mockCatalogos.Zona, f.destino);
-      const tipoName = lookup(mockCatalogos.Operación, tipoOp);
+          ? lookupLugar(zonasPortuarias, f.destino)
+          : lookupCodigo(mockCatalogos.Zona, f.destino);
+      const tipoName = lookupCodigo(mockCatalogos.Operación, tipoOp);
+
       return {
         id: p.id.toString(),
         cliente: clienteName,
@@ -155,7 +165,7 @@ const confirmarFalsoFlete = () => {
   }, []);
 
   const dropdownOptions = (row: ServiceRow): DropdownOption<ServiceRow>[] => {
-    const options: DropdownOption<ServiceRow>[] = [
+    const opts: DropdownOption<ServiceRow>[] = [
       {
         label: "Ver detalle",
         onClick: () => navigate(`/detalle-servicio/${row.id}`),
@@ -163,7 +173,7 @@ const confirmarFalsoFlete = () => {
     ];
 
     if (row.estado === "En Proceso") {
-      options.push(
+      opts.push(
         {
           label: "Ver/Editar Servicio",
           onClick: () => navigate(`/comercial/modificar-servicio/${row.id}`),
@@ -180,23 +190,22 @@ const confirmarFalsoFlete = () => {
     }
 
     if (row.estado === "Sin Asignar") {
-      options.push({
+      opts.push({
         label: "Asignar chofer y móvil",
         onClick: () => openModal(Number(row.id)),
       });
     }
 
-    return options;
+    return opts;
   };
-  
+
   const estadoCheckboxFilter = [
     {
       label: "Filtrar por estado",
       key: "estado" as keyof ServiceRow,
-      options: Object.keys(estadoStyles),
+      options: Object.keys(estadoStyles) as EstadoServicio[],
     },
   ];
-
 
   return (
     <div className="p-6">
@@ -241,8 +250,7 @@ const confirmarFalsoFlete = () => {
         <h2 className="text-xl font-semibold mb-4">Confirmar acción</h2>
         <p className="mb-6">
           ¿Estás seguro de que deseas marcar este servicio como{" "}
-          <strong>Falso Flete</strong>?<br />
-          Esta acción no se puede deshacer.
+          <strong>Falso Flete</strong>? Esta acción no se puede deshacer.
         </p>
         <div className="flex justify-end gap-4">
           <button

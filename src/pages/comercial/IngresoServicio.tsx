@@ -14,6 +14,7 @@ import {
   deleteDraft,
   Payload,
   EstadoServicio,
+  Lugar,
 } from "../../utils/ServiceDrafts";
 import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
 
@@ -77,12 +78,11 @@ const searchFilters: SearchFilter<ServiceRow>[] = [
   },
 ];
 
-// Ahora incluimos "Sin Asignar" junto a "Pendiente"
 const checkboxFilterGroups: CheckboxFilterGroup<ServiceRow>[] = [
   {
     label: "Estados",
     key: "estado",
-    options: ["Pendiente", "Sin Asignar"],
+    options: estadosFiltrados,
   },
 ];
 
@@ -91,8 +91,20 @@ const IngresoServicio: React.FC = () => {
   const [rows, setRows] = useState<ServiceRow[]>([]);
 
   useEffect(() => {
-    const lookup = (arr: { codigo: number; nombre: string }[], code: number) =>
-      arr.find((x) => x.codigo === code)?.nombre || code.toString();
+    // Lookup para catálogos con `codigo`
+    const lookupCodigo = (
+      arr: { codigo: number; nombre: string }[],
+      code: number
+    ) => arr.find((x) => x.codigo === code)?.nombre || code.toString();
+
+    // Lookup para Lugares por `id`
+    const lookupLugar = (arr: Lugar[], id: number) =>
+      arr.find((x) => x.id === id)?.nombre || id.toString();
+
+    // Zonas portuarias extraídas de Lugares
+    const zonasPortuarias = mockCatalogos.Lugares.filter(
+      (l) => l.tipo === "Zona Portuaria"
+    );
 
     // Cargo borradores y enviados, filtro sólo los pendientes y sin asignar
     const payloads: Payload[] = [...loadDrafts(), ...loadSent()].filter((p) =>
@@ -104,18 +116,18 @@ const IngresoServicio: React.FC = () => {
       const tipoOp = f.tipoOperacion;
       const origenName =
         tipoOp === 2
-          ? lookup(mockCatalogos.Zona_portuaria, f.origen)
-          : lookup(mockCatalogos.Zona, f.origen);
+          ? lookupLugar(zonasPortuarias, f.origen)
+          : lookupCodigo(mockCatalogos.Zona, f.origen);
       const destinoName =
         tipoOp === 1
-          ? lookup(mockCatalogos.Zona_portuaria, f.destino)
-          : lookup(mockCatalogos.Zona, f.destino);
+          ? lookupLugar(zonasPortuarias, f.destino)
+          : lookupCodigo(mockCatalogos.Zona, f.destino);
       return {
         id: p.id.toString(),
         origen: origenName,
         destino: destinoName,
         fecha: f.fechaSol,
-        tipo: lookup(mockCatalogos.Operación, tipoOp),
+        tipo: lookupCodigo(mockCatalogos.Operación, tipoOp),
         estado: p.estado,
         raw: p,
       };
@@ -159,7 +171,6 @@ const IngresoServicio: React.FC = () => {
         },
       ];
     } else {
-      // "Pendiente" sólo lectura
       return [
         {
           label: "Ver Detalle",

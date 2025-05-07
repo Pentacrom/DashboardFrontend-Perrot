@@ -496,16 +496,17 @@ function ListWithSearch<T extends Record<string, any>>({
                                     ref={dropdownRef}
                                     className="bg-white border rounded shadow-lg z-50 flex flex-col"
                                     style={{
-                                      position: "fixed",
-                                      top:
-                                        dropdownButtonRefs.current[
-                                          idx
-                                        ]!.getBoundingClientRect().bottom + 4,
-                                      left: dropdownButtonRefs.current[
-                                        idx
-                                      ]!.getBoundingClientRect().left,
-                                      width: "12rem",
-                                    }}
+                                    position: "fixed",
+                                    top: Math.min(
+                                      dropdownButtonRefs.current[idx]!.getBoundingClientRect().bottom + 4,
+                                      window.innerHeight - 200 // margen inferior mínimo
+                                    ),
+                                    left: Math.min(
+                                      dropdownButtonRefs.current[idx]!.getBoundingClientRect().left,
+                                      window.innerWidth - 192 // 12rem = 192px, margen lateral mínimo
+                                    ),
+                                    width: "12rem",
+                                  }}
                                   >
                                     {rowOptions.map((option, dIdx) => (
                                       <button

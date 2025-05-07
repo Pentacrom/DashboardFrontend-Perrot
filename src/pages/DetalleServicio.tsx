@@ -1,4 +1,3 @@
-// src/pages/DetalleServicio.tsx
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -8,8 +7,8 @@ import {
   Punto,
   ValorFactura,
   mockCatalogos,
-  mockCentros,
 } from "../utils/ServiceDrafts";
+import { Lugar } from "../utils/ServiceDrafts";
 
 const DetalleServicio: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -34,8 +33,15 @@ const DetalleServicio: React.FC = () => {
     }
   }, [id]);
 
-  const lookup = (arr: { codigo: number; nombre: string }[], code: number) =>
-    arr.find((x) => x.codigo === code)?.nombre || code.toString();
+  // Lookup para catálogos con `codigo`
+  const lookupCodigo = (
+    arr: { codigo: number; nombre: string }[],
+    code: number
+  ) => arr.find((x) => x.codigo === code)?.nombre || code.toString();
+
+  // Lookup para catálogo `Lugares` con `id`
+  const lookupLugar = (arr: Lugar[], id: number) =>
+    arr.find((x) => x.id === id)?.nombre || id.toString();
 
   if (loading) {
     return (
@@ -63,11 +69,12 @@ const DetalleServicio: React.FC = () => {
 
   const { form, puntos, estado, valores = [], chofer, movil } = service;
 
-  // Arreglo de lugares válidos para puntos (zonas portuarias + centros del cliente)
-  const centrosFiltrados = mockCentros.filter(
-    (c) => c.cliente === form.cliente
+  // Arreglo de lugares válidos para puntos: zonas portuarias + centros del cliente
+  const puntosOptions = mockCatalogos.Lugares.filter(
+    (l) =>
+      l.tipo === "Zona Portuaria" ||
+      (l.tipo === "Centro" && l.cliente === form.cliente)
   );
-  const puntosOptions = [...mockCatalogos.Zona_portuaria, ...centrosFiltrados];
 
   // Determinar punto actual: primero sin 'salida'
   const puntoActual: Punto | null = puntos.find((p) => !p.salida) || null;
@@ -87,26 +94,26 @@ const DetalleServicio: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <p className="font-medium">Cliente:</p>
-            <p>{lookup(mockCatalogos.empresas, form.cliente)}</p>
+            <p>{lookupCodigo(mockCatalogos.empresas, form.cliente)}</p>
           </div>
           <div>
             <p className="font-medium">Tipo de operación:</p>
-            <p>{lookup(mockCatalogos.Operación, form.tipoOperacion)}</p>
+            <p>{lookupCodigo(mockCatalogos.Operación, form.tipoOperacion)}</p>
           </div>
           <div>
             <p className="font-medium">Origen:</p>
             <p>
               {form.tipoOperacion === 2
-                ? lookup(mockCatalogos.Zona_portuaria, form.origen)
-                : lookup(mockCatalogos.Zona, form.origen)}
+                ? lookupLugar(mockCatalogos.Lugares, form.origen)
+                : lookupCodigo(mockCatalogos.Zona, form.origen)}
             </p>
           </div>
           <div>
             <p className="font-medium">Destino:</p>
             <p>
               {form.tipoOperacion === 1
-                ? lookup(mockCatalogos.Zona_portuaria, form.destino)
-                : lookup(mockCatalogos.Zona, form.destino)}
+                ? lookupLugar(mockCatalogos.Lugares, form.destino)
+                : lookupCodigo(mockCatalogos.Zona, form.destino)}
             </p>
           </div>
           <div>
@@ -119,7 +126,9 @@ const DetalleServicio: React.FC = () => {
           </div>
           <div>
             <p className="font-medium">Tipo Contenedor:</p>
-            <p>{lookup(mockCatalogos.Tipo_contenedor, form.tipoContenedor)}</p>
+            <p>
+              {lookupCodigo(mockCatalogos.Tipo_contenedor, form.tipoContenedor)}
+            </p>
           </div>
           <div>
             <p className="font-medium">Chofer Asignado:</p>
@@ -175,8 +184,8 @@ const DetalleServicio: React.FC = () => {
           <div className="mb-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
             Punto actual:{" "}
             <strong>
-              {lookup(puntosOptions, puntoActual.idLugar)} — acción{" "}
-              {lookup(mockCatalogos.acciones, puntoActual.accion)}
+              {lookupLugar(puntosOptions, puntoActual.idLugar)} — acción{" "}
+              {lookupCodigo(mockCatalogos.acciones, puntoActual.accion)}
             </strong>
           </div>
         )}
@@ -193,11 +202,11 @@ const DetalleServicio: React.FC = () => {
             >
               <p>
                 <strong>Punto {i + 1}:</strong>{" "}
-                {lookup(puntosOptions, p.idLugar)}
+                {lookupLugar(puntosOptions, p.idLugar)}
               </p>
               <p>
-                Acción: {lookup(mockCatalogos.acciones, p.accion)} — Estado
-                interno: {p.estado}
+                Acción: {lookupCodigo(mockCatalogos.acciones, p.accion)} —
+                Estado interno: {p.estado}
               </p>
               <p>ETA: {p.eta}</p>
               <p>Llegada: {p.llegada || "—"}</p>
@@ -207,17 +216,6 @@ const DetalleServicio: React.FC = () => {
         </ul>
       </div>
 
-      {/* Mapa de ejemplo
-      <div className="bg-white p-6 rounded shadow">
-        <h2 className="text-lg font-semibold mb-4">Mapa de la Ruta</h2>
-        <img
-          src="https://via.placeholder.com/800x400?text=Mapa+de+Ejemplo"
-          alt="Mapa de ejemplo"
-          className="w-full h-64 object-cover rounded-lg shadow"
-        />
-      </div>
-
-     */}
       <button
         onClick={() => navigate(-1)}
         className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
