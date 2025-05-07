@@ -1,158 +1,229 @@
-import React from "react";
-import { useSearchParams, Link } from "react-router-dom";
-
-interface Servicio {
-  id: string; // ODV
-  cliente: string;
-  origen: string;
-  destino: string;
-  fecha: string;
-  tipo: string;
-  estado: string;
-  zona: string; // Zona (destino de la carga)
-  zonaPortuaria: string; // Zona portuaria (Puerto involucrado)
-  pais: string; // PAIS (Procedencia o destino carga)
-  naviera: string; // Naviera (nombre naviera)
-  nave: string; // Nave (Nombre nave)
-  tipoContenedor: string; // TIPO (Tipo contenedor)
-  contenedorBulto: string; // Contenedor Bulto (ID Contenedor)
-  sello: string; // Sello (Sello contenedor)
-  producto: string; // Producto (Tipo Producto)
-  observacion: string;
-}
-
-// Datos de ejemplo
-const servicio: Servicio = {
-  id: "001",
-  cliente: "Empresa A",
-  origen: "Santiago",
-  destino: "Valparaíso",
-  fecha: "2025-02-10",
-  tipo: "Transporte",
-  estado: "Pendiente",
-  zona: "Norte",
-  zonaPortuaria: "LQN",
-  pais: "Chile",
-  naviera: "MSC",
-  nave: "MSC BARI",
-  tipoContenedor: "40HC",
-  contenedorBulto: "ABC123",
-  sello: "XYZ789",
-  producto: "Producto X",
-  observacion: "Servicio urgente. Se requiere entrega rápida.",
-};
+// src/pages/DetalleServicio.tsx
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import {
+  loadDrafts,
+  loadSent,
+  Payload,
+  Punto,
+  ValorFactura,
+  mockCatalogos,
+  mockCentros,
+} from "../utils/ServiceDrafts";
 
 const DetalleServicio: React.FC = () => {
-  // Usamos useSearchParams para leer el parámetro "facturable"
-  const [searchParams] = useSearchParams();
-  const isFacturable = searchParams.get("facturable") === "true";
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [service, setService] = useState<Payload | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const sid = Number(id);
+      if (!sid) throw new Error("ID de servicio inválido");
+      const sent = loadSent().find((s) => s.id === sid);
+      const draft = loadDrafts().find((s) => s.id === sid);
+      const found = sent || draft;
+      if (!found) throw new Error("Servicio no encontrado");
+      setService(found);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al cargar");
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  const lookup = (arr: { codigo: number; nombre: string }[], code: number) =>
+    arr.find((x) => x.codigo === code)?.nombre || code.toString();
+
+  if (loading) {
+    return (
+      <div className="p-6 flex justify-center">
+        <div className="animate-spin h-12 w-12 border-t-2 border-b-2 border-blue-500 rounded-full" />
+      </div>
+    );
+  }
+
+  if (error || !service) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
+          {error || "Servicio no encontrado."}
+        </div>
+        <button
+          onClick={() => navigate(-1)}
+          className="mt-4 px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+        >
+          Volver
+        </button>
+      </div>
+    );
+  }
+
+  const { form, puntos, estado, valores = [], chofer, movil } = service;
+
+  // Arreglo de lugares válidos para puntos (zonas portuarias + centros del cliente)
+  const centrosFiltrados = mockCentros.filter(
+    (c) => c.cliente === form.cliente
+  );
+  const puntosOptions = [...mockCatalogos.Zona_portuaria, ...centrosFiltrados];
+
+  // Determinar punto actual: primero sin 'salida'
+  const puntoActual: Punto | null = puntos.find((p) => !p.salida) || null;
 
   return (
-    <div className="min-h-screen min-w-max rounded-2xl drop-shadow-sm bg-white p-6">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-center mb-8">
-          Detalle de Servicio
-        </h1>
-        {/* Contenedor de datos organizados en un grid responsive */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 justify-items-stretch">
-          <div className="border-b border-gray-300 pb-2">
-            <p className="text-sm font-semibold text-gray-600">ODV:</p>
-            <p className="text-lg text-gray-800">{servicio.id}</p>
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Detalle Servicio #{service.id}</h1>
+        <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full">
+          Estado: {estado}
+        </span>
+      </div>
+
+      {/* Información General */}
+      <div className="bg-white p-6 rounded shadow">
+        <h2 className="text-lg font-semibold mb-4">Información General</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <p className="font-medium">Cliente:</p>
+            <p>{lookup(mockCatalogos.empresas, form.cliente)}</p>
           </div>
-          <div className="border-b border-gray-300 pb-2">
-            <p className="text-sm font-semibold text-gray-600">Cliente:</p>
-            <p className="text-lg text-gray-800">{servicio.cliente}</p>
+          <div>
+            <p className="font-medium">Tipo de operación:</p>
+            <p>{lookup(mockCatalogos.Operación, form.tipoOperacion)}</p>
           </div>
-          <div className="border-b border-gray-300 pb-2">
-            <p className="text-sm font-semibold text-gray-600">Origen:</p>
-            <p className="text-lg text-gray-800">{servicio.origen}</p>
-          </div>
-          <div className="border-b border-gray-300 pb-2">
-            <p className="text-sm font-semibold text-gray-600">Destino:</p>
-            <p className="text-lg text-gray-800">{servicio.destino}</p>
-          </div>
-          <div className="border-b border-gray-300 pb-2">
-            <p className="text-sm font-semibold text-gray-600">Fecha:</p>
-            <p className="text-lg text-gray-800">{servicio.fecha}</p>
-          </div>
-          <div className="border-b border-gray-300 pb-2">
-            <p className="text-sm font-semibold text-gray-600">Tipo:</p>
-            <p className="text-lg text-gray-800">{servicio.tipo}</p>
-          </div>
-          <div className="border-b border-gray-300 pb-2">
-            <p className="text-sm font-semibold text-gray-600">Estado:</p>
-            <p className="text-lg text-gray-800">{servicio.estado}</p>
-          </div>
-          <div className="border-b border-gray-300 pb-2">
-            <p className="text-sm font-semibold text-gray-600">
-              Zona (destino de la carga):
+          <div>
+            <p className="font-medium">Origen:</p>
+            <p>
+              {form.tipoOperacion === 2
+                ? lookup(mockCatalogos.Zona_portuaria, form.origen)
+                : lookup(mockCatalogos.Zona, form.origen)}
             </p>
-            <p className="text-lg text-gray-800">{servicio.zona}</p>
           </div>
-          <div className="border-b border-gray-300 pb-2">
-            <p className="text-sm font-semibold text-gray-600">
-              Zona portuaria (Puerto involucrado):
+          <div>
+            <p className="font-medium">Destino:</p>
+            <p>
+              {form.tipoOperacion === 1
+                ? lookup(mockCatalogos.Zona_portuaria, form.destino)
+                : lookup(mockCatalogos.Zona, form.destino)}
             </p>
-            <p className="text-lg text-gray-800">{servicio.zonaPortuaria}</p>
           </div>
-          <div className="border-b border-gray-300 pb-2">
-            <p className="text-sm font-semibold text-gray-600">
-              PAIS (Procedencia o destino carga):
-            </p>
-            <p className="text-lg text-gray-800">{servicio.pais}</p>
+          <div>
+            <p className="font-medium">Fecha Solicitud:</p>
+            <p>{form.fechaSol}</p>
           </div>
-          <div className="border-b border-gray-300 pb-2">
-            <p className="text-sm font-semibold text-gray-600">
-              Naviera (nombre naviera):
-            </p>
-            <p className="text-lg text-gray-800">{servicio.naviera}</p>
+          <div>
+            <p className="font-medium">Fecha Creación:</p>
+            <p>{form.fechaIng}</p>
           </div>
-          <div className="border-b border-gray-300 pb-2">
-            <p className="text-sm font-semibold text-gray-600">
-              Nave (Nombre nave):
-            </p>
-            <p className="text-lg text-gray-800">{servicio.nave}</p>
+          <div>
+            <p className="font-medium">Tipo Contenedor:</p>
+            <p>{lookup(mockCatalogos.Tipo_contenedor, form.tipoContenedor)}</p>
           </div>
-          <div className="border-b border-gray-300 pb-2">
-            <p className="text-sm font-semibold text-gray-600">
-              TIPO (Tipo contenedor):
-            </p>
-            <p className="text-lg text-gray-800">{servicio.tipoContenedor}</p>
+          <div>
+            <p className="font-medium">Chofer Asignado:</p>
+            <p>{chofer || "No asignado"}</p>
           </div>
-          <div className="border-b border-gray-300 pb-2">
-            <p className="text-sm font-semibold text-gray-600">
-              Contenedor Bulto (ID Contenedor):
-            </p>
-            <p className="text-lg text-gray-800">{servicio.contenedorBulto}</p>
-          </div>
-          <div className="border-b border-gray-300 pb-2">
-            <p className="text-sm font-semibold text-gray-600">
-              Sello (Sello contenedor):
-            </p>
-            <p className="text-lg text-gray-800">{servicio.sello}</p>
-          </div>
-          <div className="border-b border-gray-300 pb-2">
-            <p className="text-sm font-semibold text-gray-600">
-              Producto (Tipo Producto):
-            </p>
-            <p className="text-lg text-gray-800">{servicio.producto}</p>
-          </div>
-          <div className="md:col-span-2 border-b border-gray-300 pb-2">
-            <p className="text-sm font-semibold text-gray-600">Observación:</p>
-            <p className="text-lg text-gray-800">{servicio.observacion}</p>
+          <div>
+            <p className="font-medium">Móvil Asignado:</p>
+            <p>{movil || "No asignado"}</p>
           </div>
         </div>
-        {isFacturable && (
-          <div className="mt-6 text-center">
-            <Link
-              to={`/facturar-servicio`}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-            >
-              Facturar Servicio
-            </Link>
-          </div>
+      </div>
+
+      {/* Valores / Facturación */}
+      <div className="bg-white p-6 rounded shadow">
+        <h2 className="text-lg font-semibold mb-4">Valores / Facturación</h2>
+        {valores.length === 0 ? (
+          <p className="text-gray-500">No hay valores cargados.</p>
+        ) : (
+          <table className="w-full table-fixed border-collapse">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border px-2 py-1 text-left">Concepto</th>
+                <th className="border px-2 py-1 text-right">Monto</th>
+                <th className="border px-2 py-1 text-right">Impuesto (%)</th>
+                <th className="border px-2 py-1 text-center">Fecha emisión</th>
+              </tr>
+            </thead>
+            <tbody>
+              {valores.map((v: ValorFactura) => (
+                <tr key={v.id}>
+                  <td className="border px-2 py-1">{v.concepto}</td>
+                  <td className="border px-2 py-1 text-right">
+                    ${v.monto.toFixed(2)}
+                  </td>
+                  <td className="border px-2 py-1 text-right">{v.impuesto}%</td>
+                  <td className="border px-2 py-1 text-center">
+                    {v.fechaEmision}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
+
+      {/* Puntos y estado actual */}
+      <div className="bg-white p-6 rounded shadow">
+        <h2 className="text-lg font-semibold mb-4">
+          Recorrido y Estado de Puntos
+        </h2>
+
+        {puntoActual && (
+          <div className="mb-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+            Punto actual:{" "}
+            <strong>
+              {lookup(puntosOptions, puntoActual.idLugar)} — acción{" "}
+              {lookup(mockCatalogos.acciones, puntoActual.accion)}
+            </strong>
+          </div>
+        )}
+
+        <ul className="space-y-2">
+          {puntos.map((p, i) => (
+            <li
+              key={i}
+              className={`p-3 rounded ${
+                p === puntoActual
+                  ? "bg-blue-50 border-l-4 border-blue-400"
+                  : "bg-gray-50"
+              }`}
+            >
+              <p>
+                <strong>Punto {i + 1}:</strong>{" "}
+                {lookup(puntosOptions, p.idLugar)}
+              </p>
+              <p>
+                Acción: {lookup(mockCatalogos.acciones, p.accion)} — Estado
+                interno: {p.estado}
+              </p>
+              <p>ETA: {p.eta}</p>
+              <p>Llegada: {p.llegada || "—"}</p>
+              <p>Salida: {p.salida || "—"}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Mapa de ejemplo
+      <div className="bg-white p-6 rounded shadow">
+        <h2 className="text-lg font-semibold mb-4">Mapa de la Ruta</h2>
+        <img
+          src="https://via.placeholder.com/800x400?text=Mapa+de+Ejemplo"
+          alt="Mapa de ejemplo"
+          className="w-full h-64 object-cover rounded-lg shadow"
+        />
+      </div>
+
+     */}
+      <button
+        onClick={() => navigate(-1)}
+        className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+      >
+        Volver
+      </button>
     </div>
   );
 };

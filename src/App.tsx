@@ -7,20 +7,21 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import HomePage from "./pages/HomePage";
 import IngresoServicioCliente from "./pages/cliente/IngresoServicio";
 import IngresoServicioComercial from "./pages/comercial/IngresoServicio";
-import VistaServiciosPendientes from "./pages/VistaServiciosPendientes";
+import VistaTorreDeControl from "./pages/torreDeControl/VistaServicios";
 import ServiciosPendientesComercial from "./pages/comercial/VistaServiciosPendientes";
 import ServiciosPendientesOperacion from "./pages/operaciones/VistaServiciosPendientes";
 import CompletarEntrega from "./pages/CompletarEntrega";
 import ValorizarServicio from "./pages/ValorizarServicio";
 import ServiciosPorFacturar from "./pages/ServiciosPorFacturar";
-import CompletarServicio from "./pages/CompletarServicio";
 import VistaServicios from "./pages/torreDeControl/VistaServicios";
 import VistaServiciosTest from "./pages/VistaServiciosTest";
 import DetalleServicio from "./pages/DetalleServicio";
 import InformeServicio from "./pages/InformeServicios";
 import FacturarServicio from "./pages/FacturarServicio";
-import ModificarServicio from "./pages/CompletarServicio";
 import NuevoServicio from "./pages/NuevoServicio";
+import AgregarValores from "./pages/AgregarValoresServicio";
+import SeguimientoServicio from "./pages/torreDeControl/SeguimientoServicio";
+import AsignarChoferMovil from "./pages/operaciones/AsignarChoferMovil";
 
 // Inicio de sesión
 import InicioSesion from "./pages/InicioSesion";
@@ -59,16 +60,24 @@ function App() {
                         element={<VistaServiciosTest />}
                       />
                       <Route
-                        path="/servicios-pendientes"
-                        element={<VistaServiciosPendientes />}
+                        path="/torre-de-control/servicios"
+                        element={<VistaTorreDeControl />}
+                      />
+                      <Route
+                        path="/torre-de-control/seguimiento-servicio/:id"
+                        element={<SeguimientoServicio />}
                       />
                       <Route
                         path="/comercial/servicios-pendientes"
                         element={<ServiciosPendientesComercial />}
                       />
                       <Route
-                        path="/operaciones/servicios-pendientes"
+                        path="/operaciones/servicios"
                         element={<ServiciosPendientesOperacion />}
+                      />
+                      <Route
+                        path="/operaciones/asignar/:id"
+                        element={<AsignarChoferMovil />}
                       />
                       <Route
                         path="/completar-entrega"
@@ -79,15 +88,11 @@ function App() {
                         element={<ValorizarServicio />}
                       />
                       <Route
-                        path="/completar-servicio"
-                        element={<CompletarServicio />}
-                      />
-                      <Route
                         path="/servicios-por-facturar"
                         element={<ServiciosPorFacturar />}
                       />
                       <Route
-                        path="/detalle-servicio"
+                        path="/detalle-servicio/:id"
                         element={<DetalleServicio />}
                       />
                       <Route
@@ -101,6 +106,10 @@ function App() {
                       <Route
                         path="/comercial/modificar-servicio/:id"
                         element={<NuevoServicio />}
+                      />
+                      <Route
+                        path="/comercial/agregar-valores/:id"
+                        element={<AgregarValores />}
                       />
                       <Route
                         path="/comercial/nuevo-servicio"

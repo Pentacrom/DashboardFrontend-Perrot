@@ -1,46 +1,29 @@
+// src/pages/IngresoServicio.tsx
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ListWithSearch, {
   Column,
   DropdownOption,
   SearchFilter,
+  CheckboxFilterGroup,
 } from "../../components/ListWithSearch";
+import {
+  mockCatalogos,
+  loadDrafts,
+  loadSent,
+  deleteDraft,
+  Payload,
+  EstadoServicio,
+} from "../../utils/ServiceDrafts";
+import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
 
-interface Punto {
-  idLugar: number;
-  accion: number;
-  estado: number;
-  eta: string;
+// Extendemos Column para permitir un render personalizado
+interface CustomColumn<T> extends Column<T> {
+  render?: (value: any, row: T) => React.ReactNode;
 }
-
-interface Payload {
-  id: number;
-  form: {
-    cliente: number;
-    tipoOperacion: number;
-    origen: number;
-    destino: number;
-    pais: number;
-    fechaSol: string;
-    tipoContenedor: number;
-    zonaPortuaria: number;
-    kilos: number;
-    precioCarga: number;
-    temperatura: number;
-    idCCosto: number;
-    guia: string;
-    tarjeton: string;
-    maquina: string;
-    sello: string;
-    nave: number;
-    observacion: string;
-    interchange: string;
-    rcNoDevolucion: number;
-    odv: string;
-    documentoPorContenedor: string;
-  };
-  puntos: Punto[];
-  enviado?: boolean;
+// Extendemos DropdownOption para poder deshabilitar opciones
+interface CustomDropdownOption extends DropdownOption {
+  disabled?: boolean;
 }
 
 interface ServiceRow {
@@ -49,94 +32,74 @@ interface ServiceRow {
   destino: string;
   fecha: string;
   tipo: string;
+  estado: EstadoServicio;
   raw: Payload;
 }
 
-interface CatalogoItem { codigo: number; nombre: string; }
-interface DatosCatalogo {
-  Operación: CatalogoItem[];
-  Zona: CatalogoItem[];
-  Zona_portuaria: CatalogoItem[];
-  Tipo_contenedor: CatalogoItem[];
-}
+// Queremos mostrar sólo estos dos estados
+const estadosFiltrados: EstadoServicio[] = ["Pendiente", "Sin Asignar"];
 
-const mockCatalogos: DatosCatalogo = {
-  Operación: [
-    { codigo: 1, nombre: "EXPORTACIÓN" },
-    { codigo: 2, nombre: "IMPORTACIÓN" },
-    { codigo: 3, nombre: "NACIONAL" },
-    { codigo: 4, nombre: "TRENADA" },
-    { codigo: 5, nombre: "REUTILIZACIÓN" },
-    { codigo: 6, nombre: "RETORNO" },
-    { codigo: 7, nombre: "LOCAL" },
-  ],
-  Zona: [
-    { codigo: 1, nombre: "SUR" },
-    { codigo: 2, nombre: "CENTRO" },
-    { codigo: 3, nombre: "NORTE" },
-  ],
-  Zona_portuaria: [
-    { codigo: 1, nombre: "SAI" },
-    { codigo: 2, nombre: "VAP" },
-    { codigo: 3, nombre: "CNL" },
-    { codigo: 4, nombre: "LQN" },
-    { codigo: 5, nombre: "SVE" },
-    { codigo: 6, nombre: "SCL" },
-  ],
-  Tipo_contenedor: [
-    { codigo: 1, nombre: "20 DV" },
-    { codigo: 2, nombre: "20 FR" },
-    { codigo: 3, nombre: "20 OT" },
-    { codigo: 4, nombre: "20 RF" },
-    { codigo: 5, nombre: "40 DV" },
-    { codigo: 6, nombre: "40 FR" },
-    { codigo: 7, nombre: "40 HC" },
-    { codigo: 8, nombre: "40 NOR" },
-    { codigo: 9, nombre: "40 OT" },
-    { codigo: 10, nombre: "40 RF" },
-    { codigo: 11, nombre: "LCL / MAQUINARIA" },
-  ],
-};
-
-const columns: Column<ServiceRow>[] = [
+const columns: CustomColumn<ServiceRow>[] = [
   { label: "ID", key: "id", sortable: true },
   { label: "Origen", key: "origen", sortable: true },
   { label: "Destino", key: "destino", sortable: true },
   { label: "Fecha", key: "fecha", sortable: true },
   { label: "Tipo", key: "tipo", sortable: true },
+  {
+    label: "Estado",
+    key: "estado",
+    sortable: true,
+    render: (value: EstadoServicio) => (
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${
+          estadoStyles[value] || ""
+        } ${badgeTextColor[value] || ""}`}
+      >
+        {value}
+      </span>
+    ),
+  },
 ];
 
 const searchFilters: SearchFilter<ServiceRow>[] = [
   { label: "ID", key: "id", type: "text", placeholder: "Buscar ID" },
-  { label: "Origen", key: "origen", type: "text", placeholder: "Buscar origen" },
-  { label: "Destino", key: "destino", type: "text", placeholder: "Buscar destino" },
+  {
+    label: "Origen",
+    key: "origen",
+    type: "text",
+    placeholder: "Buscar origen",
+  },
+  {
+    label: "Destino",
+    key: "destino",
+    type: "text",
+    placeholder: "Buscar destino",
+  },
 ];
 
-const STORAGE = {
-  borradores: "serviciosBorradores",
-  legacyBorrador: "nuevoServicioBorrador",
-};
+// Ahora incluimos "Sin Asignar" junto a "Pendiente"
+const checkboxFilterGroups: CheckboxFilterGroup<ServiceRow>[] = [
+  {
+    label: "Estados",
+    key: "estado",
+    options: ["Pendiente", "Sin Asignar"],
+  },
+];
 
 const IngresoServicio: React.FC = () => {
   const navigate = useNavigate();
   const [rows, setRows] = useState<ServiceRow[]>([]);
 
   useEffect(() => {
-    const lookup = (arr: CatalogoItem[], code: number) =>
-      arr.find(x => x.codigo === code)?.nombre || code.toString();
+    const lookup = (arr: { codigo: number; nombre: string }[], code: number) =>
+      arr.find((x) => x.codigo === code)?.nombre || code.toString();
 
-    const loadList = () =>
-      JSON.parse(localStorage.getItem(STORAGE.borradores) || "[]") as Payload[];
+    // Cargo borradores y enviados, filtro sólo los pendientes y sin asignar
+    const payloads: Payload[] = [...loadDrafts(), ...loadSent()].filter((p) =>
+      estadosFiltrados.includes(p.estado)
+    );
 
-    // solo borradores (+ legacy)
-    const payloads: Payload[] = [
-      ...loadList(),
-      ...(localStorage.getItem(STORAGE.legacyBorrador)
-        ? [JSON.parse(localStorage.getItem(STORAGE.legacyBorrador)!)]
-        : []),
-    ];
-
-    const mapped = payloads.map(p => {
+    const mapped = payloads.map((p) => {
       const f = p.form;
       const tipoOp = f.tipoOperacion;
       const origenName =
@@ -153,6 +116,7 @@ const IngresoServicio: React.FC = () => {
         destino: destinoName,
         fecha: f.fechaSol,
         tipo: lookup(mockCatalogos.Operación, tipoOp),
+        estado: p.estado,
         raw: p,
       };
     });
@@ -160,48 +124,75 @@ const IngresoServicio: React.FC = () => {
     setRows(mapped);
   }, []);
 
-  const handleDelete = (id: string) => {
-    if (!window.confirm(`¿Eliminar borrador ${id}?`)) return;
-    setRows(r => r.filter(x => x.id !== id));
+  const handleDelete = (row: ServiceRow) => {
+    if (!window.confirm(`¿Eliminar servicio ${row.id}?`)) return;
+    const idNum = Number(row.id);
 
-    // eliminar del storage
-    const list = JSON.parse(localStorage.getItem(STORAGE.borradores) || "[]") as Payload[];
-    localStorage.setItem(
-      STORAGE.borradores,
-      JSON.stringify(list.filter(p => p.id.toString() !== id))
-    );
+    // Si existe en borradores, lo borro de ahí, si no, de enviados
+    const drafts = loadDrafts();
+    if (drafts.some((d) => d.id === idNum)) {
+      deleteDraft(idNum);
+    } else {
+      const sent = loadSent().filter((s) => s.id !== idNum);
+      localStorage.setItem("serviciosEnviados", JSON.stringify(sent));
+    }
+
+    setRows((prev) => prev.filter((r) => r.id !== row.id));
   };
 
-  const dropdownOptions = (): DropdownOption<ServiceRow>[] => [
-    {
-      label: "Completar servicio",
-      onClick: row =>
-        navigate(`/comercial/modificar-servicio/${row.id}`),
-    },
-    {
-      label: "Eliminar borrador",
-      onClick: row => handleDelete(row.id),
-    },
-  ];
+  const dropdownOptions = (row: ServiceRow): CustomDropdownOption[] => {
+    if (row.estado === "Pendiente") {
+      return [
+        {
+          label: "Ver/Editar Servicio",
+          onClick: () => navigate(`/comercial/modificar-servicio/${row.id}`),
+        },
+        {
+          label: "Gestionar Valores",
+          onClick: () => navigate(`/comercial/agregar-valores/${row.id}`),
+          disabled: false,
+        },
+        {
+          label: "Eliminar",
+          onClick: () => handleDelete(row),
+          disabled: false,
+        },
+      ];
+    } else {
+      // "Pendiente" sólo lectura
+      return [
+        {
+          label: "Ver Detalle",
+          onClick: () => navigate(`/detalle-servicio/${row.id}`),
+        },
+      ];
+    }
+  };
 
   return (
     <div className="p-6">
+      <div className="mb-4 flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Servicios</h1>
+        <Link
+          to="/comercial/nuevo-servicio"
+          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+        >
+          Nuevo Servicio
+        </Link>
+      </div>
+
       <ListWithSearch<ServiceRow>
         data={rows}
         columns={columns}
         searchFilters={searchFilters}
-        checkboxFilterGroups={[]}
+        checkboxFilterGroups={checkboxFilterGroups}
         dropdownOptions={dropdownOptions}
-        tableTitle="Borradores de Servicio"
-        filterTitle="Buscar borrador"
-        globalButtons={
-          <Link
-            to="/comercial/nuevo-servicio"
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-          >
-            Nuevo Servicio
-          </Link>
-        }
+        colorConfig={{
+          field: "estado",
+          bgMapping: estadoStyles,
+          textMapping: badgeTextColor,
+          mode: "row",
+        }}
         onDownloadExcel={() => alert("Descarga de Excel (stub)")}
         onSearch={() => alert("Buscar (stub)")}
       />

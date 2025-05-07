@@ -1,19 +1,21 @@
-// Mapeo de estado a clases de Tailwind para el badge
+// Mapeo de estado a clases de Tailwind para el badge (colores básicos)
 export const estadoStyles: Record<string, string> = {
-  "por procesar": "bg-red-500",
-  "en proceso": "bg-purple-500",
-  "por facturar": "bg-orange-500",
-  "facturado": "bg-blue-500",
-  completado: "bg-green-500",
-  cancelado: "bg-yellow-500",
+  Pendiente:      "bg-yellow-500",
+  "En Proceso":   "bg-red-500",
+  "Por facturar": "bg-green-500",
+  Completado:     "bg-green-700",
+  Cancelado:      "bg-gray-500",
+  "Sin Asignar":  "bg-blue-500",
+  "Falso Flete":  "text-white",
 };
 
-// Definición de color de texto para cada badge
+// Color de texto para cada badge
 export const badgeTextColor: Record<string, string> = {
-  "por procesar": "text-white",
-  "en proceso": "text-white",
-  "por facturar": "text-white",
-  "facturado": "text-white",
-  completado: "text-white",
-  cancelado: "text-black",
+  Pendiente:      "text-white",
+  "En Proceso":   "text-white",
+  "Por facturar": "text-white",
+  Completado:     "text-white",
+  Cancelado:      "text-white",
+  "Sin Asignar":  "text-white",
+  "Falso Flete":  "bg-gray-600",
 };

@@ -1,125 +1,41 @@
-import React, { useEffect, useState, useRef } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+// src/pages/NuevoServicio.tsx
+import React, { useEffect, useState, useRef, useCallback } from "react";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import {
+  Punto,
+  FormState,
+  Item,
+  getNextId,
+  loadSent,
+  saveOrUpdateSent,
+  mockCatalogos,
+  mockCentros,
+  mockPaises,
+  useServiceDrafts,
+  Payload,
+  valoresPorDefecto,
+  ValorFactura
+} from "../utils/ServiceDrafts";
+import { ArrowDown } from "lucide-react";
 
-interface Item {
-  codigo: number;
-  nombre: string;
-}
-interface Catalogos {
-  Operación: Item[];
-  Zona: Item[];
-  Zona_portuaria: Item[];
-  Tipo_contenedor: Item[];
-  acciones: Item[];
-  empresas: Item[];
-}
-interface Centro {
-  codigo: number;
-  nombre: string;
-  cliente: number;
-}
-type Punto = {
-  idLugar: number;
-  accion: number;
-  estado: number;
-  eta: string;
-};
-
-// mock data
-const mockCatalogos: Catalogos = {
-  Operación: [
-    { codigo: 1, nombre: "EXPORTACIÓN" },
-    { codigo: 2, nombre: "IMPORTACIÓN" },
-    { codigo: 3, nombre: "NACIONAL" },
-    { codigo: 4, nombre: "TRENADA" },
-    { codigo: 5, nombre: "REUTILIZACIÓN" },
-    { codigo: 6, nombre: "RETORNO" },
-    { codigo: 7, nombre: "LOCAL" },
-  ],
-  Zona: [
-    { codigo: 1, nombre: "SUR" },
-    { codigo: 2, nombre: "CENTRO" },
-    { codigo: 3, nombre: "NORTE" },
-  ],
-  Zona_portuaria: [
-    { codigo: 1, nombre: "SAI" },
-    { codigo: 2, nombre: "VAP" },
-    { codigo: 3, nombre: "CNL" },
-    { codigo: 4, nombre: "LQN" },
-    { codigo: 5, nombre: "SVE" },
-    { codigo: 6, nombre: "SCL" },
-  ],
-  Tipo_contenedor: [
-    { codigo: 1, nombre: "20 DV" },
-    { codigo: 2, nombre: "20 FR" },
-    { codigo: 3, nombre: "20 OT" },
-    { codigo: 4, nombre: "20 RF" },
-    { codigo: 5, nombre: "40 DV" },
-    { codigo: 6, nombre: "40 FR" },
-    { codigo: 7, nombre: "40 HC" },
-    { codigo: 8, nombre: "40 NOR" },
-    { codigo: 9, nombre: "40 OT" },
-    { codigo: 10, nombre: "40 RF" },
-    { codigo: 11, nombre: "LCL / MAQUINARIA" },
-  ],
-  acciones: [
-    { codigo: 1, nombre: "retirar container vacío" },
-    { codigo: 2, nombre: "retirar container cargado" },
-    { codigo: 3, nombre: "dejar container vacío" },
-    { codigo: 4, nombre: "dejar container cargado" },
-    { codigo: 5, nombre: "almacenar contenido" },
-    { codigo: 6, nombre: "llenar container" },
-    { codigo: 7, nombre: "vaciar container" },
-  ],
-  empresas: [
-    { codigo: 1, nombre: "Perrot1" },
-    { codigo: 2, nombre: "Perrot2" },
-  ],
-};
-
-const mockCentros: Centro[] = [
-  { codigo: 1, nombre: "Centro A", cliente: 1 },
-  { codigo: 2, nombre: "Centro B", cliente: 1 },
-  { codigo: 3, nombre: "Centro C", cliente: 2 },
-  { codigo: 4, nombre: "Centro D", cliente: 2 },
-];
-
-const mockPaises: Item[] = [
-  { codigo: 1, nombre: "Chile" },
-  { codigo: 2, nombre: "Argentina" },
-  { codigo: 3, nombre: "Perú" },
-];
-
-// claves en localStorage
-const STORAGE = {
-  enviados: "serviciosEnviados",
-  borradores: "serviciosBorradores",
-  ultimoId: "ultimoIdServicio",
-};
-
-// Genera un ID autoincremental guardado en localStorage
-function getNextId(): number {
-  const last = parseInt(localStorage.getItem(STORAGE.ultimoId) || "0", 10);
-  const next = last + 1;
-  localStorage.setItem(STORAGE.ultimoId, next.toString());
-  return next;
-}
 
 const NuevoServicio: React.FC = () => {
   const { id: paramId } = useParams<{ id?: string }>();
   const nav = useNavigate();
+  const location = useLocation();
+  const isComercial = location.pathname.includes("/comercial");
   const formRef = useRef<HTMLFormElement>(null);
+  const { drafts, upsert, remove } = useServiceDrafts();
 
   const [idService, setIdService] = useState<number | null>(null);
-  const [catalogos, setCatalogos] = useState<Catalogos | null>(null);
-  const [centros, setCentros] = useState<Centro[]>([]);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FormState>({
     cliente: 0,
     tipoOperacion: 0,
     origen: 0,
     destino: 0,
     pais: 0,
     fechaSol: "",
+    fechaIng: new Date().toISOString().replace("T", " ").split(".")[0] ?? "",
     tipoContenedor: 0,
     zonaPortuaria: 0,
     kilos: 0,
@@ -139,153 +55,245 @@ const NuevoServicio: React.FC = () => {
   });
   const [puntos, setPuntos] = useState<Punto[]>([]);
 
-  // cargar mocks y, si hay id, cargar datos existentes
+  // Carga inicial si editando
   useEffect(() => {
-    setCatalogos(mockCatalogos);
-    setCentros(mockCentros);
-
-    if (paramId) {
-      const svcId = parseInt(paramId, 10);
-      if (!isNaN(svcId)) {
-        const enviados = JSON.parse(
-          localStorage.getItem(STORAGE.enviados) || "[]"
-        );
-        const borradores = JSON.parse(
-          localStorage.getItem(STORAGE.borradores) || "[]"
-        );
-        const found =
-          enviados.find((s: any) => s.id === svcId) ||
-          borradores.find((s: any) => s.id === svcId);
-        if (found) {
-          setIdService(svcId);
-          setForm(found.form);
-          setPuntos(found.puntos || []);
-        }
-      }
+    if (!paramId) return;
+    const svcId = parseInt(paramId, 10);
+    if (isNaN(svcId)) return;
+    const sent = loadSent();
+    const found =
+      sent.find((s) => s.id === svcId) || drafts.find((d) => d.id === svcId);
+    if (found) {
+      setIdService(svcId);
+      setForm(found.form as FormState);
+      setPuntos(found.puntos || []);
     }
-  }, [paramId]);
+  }, [paramId, drafts]);
 
-  const upd =
-    (k: keyof typeof form) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-      const val =
-        e.target.type === "number" || typeof form[k] === "number"
-          ? Number(e.target.value)
-          : e.target.value;
-      setForm({ ...form, [k]: val });
+  // Actualización de campos del formulario
+  function upd<K extends keyof FormState>(
+    key: K
+  ): (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
+  ) => void {
+    return (e) => {
+      const t = e.target;
+      const value =
+        t.type === "number" || typeof form[key] === "number"
+          ? (Number(t.value) as FormState[K])
+          : (t.value as FormState[K]);
+      setForm((f) => ({ ...f, [key]: value } as FormState));
     };
+  }
 
-  const opt = (arr?: Item[]) =>
-    arr?.map((i) => (
-      <option key={i.codigo} value={i.codigo}>
-        {i.nombre}
-      </option>
-    ));
 
-  const centrosFiltrados = centros.filter((c) => c.cliente === form.cliente);
-  const origenOptions: Item[] =
+  const opt = useCallback(
+    (arr?: Item[]) =>
+      arr?.map((i) => (
+        <option key={i.codigo} value={i.codigo}>
+          {i.nombre}
+        </option>
+      )),
+    []
+  );
+
+  // Filtrado de catálogos según cliente y operación
+  const centrosFiltrados = mockCentros.filter(
+    (c) => c.cliente === form.cliente
+  );
+  const origenOptions =
     form.tipoOperacion === 2
-      ? catalogos?.Zona_portuaria || []
+      ? mockCatalogos.Zona_portuaria
       : form.tipoOperacion === 1
       ? centrosFiltrados
       : [];
-  const destinoOptions: Item[] =
+  const destinoOptions =
     form.tipoOperacion === 1
-      ? catalogos?.Zona_portuaria || []
+      ? mockCatalogos.Zona_portuaria
       : form.tipoOperacion === 2
       ? centrosFiltrados
       : [];
+  const puntosOptions = [...mockCatalogos.Zona_portuaria, ...centrosFiltrados];
 
-  const addPunto = () =>
-    setPuntos([...puntos, { idLugar: 0, accion: 0, estado: 1, eta: "" }]);
-  const updatePunto = (
-    idx: number,
-    key: "idLugar" | "accion" | "eta",
-    value: number | string
-  ) =>
-    setPuntos(
-      puntos.map((p, i) => (i === idx ? { ...p, [key]: value } : p))
-    );
-  const removePunto = (idx: number) =>
-    setPuntos(puntos.filter((_, i) => i !== idx));
+  // Determina el estado previo del camión antes de cada punto
+  const estadosPrevios = puntos.map((_, idx) => {
+    if (idx === 0) return "none";
+    const act = puntos[idx - 1]?.accion ?? 0;
+    if ([1, 7].includes(act)) return "empty";
+    if ([2, 6, 8, 9].includes(act)) return "loaded";
+    return "none";
+  });
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setForm({ ...form, documentoPorContenedor: `/uploads/${file.name}` });
-    }
+  // Agregar punto al final
+  const addPunto = useCallback(
+    () =>
+      setPuntos((p) => [...p, { idLugar: 0, accion: 0, estado: 1, eta: "" }]),
+    []
+  );
+  // Insertar punto antes de la posición idx
+  const insertPunto = useCallback(
+    (idx: number) =>
+      setPuntos((p) => [
+        ...p.slice(0, idx),
+        { idLugar: 0, accion: 0, estado: 1, eta: "" },
+        ...p.slice(idx),
+      ]),
+    []
+  );
+  const updatePunto = useCallback(
+    (idx: number, key: keyof Punto, v: number | string) =>
+      setPuntos((p) =>
+        p.map((pt, i) => (i === idx ? { ...pt, [key]: v } : pt))
+      ),
+    []
+  );
+  const removePunto = useCallback(
+    (idx: number) => setPuntos((p) => p.filter((_, i) => i !== idx)),
+    []
+  );
+
+  // Manejo de archivo para "documentoPorContenedor"
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        setForm((f) => ({
+          ...f,
+          documentoPorContenedor: `/uploads/${file.name}`,
+        }));
+      }
+    },
+    []
+  );
+
+  // Mostrar estado actual (solo si existe idService)
+  const mostrarEstado = () => {
+    if (!idService) return "Nuevo (no guardado)";
+    const svc =
+      loadSent().find((s) => s.id === idService) ||
+      drafts.find((d) => d.id === idService);
+    return svc?.estado ?? "Pendiente";
   };
 
-  // Enviar (crear o actualizar) y marcar como enviados
-  const handleEnviar = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formRef.current?.checkValidity()) {
-      formRef.current.reportValidity();
-      return;
-    }
+  // Handler para Enviar servicio
+  const handleEnviar = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!formRef.current?.checkValidity()) {
+        formRef.current?.reportValidity();
+        return;
+      }
+      if (puntos.length < 2) {
+        alert("Debes definir al menos 2 puntos.");
+        return;
+      }
+      const lastAcc = puntos[puntos.length - 1]?.accion;
+      const lastState = [1, 7].includes(lastAcc ?? 0)
+        ? "empty"
+        : [2, 6].includes(lastAcc ?? 0)
+        ? "loaded"
+        : "none";
+      if (lastState !== "none") {
+        alert("El viaje debe terminar sin contenedor.");
+        return;
+      }
 
+      const newId = idService ?? getNextId();
+      const sentList = loadSent();
+      const existing =
+        sentList.find((s) => s.id === newId) ||
+        drafts.find((d) => d.id === newId);
+      const hasValores = Boolean((existing as Payload)?.valores?.length);
+
+      if (!hasValores) {
+        const valores = generarValoresDesdePuntos(puntos);
+        saveOrUpdateSent({ id: newId, form, puntos, estado: "Sin Asignar", valores });
+        if (drafts.some((d) => d.id === newId)) remove(newId);
+        alert("Se generaron valores automáticamente. Revisa y confirma.");
+        nav(`/comercial/agregar-valores/${newId}`);
+        return;
+      }
+
+      // Con valores: estado depende de chofer/móvil
+      const hasChofer = Boolean((existing as Payload).chofer);
+      const hasMovil = Boolean((existing as Payload).movil);
+      const estadoFinal: Payload["estado"] =
+        hasChofer && hasMovil ? "En Proceso" : "Sin Asignar";
+
+      saveOrUpdateSent({
+        id: newId,
+        form,
+        puntos,
+        estado: estadoFinal,
+        valores: (existing as Payload).valores,
+        chofer: (existing as Payload).chofer,
+        movil: (existing as Payload).movil,
+      });
+      if (drafts.some((d) => d.id === newId)) remove(newId);
+
+      alert(`Servicio ${newId} enviado. Estado: ${estadoFinal}`);
+      nav("/comercial/ingresoServicios");
+    },
+    [form, puntos, idService, drafts, remove, nav]
+  );
+
+  // Handler para Guardar borrador
+  const handleGuardar = useCallback(() => {
     const newId = idService ?? getNextId();
-    const payload = {
-      id: newId,
-      form,
-      puntos,
-      enviado: true,
-    };
-
-    // actualizar storage de enviados
-    const enviados = JSON.parse(
-      localStorage.getItem(STORAGE.enviados) || "[]"
-    );
-    const idxEnv = enviados.findIndex((s: any) => s.id === newId);
-    if (idxEnv >= 0) {
-      enviados[idxEnv] = payload;
-    } else {
-      enviados.push(payload);
-    }
-    localStorage.setItem(STORAGE.enviados, JSON.stringify(enviados));
-
-    // eliminar si existía en borradores
-    const borradores = JSON.parse(
-      localStorage.getItem(STORAGE.borradores) || "[]"
-    );
-    const filtrados = borradores.filter((s: any) => s.id !== newId);
-    localStorage.setItem(STORAGE.borradores, JSON.stringify(filtrados));
-
-    alert(`Servicio ${newId} enviado correctamente.`);
+    // si ya existía un estado, lo reutilizamos; si no, "Pendiente"
+    const existing =
+      idService
+        ? loadSent().find((s) => s.id === newId) || drafts.find((d) => d.id === newId)
+        : null;
+    const estadoToUse = existing?.estado ?? "Pendiente";
+    saveOrUpdateSent({ id: newId, form, puntos, estado: estadoToUse });
+    upsert({ id: newId, form, puntos, estado: estadoToUse });
+    alert(`Borrador guardado con ID ${newId}. Estado: Pendiente`);
     nav("/comercial/ingresoServicios");
-  };
+  }, [form, puntos, idService, upsert, nav]);
 
-  // Guardar borrador (sin validar required)
-  const handleGuardar = () => {
-    const newId = idService ?? getNextId();
-    const payload = { id: newId, form, puntos };
-    const borradores = JSON.parse(
-      localStorage.getItem(STORAGE.borradores) || "[]"
-    );
-    const idxBor = borradores.findIndex((s: any) => s.id === newId);
-    if (idxBor >= 0) {
-      borradores[idxBor] = payload;
-    } else {
-      borradores.push(payload);
-    }
-    localStorage.setItem(STORAGE.borradores, JSON.stringify(borradores));
-    alert(`Borrador guardado con ID ${newId}.`);
-    nav("/comercial/ingresoServicios");
-  };
+function generarValoresDesdePuntos(puntos: Punto[]): ValorFactura[] {
+  const hoy: string = new Date().toISOString().split("T")[0]!; // aseguras que es string
+
+  return puntos
+    .filter((p) => valoresPorDefecto[p.accion])
+    .map((p, i) => {
+      const def = valoresPorDefecto[p.accion]!;
+      return {
+        id: `auto-${i}`,
+        concepto: def.concepto,
+        monto: def.monto,
+        impuesto: 0,
+        fechaEmision: hoy, // ahora TypeScript no reclama
+        tipo: "venta",
+        codigo: p.accion.toString(),
+      };
+    });
+}
+
+
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-2">
-        {idService ? "Modificar Servicio" : "Nuevo Servicio"}
-      </h1>
-      <p className="mb-4 text-sm text-gray-600">* Campos obligatorios</p>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">
+          {idService ? "Modificar Servicio" : "Nuevo Servicio"}
+        </h1>
+        {idService && (
+          <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full">
+            Estado: {mostrarEstado()}
+          </span>
+        )}
+      </div>
 
       <form
         ref={formRef}
         onSubmit={handleEnviar}
         className="space-y-6 bg-white p-6 shadow rounded"
       >
-        {/* Cliente y Operación */}
+        {/* Cliente y operación */}
         <div className="grid md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium">Cliente *</label>
@@ -296,7 +304,7 @@ const NuevoServicio: React.FC = () => {
               required
             >
               <option value={0}>—</option>
-              {opt(catalogos?.empresas)}
+              {opt(mockCatalogos.empresas)}
             </select>
           </div>
           <div>
@@ -310,12 +318,12 @@ const NuevoServicio: React.FC = () => {
               required
             >
               <option value={0}>—</option>
-              {opt(catalogos?.Operación)}
+              {opt(mockCatalogos.Operación)}
             </select>
           </div>
         </div>
 
-        {/* Origen y Destino */}
+        {/* Origen / Destino */}
         {form.cliente > 0 && form.tipoOperacion > 0 && (
           <div className="grid md:grid-cols-2 gap-4">
             <div>
@@ -327,7 +335,7 @@ const NuevoServicio: React.FC = () => {
                 required
               >
                 <option value={0}>—</option>
-                {opt(origenOptions)}
+                {opt(origenOptions as Item[])}
               </select>
             </div>
             <div>
@@ -339,221 +347,280 @@ const NuevoServicio: React.FC = () => {
                 required
               >
                 <option value={0}>—</option>
-                {opt(destinoOptions)}
+                {opt(destinoOptions as Item[])}
               </select>
             </div>
           </div>
         )}
 
-        {/* Resto de campos */}
+        {/* Otros campos */}
         {form.cliente > 0 && form.tipoOperacion > 0 && (
-          <>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium">ODV *</label>
-                <input
-                  className="input"
-                  value={form.odv}
-                  onChange={upd("odv")}
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">País *</label>
-                <select
-                  className="input"
-                  value={form.pais}
-                  onChange={upd("pais")}
-                  required
-                >
-                  <option value={0}>—</option>
-                  {opt(mockPaises)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium">
-                  Fecha de servicio *
-                </label>
-                <input
-                  type="date"
-                  className="input"
-                  value={form.fechaSol}
-                  onChange={upd("fechaSol")}
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">
-                  Tipo de contenedor *
-                </label>
-                <select
-                  className="input"
-                  value={form.tipoContenedor}
-                  onChange={upd("tipoContenedor")}
-                  required
-                >
-                  <option value={0}>—</option>
-                  {opt(catalogos?.Tipo_contenedor)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium">Kilos *</label>
-                <input
-                  type="number"
-                  className="input"
-                  value={form.kilos}
-                  onChange={upd("kilos")}
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">
-                  Precio de Carga *
-                </label>
-                <input
-                  type="number"
-                  className="input"
-                  value={form.precioCarga}
-                  onChange={upd("precioCarga")}
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">
-                  Temperatura *
-                </label>
-                <input
-                  type="number"
-                  className="input"
-                  value={form.temperatura}
-                  onChange={upd("temperatura")}
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">Guía</label>
-                <input
-                  className="input"
-                  value={form.guia}
-                  onChange={upd("guia")}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">Tarjetón</label>
-                <input
-                  className="input"
-                  value={form.tarjeton}
-                  onChange={upd("tarjeton")}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">Máquina</label>
-                <input
-                  className="input"
-                  value={form.maquina}
-                  onChange={upd("maquina")}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">Sello</label>
-                <input
-                  className="input"
-                  value={form.sello}
-                  onChange={upd("sello")}
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium">Observación</label>
-                <textarea
-                  className="input w-full h-24"
-                  value={form.observacion}
-                  onChange={upd("observacion")}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">Interchange</label>
-                <input
-                  className="input"
-                  value={form.interchange}
-                  onChange={upd("interchange")}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">
-                  Documento por Contenedor
-                </label>
-                <input type="file" onChange={handleFileChange} />
-              </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            {/*<div>
+              <label className="block text-sm font-medium">ODV *</label>
+              <input
+                className="input"
+                value={form.odv}
+                onChange={upd("odv")}
+                required
+              />
+            </div>*/}
+            <div>
+              <label className="block text-sm font-medium">País *</label>
+              <select
+                className="input"
+                value={form.pais}
+                onChange={upd("pais")}
+                required
+              >
+                <option value={0}>—</option>
+                {opt(mockPaises)}
+              </select>
             </div>
-
-            <section className="space-y-4">
-              <h2 className="text-lg font-semibold">Puntos del recorrido</h2>
-              {puntos.map((p, idx) => (
-                <div
-                  key={idx}
-                  className="grid md:grid-cols-4 gap-2 items-center"
-                >
-                  <select
-                    className="input"
-                    value={p.idLugar}
-                    onChange={(e) =>
-                      updatePunto(idx, "idLugar", +e.target.value)
-                    }
-                  >
-                    <option value={0}>Lugar</option>
-                    {opt(destinoOptions)}
-                  </select>
-                  <select
-                    className="input"
-                    value={p.accion}
-                    onChange={(e) =>
-                      updatePunto(idx, "accion", +e.target.value)
-                    }
-                  >
-                    <option value={0}>Acción</option>
-                    {opt(catalogos?.acciones)}
-                  </select>
-                  <input
-                    type="datetime-local"
-                    className="input"
-                    placeholder="Hora estimada de llegada"
-                    value={p.eta}
-                    onChange={(e) =>
-                      updatePunto(idx, "eta", e.target.value)
-                    }
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removePunto(idx)}
-                    className="px-2 py-1 bg-red-600 text-white rounded"
-                  >
-                    X
-                  </button>
-                </div>
-              ))}
-              <button type="button" onClick={addPunto} className="btn-primary">
-                Añadir punto
-              </button>
-            </section>
-          </>
+            <div>
+              <label className="block text-sm font-medium">
+                Fecha de Solicitud *
+              </label>
+              <input
+                type="date"
+                className="input"
+                value={form.fechaSol}
+                onChange={upd("fechaSol")}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">
+                Tipo de contenedor *
+              </label>
+              <select
+                className="input"
+                value={form.tipoContenedor}
+                onChange={upd("tipoContenedor")}
+                required
+              >
+                <option value={0}>—</option>
+                {opt(mockCatalogos.Tipo_contenedor)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Kilos *</label>
+              <input
+                type="number"
+                className="input"
+                value={form.kilos}
+                onChange={upd("kilos")}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">
+                Precio de Carga *
+              </label>
+              <input
+                type="number"
+                className="input"
+                value={form.precioCarga}
+                onChange={upd("precioCarga")}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Temperatura *</label>
+              <input
+                type="number"
+                className="input"
+                value={form.temperatura}
+                onChange={upd("temperatura")}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Guía</label>
+              <input
+                className="input"
+                value={form.guia}
+                onChange={upd("guia")}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Tarjetón</label>
+              <input
+                className="input"
+                value={form.tarjeton}
+                onChange={upd("tarjeton")}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Máquina</label>
+              <input
+                className="input"
+                value={form.maquina}
+                onChange={upd("maquina")}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Sello</label>
+              <input
+                className="input"
+                value={form.sello}
+                onChange={upd("sello")}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium">Observación</label>
+              <textarea
+                className="input w-full h-24"
+                value={form.observacion}
+                onChange={upd("observacion")}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Interchange</label>
+              <input
+                className="input"
+                value={form.interchange}
+                onChange={upd("interchange")}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">
+                Documento por Contenedor
+              </label>
+              <input type="file" onChange={handleFileChange} />
+            </div>
+          </div>
         )}
 
+        {/* Puntos del recorrido */}
+        {form.cliente > 0 && form.tipoOperacion > 0 && (
+          <section className="space-y-4 mt-6">
+            <h2 className="text-lg font-semibold">Puntos del Recorrido</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Debes definir al menos 2 puntos y asegurar que el camión comience
+              retirando un contenedor y termine vacío.
+            </p>
+            <div className="space-y-4">
+              {puntos.map((p, idx) => {
+                const prev = estadosPrevios[idx];
+                let acciones: Item[] = [];
+                if (prev === "none")
+                  acciones = mockCatalogos.acciones.filter((a) =>
+                    [1, 2].includes(a.codigo)
+                  );
+                else if (prev === "empty")
+                  acciones = mockCatalogos.acciones.filter((a) =>
+                    [6, 3].includes(a.codigo)
+                  );
+                else if (prev === "loaded")
+                  acciones = mockCatalogos.acciones.filter((a) =>
+                    [7, 4, 8, 9].includes(a.codigo)
+                  );
+
+                return (
+                  <div
+                    key={idx}
+                    className="grid md:grid-cols-4 gap-4 items-end p-3 bg-white rounded shadow"
+                  >
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Lugar del Punto {idx + 1} *
+                      </label>
+                      <select
+                        className="input w-full"
+                        value={p.idLugar}
+                        onChange={(e) =>
+                          updatePunto(idx, "idLugar", +e.target.value)
+                        }
+                        required
+                      >
+                        <option value={0}>Seleccione un lugar</option>
+                        {opt(puntosOptions)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Acción *
+                      </label>
+                      <select
+                        className="input w-full"
+                        value={p.accion}
+                        onChange={(e) =>
+                          updatePunto(idx, "accion", +e.target.value)
+                        }
+                        required
+                      >
+                        <option value={0}>Seleccione una acción</option>
+                        {opt(acciones)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        ETA *
+                      </label>
+                      <input
+                        type="datetime-local"
+                        className="input w-full"
+                        value={p.eta}
+                        onChange={(e) =>
+                          updatePunto(idx, "eta", e.target.value)
+                        }
+                        required
+                      />
+                    </div>
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => insertPunto(idx)}
+                        className="px-3 py-1.5 bg-yellow-600 text-white rounded"
+                        title="Insertar punto abajo"
+                      >
+                        <ArrowDown strokeWidth={3} className="w-6 h-6" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removePunto(idx)}
+                        className="px-3 py-1.5 bg-red-600 text-white rounded"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                onClick={addPunto}
+                className="px-4 py-2 bg-green-600 text-white rounded"
+              >
+                Añadir Punto
+              </button>
+            </div>
+          </section>
+        )}
+
+        {/* Botones Enviar y Guardar */}
         <div className="flex gap-4">
-          <button type="submit" className="btn-primary">
-            Enviar
-          </button>
+          {isComercial && (
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded"
+            >
+              Enviar
+            </button>
+          )}
           <button
             type="button"
             onClick={handleGuardar}
-            className="btn-secondary"
+            className="px-4 py-2 bg-gray-500 text-white rounded"
           >
             Guardar
           </button>
+          {/* Botón Cancelar */}
           <button
             type="button"
             onClick={() => nav(-1)}
-            className="btn-secondary"
+            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
           >
             Cancelar
           </button>

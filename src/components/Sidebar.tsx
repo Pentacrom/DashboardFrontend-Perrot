@@ -24,7 +24,7 @@ const Sidebar: React.FC = () => {
       </div>
 
       <nav className="p-4 flex-1 overflow-y-auto border-r border-gray-300 drop-shadow-md">
-        {/* Sección Cliente */}
+        {/* Sección Cliente 
         {(isAdmin || roles.includes("cliente")) && (
           <div>
             <h2 className="font-bold uppercase border-b border-gray-300 pb-1">
@@ -43,7 +43,7 @@ const Sidebar: React.FC = () => {
               </li>
             </ul>
           </div>
-        )}
+        )}*/}
 
         {/* Sección Comercial */}
         {(isAdmin || roles.includes("comercial")) && (
@@ -60,14 +60,6 @@ const Sidebar: React.FC = () => {
                   <span>Ingreso de servicios</span>
                 </NavLink>
               </li>
-              <li>
-                <NavLink
-                  to="/comercial/servicios-pendientes"
-                  className={linkClasses}
-                >
-                  <span>Servicios pendientes</span>
-                </NavLink>
-              </li>
             </ul>
           </div>
         )}
@@ -80,13 +72,8 @@ const Sidebar: React.FC = () => {
             </h2>
             <ul className="mt-2 ml-4">
               <li>
-                <NavLink to="/servicios" className={linkClasses}>
-                  <span>Servicios</span>
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/servicios-test" className={linkClasses}>
-                  <span>Servicios test</span>
+                <NavLink to="/torre-de-control/servicios" className={linkClasses}>
+                  <span>Servicios en proceso</span>
                 </NavLink>
               </li>
             </ul>
@@ -102,10 +89,10 @@ const Sidebar: React.FC = () => {
             <ul className="mt-2 ml-4">
               <li>
                 <NavLink
-                  to="/operaciones/servicios-pendientes"
+                  to="/operaciones/servicios"
                   className={linkClasses}
                 >
-                  <span>Servicios pendientes</span>
+                  <span>Servicios</span>
                 </NavLink>
               </li>
             </ul>
