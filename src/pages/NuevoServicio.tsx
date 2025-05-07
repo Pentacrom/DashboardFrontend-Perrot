@@ -9,7 +9,6 @@ import {
   loadSent,
   saveOrUpdateSent,
   mockCatalogos,
-  mockCentros,
   mockPaises,
   useServiceDrafts,
   Payload,
@@ -113,8 +112,8 @@ const NuevoServicio: React.FC = () => {
   
 
   // Filtrado de catálogos según cliente y operación
-  const centrosFiltrados = mockCentros.filter(
-    (c) => c.cliente === form.cliente
+  const centrosFiltrados = mockCatalogos.Lugares.filter(
+    (c) => c.cliente === form.cliente && c.tipo === "Centro"
   );
 
   const ZonasPortuarias = mockCatalogos.Lugares.filter(
@@ -523,18 +522,44 @@ function generarValoresDesdePuntos(puntos: Punto[]): ValorFactura[] {
               {puntos.map((p, idx) => {
                 const prev = estadosPrevios[idx];
                 let acciones: Item[] = [];
-                if (prev === "none")
+                let lugaresPuntos: Lugar[] = [];
+                if (prev === "none") {
                   acciones = mockCatalogos.acciones.filter((a) =>
                     [1, 2].includes(a.codigo)
                   );
+
+                  lugaresPuntos = mockCatalogos.Lugares.filter((a) =>
+                    a.cliente === form.cliente ||
+                    a.cliente === undefined &&
+                    a.tipo === "Zona Portuaria" ||
+                    a.tipo === "Centro"
+                  );
+                }
                 else if (prev === "empty")
+                {
                   acciones = mockCatalogos.acciones.filter((a) =>
                     [6, 3].includes(a.codigo)
                   );
-                else if (prev === "loaded")
+                  
+                  lugaresPuntos = mockCatalogos.Lugares.filter(
+                    (a) =>
+                      a.cliente === form.cliente ||
+                      a.cliente === undefined &&
+                      a.tipo === "Zona Portuaria" ||
+                      a.tipo === "Centro"
+                  );
+                }
+                else if (prev === "loaded") {
                   acciones = mockCatalogos.acciones.filter((a) =>
                     [7, 4, 8, 9].includes(a.codigo)
                   );
+
+                  lugaresPuntos = mockCatalogos.Lugares.filter(
+                    (a) =>
+                      a.cliente === form.cliente ||
+                      a.cliente === undefined
+                  );
+                }
 
                 return (
                   <div
