@@ -4,7 +4,6 @@ export const estadoStyles: Record<string, string> = {
   "En Proceso":   "bg-red-500",
   "Por facturar": "bg-green-500",
   Completado:     "bg-green-700",
-  Cancelado:      "bg-gray-500",
   "Sin Asignar":  "bg-blue-500",
   "Falso Flete":  "text-white",
 };

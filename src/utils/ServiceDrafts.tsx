@@ -34,6 +34,8 @@ export interface Punto {
   eta: string; // estimada
   llegada?: string; // datetime de llegada
   salida?: string; // datetime de salida
+  observacion?: string;
+  razonDeTardia?: string;
 }
 
 export interface FormState {
@@ -45,21 +47,23 @@ export interface FormState {
   fechaSol: string;
   fechaIng: string;
   tipoContenedor: number;
-  zonaPortuaria: number;
   kilos: number;
   precioCarga: number;
   temperatura: number;
   idCCosto: number;
-  guia: string;
+  guiaDeDespacho: string;
   tarjeton: string;
-  maquina: string;
+  nroContenedor: string;
   sello: string;
   nave: number;
   observacion: string;
   interchange: string;
   rcNoDevolucion: number;
   odv: string;
-  documentoPorContenedor: string;
+  documentoPorContenedor: string[];
+  imoCargo: boolean;
+  imoCategoria: number;
+  tipoServicio: number;
 }
 
 export type EstadoServicio = 'Pendiente' | 'En Proceso' | 'Por facturar' | 'Completado' | 'Sin Asignar' | 'Falso Flete';
@@ -68,11 +72,17 @@ export type TipoLugar = 'Zona Portuaria' | 'Centro' | 'Proveedor'
 export interface ValorFactura {
   id: string;
   concepto: string;
-  monto: number;
-  impuesto: number;
+  montoCosto: number;
+  montoVenta: number;
   fechaEmision: string;
   tipo: "costo" | "venta";
   codigo?: string;
+  descuentoPorcentaje?: Descuento[] /** Descuento porcentual aplicado a este ítem (0-100) */;
+}
+
+export interface Descuento {
+  porcentajeDescuento: number;
+  razon: string;
 }
 
 
@@ -85,6 +95,9 @@ export interface Payload {
   valores?: ValorFactura[];
   chofer?: string; // lista de nombres o IDs de choferes asignados
   movil?: string; // lista de patentes o IDs de móviles asignados
+  /** Descuento porcentual aplicado al total del servicio (0-100) */
+  descuentoServicioPorcentaje?: Descuento[];
+  createdBy: string;
 }
 
 
@@ -114,10 +127,10 @@ export const mockCatalogos: Catalogos = {
     { id: 10, nombre: "Proveedor 1", tipo: "Proveedor" },
     { id: 11, nombre: "Proveedor 2", tipo: "Proveedor" },
     { id: 12, nombre: "Proveedor 3", tipo: "Proveedor" },
-    { id: 1, nombre: "Centro A", tipo: "Centro", cliente: 1 },
-    { id: 2, nombre: "Centro B", tipo: "Centro", cliente: 1 },
-    { id: 3, nombre: "Centro C", tipo: "Centro", cliente: 2 },
-    { id: 4, nombre: "Centro D", tipo: "Centro", cliente: 2 },
+    { id: 13, nombre: "Centro A", tipo: "Centro", cliente: 1 },
+    { id: 14, nombre: "Centro B", tipo: "Centro", cliente: 1 },
+    { id: 15, nombre: "Centro C", tipo: "Centro", cliente: 2 },
+    { id: 16, nombre: "Centro D", tipo: "Centro", cliente: 2 },
   ],
   Tipo_contenedor: [
     { codigo: 1, nombre: "20 DV" },
@@ -142,7 +155,11 @@ export const mockCatalogos: Catalogos = {
     { codigo: 7, nombre: "vaciar container" },
     { codigo: 8, nombre: "porteo" },
     { codigo: 9, nombre: "almacenaje" },
+    { codigo: 10, nombre: "resguardo" },
+    { codigo: 11, nombre: "retirar carga" },
+    { codigo: 12, nombre: "dejar carga" },
   ],
+
   empresas: [
     { codigo: 1, nombre: "Perrot1" },
     { codigo: 2, nombre: "Perrot2" },
@@ -175,43 +192,149 @@ const STORAGE = {
   enviados: "serviciosEnviados",
 };
 
-interface ValorPorDefecto {
+export interface ValorPorDefecto {
   concepto: string;
-  monto: number;
+  montoVenta: number;
+  montoCosto: number;
   aplicaA: "punto" | "servicio";
 }
 
 export const valoresPorDefecto: Record<number | string, ValorPorDefecto> = {
-  // Valores por acción de punto
-  1: { concepto: "Retiro de container vacío", monto: 50000, aplicaA: "punto" },
+  // Valores por acción de punto (ejemplos)
+  1: {
+    concepto: "Retiro de container vacío",
+    montoVenta: 60000,
+    montoCosto: 10000,
+    aplicaA: "punto",
+  },
   2: {
     concepto: "Retiro de container cargado",
-    monto: 70000,
+    montoVenta: 80000,
+    montoCosto: 12000,
     aplicaA: "punto",
   },
-  3: { concepto: "Entrega de container vacío", monto: 40000, aplicaA: "punto" },
+  3: {
+    concepto: "Entrega de container vacío",
+    montoVenta: 50000,
+    montoCosto: 9000,
+    aplicaA: "punto",
+  },
   4: {
     concepto: "Entrega de container cargado",
-    monto: 60000,
+    montoVenta: 75000,
+    montoCosto: 13000,
     aplicaA: "punto",
   },
-  5: { concepto: "Almacenaje de contenido", monto: 45000, aplicaA: "punto" },
-  6: { concepto: "Llenado de container", monto: 55000, aplicaA: "punto" },
-  7: { concepto: "Vaciado de container", monto: 53000, aplicaA: "punto" },
-  8: { concepto: "Servicio de porteo", monto: 30000, aplicaA: "punto" },
-  9: { concepto: "Servicio de almacenaje", monto: 25000, aplicaA: "punto" },
+  5: {
+    concepto: "Almacenaje de contenido",
+    montoVenta: 55000,
+    montoCosto: 8000,
+    aplicaA: "punto",
+  },
+  6: {
+    concepto: "Llenado de container",
+    montoVenta: 65000,
+    montoCosto: 11000,
+    aplicaA: "punto",
+  },
+  7: {
+    concepto: "Vaciado de container",
+    montoVenta: 63000,
+    montoCosto: 10500,
+    aplicaA: "punto",
+  },
+  8: {
+    concepto: "Servicio de porteo",
+    montoVenta: 40000,
+    montoCosto: 7000,
+    aplicaA: "punto",
+  },
+  9: {
+    concepto: "Servicio de almacenaje",
+    montoVenta: 35000,
+    montoCosto: 6000,
+    aplicaA: "punto",
+  },
 
-  // Servicios extras (no ligados a puntos)
-  doc: { concepto: "Gestión documental", monto: 12000, aplicaA: "servicio" },
-  mon: { concepto: "Monitoreo 24/7", monto: 15000, aplicaA: "servicio" },
-  track: { concepto: "Tracking GPS", monto: 8000, aplicaA: "servicio" },
-  seg: { concepto: "Seguro de carga", monto: 10000, aplicaA: "servicio" },
+  // Servicios extras (ejemplos)
+  doc: {
+    concepto: "Gestión documental",
+    montoVenta: 15000,
+    montoCosto: 3000,
+    aplicaA: "servicio",
+  },
+  mon: {
+    concepto: "Monitoreo 24/7",
+    montoVenta: 18000,
+    montoCosto: 4000,
+    aplicaA: "servicio",
+  },
+  track: {
+    concepto: "Tracking GPS",
+    montoVenta: 10000,
+    montoCosto: 2500,
+    aplicaA: "servicio",
+  },
+  seg: {
+    concepto: "Seguro de carga",
+    montoVenta: 12000,
+    montoCosto: 3500,
+    aplicaA: "servicio",
+  },
   com: {
     concepto: "Comisión administrativa",
-    monto: 6000,
+    montoVenta: 8000,
+    montoCosto: 2000,
     aplicaA: "servicio",
   },
 };
+
+export const imoCategorias = [
+  {
+    code: 1,
+    label:
+      "1 – Explosivos (sustancias que pueden detonar o iniciar reacción explosiva)",
+  },
+  {
+    code: 2,
+    label:
+      "2 – Gases (inflamables, no inflamables o tóxicos, envasados a presión)",
+  },
+  {
+    code: 3,
+    label: "3 – Líquidos inflamables (petróleo, solventes, alcoholes, etc.)",
+  },
+  {
+    code: 4,
+    label:
+      "4 – Sólidos inflamables o que emiten gases inflamables al mojarse (pólvoras, sulfuro, etc.)",
+  },
+  {
+    code: 5,
+    label:
+      "5 – Sustancias comburentes y peróxidos orgánicos (oxidantes que promueven combustión)",
+  },
+  {
+    code: 6,
+    label:
+      "6 – Sustancias tóxicas e infecciosas (venenos, agentes patógenos, etc.)",
+  },
+  {
+    code: 7,
+    label:
+      "7 – Material radiactivo (residuos nucleares, fuentes radiactivas industriales, etc.)",
+  },
+  {
+    code: 8,
+    label:
+      "8 – Sustancias corrosivas (ácidos fuertes, álcalis, etc., que destruyen tejidos o metales)",
+  },
+  {
+    code: 9,
+    label:
+      "9 – Sustancias y objetos peligrosos diversos (mercancías peligrosas que no encajan en clases anteriores)",
+  },
+];
 
 
 /** Genera un ID autoincremental */

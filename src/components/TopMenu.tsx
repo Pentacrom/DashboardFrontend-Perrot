@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext";
 
 const TopMenu: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -7,7 +8,7 @@ const TopMenu: React.FC = () => {
   const navigate = useNavigate();
 
   // Ejemplo de nombre de usuario; en una aplicación real lo obtendrías de contexto, props o global state.
-  const username = "Juan Pérez";
+  const { userName } = useContext(AuthContext);
 
   // Cierra el menú si se hace click fuera de él
   useEffect(() => {
@@ -48,7 +49,7 @@ const TopMenu: React.FC = () => {
   };
 
   return (
-    <header className="w-full h-20 bg-white border-b border-gray-300 flex items-center px-6 text-black drop-shadow-md">
+    <header className="w-full h-20 bg-white border-b border-gray-300 flex items-center px-6 text-black drop-shadow-md z-50">
       {/* Sección Izquierda: Logo y Título */}
       <div className="flex items-center">
         <span className="font-bold text-lg">
@@ -63,12 +64,12 @@ const TopMenu: React.FC = () => {
             className="cursor-pointer hover:text-blue-600 transition-colors font-bold text-xl flex items-center"
             onClick={() => setIsOpen(!isOpen)}
           >
-            {username}
+            {userName}
             <span className="ml-2 text-lg">{isOpen ? "▲" : "▼"}</span>
           </li>
         </ul>
         {isOpen && (
-          <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded shadow-md">
+          <div className="absolute right-0 z-50 mt-2 w-48 bg-white border border-gray-200 rounded shadow-md">
             <ul className="py-1">
               <li
                 className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
@@ -76,12 +77,12 @@ const TopMenu: React.FC = () => {
               >
                 Ver perfil
               </li>
-              <li
+              {/*<li
                 className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                 onClick={handleCambiarContrasena}
               >
                 Cambiar contraseña
-              </li>
+              </li>*/}
               <li
                 className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                 onClick={handleLogout}

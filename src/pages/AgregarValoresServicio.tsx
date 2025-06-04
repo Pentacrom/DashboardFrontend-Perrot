@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
+// src/pages/AgregarValoresServicio.tsx
+import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   saveOrUpdateSent,
@@ -9,314 +10,530 @@ import {
   valoresPorDefecto,
 } from "../utils/ServiceDrafts";
 
+interface Discount {
+  id: string;
+  porcentaje: number;
+  razon: string;
+}
+
+const formatCLP = (value: number) =>
+  new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.round(value));
+
 const AgregarValoresServicio: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [valores, setValores] = useState<ValorFactura[]>([]);
+
   const [payload, setPayload] = useState<Payload | null>(null);
+  const [valores, setValores] = useState<ValorFactura[]>([]);
+  const [descPorValor, setDescPorValor] = useState<Record<string, Discount[]>>(
+    {}
+  );
+  const [descTotal, setDescTotal] = useState<Discount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Extrae el primer segmento de la ruta (p.ej. "comercial" o "operacion")
+  const segments = location.pathname.split("/").filter(Boolean);
+  const perfilActual = segments[1] || "";
+  const isOperacion = perfilActual === "operaciones";
+
   useEffect(() => {
     try {
-      const servicioId = parseInt(id || "0", 10);
-      if (!servicioId) throw new Error("ID de servicio inválido");
-      const enviado = loadSent().find((s) => s.id === servicioId);
-      const borrador = loadDrafts().find((s) => s.id === servicioId);
-      const serv = enviado || borrador;
-      if (!serv) throw new Error("Servicio no encontrado");
-      setPayload(serv);
-      setValores(serv.valores || []);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Error al cargar el servicio"
+      const svcId = Number(id);
+      if (!svcId) throw new Error("ID inválido");
+      const sent = loadSent().find((s) => s.id === svcId);
+      const draft = loadDrafts().find((s) => s.id === svcId);
+      const svc = sent || draft;
+      if (!svc) throw new Error("Servicio no encontrado");
+
+      setPayload(svc);
+      setValores(svc.valores || []);
+
+      // inicializar descuentos generales
+      const initTotal: Discount[] = (svc.descuentoServicioPorcentaje || []).map(
+        (d, i) => ({
+          id: Date.now().toString() + "-" + i,
+          porcentaje: d.porcentajeDescuento,
+          razon: d.razon,
+        })
       );
+      setDescTotal(initTotal);
+
+      // inicializar descuentos por valor
+      const initPorValor: Record<string, Discount[]> = {};
+      (svc.valores || []).forEach((v) => {
+        initPorValor[v.id] = (v.descuentoPorcentaje || []).map((d, i) => ({
+          id: Date.now().toString() + "-" + i,
+          porcentaje: d.porcentajeDescuento,
+          razon: d.razon,
+        }));
+      });
+      setDescPorValor(initPorValor);
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setLoading(false);
     }
   }, [id]);
 
-  const agregarValor = useCallback(() => {
+  // ---- Helpers para valores ----
+  const agregarValor = () => {
     const nuevo: ValorFactura = {
       id: Date.now().toString(),
       concepto: "",
-      monto: 0,
-      impuesto: 0,
-      fechaEmision: new Date().toISOString().split("T")[0]!,
+      codigo: "",
+      montoVenta: 0,
+      montoCosto: 0,
+      fechaEmision: new Date().toISOString().slice(0, 10),
       tipo: "venta",
+      descuentoPorcentaje: [],
     };
-    setValores((prev) => [...prev, nuevo]);
-  }, []);
+    setValores((v) => [...v, nuevo]);
+  };
 
-  const actualizarValor = useCallback(
-    (valId: string, campo: keyof ValorFactura, valor: string | number) => {
-      setValores((prev) =>
-        prev.map((v) => (v.id === valId ? { ...v, [campo]: valor } : v))
-      );
-    },
-    []
-  );
+  const actualizarValor = (
+    vid: string,
+    campo: keyof ValorFactura,
+    val: any
+  ) => {
+    setValores((v) =>
+      v.map((x) => (x.id === vid ? { ...x, [campo]: val } : x))
+    );
+  };
+  const eliminarValor = (vid: string) => {
+    setValores((v) => v.filter((x) => x.id !== vid));
+    setDescPorValor((d) => {
+      const c = { ...d };
+      delete c[vid];
+      return c;
+    });
+  };
 
-  const eliminarValor = useCallback((valId: string) => {
-    setValores((prev) => prev.filter((v) => v.id !== valId));
-  }, []);
+  // ---- Descuentos por valor ----
+  const agregarDescValor = (vid: string) => {
+    const d: Discount = { id: Date.now().toString(), porcentaje: 0, razon: "" };
+    setDescPorValor((dv) => ({ ...dv, [vid]: [...(dv[vid] || []), d] }));
+  };
+  const actualizarDescValor = (
+    vid: string,
+    did: string,
+    campo: keyof Discount,
+    val: number | string
+  ) => {
+    setDescPorValor((dv) => {
+      const arr = (dv[vid] || []).map((x) => {
+        if (x.id !== did) return x;
 
-  const handleGuardar = useCallback(() => {
+        if (campo === "porcentaje") {
+          // 1) convertir val a string
+          let s = typeof val === "number" ? val.toString() : val;
+          // 2) eliminar todo excepto dígitos y punto
+          s = s.replace(/[^0-9.]/g, "");
+          // 3) quitar ceros al inicio (pero dejar “0” si es cero)
+          s = s.replace(/^0+(?=\d)/, "");
+          // 4) parsear y clamp
+          const num = parseFloat(s) || 0;
+          const clean = Math.max(0, Math.min(100, num));
+          return { ...x, porcentaje: clean };
+        }
+
+        // para razón no tocamos nada
+        return { ...x, [campo]: val };
+      });
+
+      return { ...dv, [vid]: arr };
+    });
+  };
+  const eliminarDescValor = (vid: string, did: string) => {
+    setDescPorValor((dv) => ({
+      ...dv,
+      [vid]: (dv[vid] || []).filter((x) => x.id !== did),
+    }));
+  };
+
+  // ---- Descuentos totales ----
+  const agregarDescTotal = () => {
+    const d: Discount = { id: Date.now().toString(), porcentaje: 0, razon: "" };
+    setDescTotal((dt) => [...dt, d]);
+  };
+  const actualizarDescTotal = (
+    did: string,
+    campo: keyof Discount,
+    val: number | string
+  ) => {
+    setDescTotal((dt) =>
+      dt.map((x) => (x.id === did ? { ...x, [campo]: val } : x))
+    );
+  };
+  const eliminarDescTotal = (did: string) => {
+    setDescTotal((dt) => dt.filter((x) => x.id !== did));
+  };
+
+  // ---- Cálculos ----
+
+  // Los descuentos son sumados 5% + 5% = 10% descuento total y por valor
+  const calcItem = (v: ValorFactura): number => {
+    // 1) suma porcentajes
+    const totalPct = Math.min(
+      100,
+      (descPorValor[v.id] || []).reduce((sum, d) => sum + d.porcentaje, 0)
+    );
+    // 2) aplica el descuento sumado
+    const discountedSale = v.montoVenta * (1 - totalPct / 100);
+    // 3) resta el costo
+    return discountedSale - v.montoCosto;
+  };
+
+  const calcSubtotal = () => valores.reduce((sum, v) => sum + calcItem(v), 0);
+  const calcTotal = () => {
+    let total = calcSubtotal();
+    descTotal.forEach((d) => {
+      total *= 1 - d.porcentaje / 100;
+    });
+    return total;
+  };
+
+  // ---- Guardar / Enviar ----
+  const handleGuardar = () => {
     if (!payload) return;
-    const actualizado: Payload = {
+    const nuevosValores: ValorFactura[] = valores.map((v) => ({
+      ...v,
+      descuentoPorcentaje: (descPorValor[v.id] || []).map((d) => ({
+        porcentajeDescuento: d.porcentaje,
+        razon: d.razon,
+      })),
+    }));
+    const nuevosDescTotal = descTotal.map((d) => ({
+      porcentajeDescuento: d.porcentaje,
+      razon: d.razon,
+    }));
+    saveOrUpdateSent({
       ...payload,
-      valores,
-      estado: "Pendiente",
-    };
-    saveOrUpdateSent(actualizado);
-    alert(`Borrador guardado con ID ${payload.id}. Estado: Pendiente`);
-    navigate("/comercial/ingresoServicios");
-  }, [payload, valores, navigate]);
-
-  const handleEnviar = useCallback(() => {
+      valores: nuevosValores,
+      descuentoServicioPorcentaje: nuevosDescTotal
+    });
+    alert(`Guardado servicio N° ${payload.id}`);
+    navigate(`/${perfilActual}/gestion-servicios`);
+  };
+  const handleEnviar = () => {
     if (!payload) return;
-    if (valores.length === 0) {
-      alert("Debes ingresar al menos un valor antes de enviar.");
-      return;
-    }
-    const hasChofer = Boolean(payload.chofer);
-    const hasMovil = Boolean(payload.movil);
-    const nuevoEstado: Payload["estado"] =
-      hasChofer && hasMovil ? "En Proceso" : "Sin Asignar";
+    if (valores.length === 0) return alert("Agrega al menos un valor");
 
-    const enviado: Payload = {
+    const nuevosValores: ValorFactura[] = valores.map((v) => ({
+      ...v,
+      descuentoPorcentaje: (descPorValor[v.id] || []).map((d) => ({
+        porcentajeDescuento: d.porcentaje,
+        razon: d.razon,
+      })),
+    }));
+    const nuevosDescTotal = descTotal.map((d) => ({
+      porcentajeDescuento: d.porcentaje,
+      razon: d.razon,
+    }));
+    const nuevoEstado =
+      payload.chofer && payload.movil ? "En Proceso" : "Sin Asignar";
+    saveOrUpdateSent({
       ...payload,
-      valores,
+      valores: nuevosValores,
+      descuentoServicioPorcentaje: nuevosDescTotal,
       estado: nuevoEstado,
-    };
-    saveOrUpdateSent(enviado);
+    });
+    alert(`Enviado servicio ${payload.id}: ${nuevoEstado}`);
+    navigate(`/${perfilActual}/gestion-servicios`);
+  };
 
-    alert(`Servicio ${payload.id} enviado. Estado: ${nuevoEstado}`);
-    navigate(-1);
-  }, [payload, valores, navigate]);
+  if (loading) return <div className="p-6">Cargando…</div>;
+  if (error) return <div className="p-6 text-red-600">{error}</div>;
+  if (!payload) return null;
 
-  if (loading) {
-    return (
-      <div className="p-6 flex justify-center">
-        <div className="animate-spin h-12 w-12 border-t-2 border-b-2 border-blue-500 rounded-full" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4">
-          {error}
-        </div>
-        <button
-          onClick={() => navigate("/comercial/ingresoServicios")}
-          className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-        >
-          Volver al listado
-        </button>
-      </div>
-    );
-  }
-
-  if (!payload) {
-    return (
-      <div className="p-6">
-        <p>No se encontraron datos del servicio.</p>
-        <button
-          onClick={() => navigate("/comercial/ingresoServicios")}
-          className="mt-4 px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-        >
-          Volver al listado
-        </button>
-      </div>
-    );
-  }
+  // Totales para el resumen
+  const totalVenta = valores.reduce((sum, v) => sum + v.montoVenta, 0);
+  const totalCosto = valores.reduce((sum, v) => sum + v.montoCosto, 0);
+  const subtotalBruto = valores.reduce(
+    (sum, v) => sum + (v.montoVenta - v.montoCosto),
+    0
+  );
+  const descuentoPorValorTotal = subtotalBruto - calcSubtotal();
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">
-        Agregar Valores al Servicio #{payload.id}
-      </h1>
+    <div className="p-6 space-y-6">
+      <h1 className="text-2xl font-bold">Valores Servicio #{payload.id}</h1>
 
-      <div className="bg-white p-6 rounded shadow mb-6">
-        <h2 className="text-lg font-semibold mb-4">Valores / Facturación</h2>
-        <button
-          onClick={agregarValor}
-          className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          + Agregar Valor
+      {/* Valores / Facturación */}
+      <section className="bg-white p-4 rounded shadow space-y-4">
+        <h2 className="font-semibold">Valores / Facturación</h2>
+        <button onClick={agregarValor} className="btn-primary">
+          + Añadir Valor
         </button>
-
-        {valores.length === 0 ? (
-          <p className="text-gray-500">No se han agregado valores aún.</p>
-        ) : (
-          <div className="space-y-4">
-            {valores.map((valor) => {
-              const conceptosDisponibles = Object.entries(
-                valoresPorDefecto
-              ).map(([key, val]) => ({
-                codigo: key,
-                concepto: val.concepto,
-                monto: val.monto,
-              }));
-
-              const match = conceptosDisponibles.find(
-                (c) => c.concepto === valor.concepto
-              );
-              const isCustom = !match;
-
-              return (
-                <div
-                  key={valor.id}
-                  className="grid grid-cols-1 md:grid-cols-5 gap-4 border p-4 rounded"
+        {valores.length === 0 && <p>No hay valores.</p>}
+        {valores.map((v) => (
+          <div key={v.id} className="border p-4 rounded space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              {/* Concepto */}
+              <div>
+                <label className="block text-sm font-medium">Concepto</label>
+                <select
+                  className="input mt-1"
+                  value={v.codigo || ""}
+                  onChange={(e) => {
+                    const sel = e.target.value;
+                    if (!sel) {
+                      actualizarValor(v.id, "codigo", "");
+                      actualizarValor(v.id, "concepto", "");
+                      actualizarValor(v.id, "montoVenta", 0);
+                      actualizarValor(v.id, "montoCosto", 0);
+                      setDescPorValor((d) => ({ ...d, [v.id]: [] }));
+                    } else {
+                      const def = valoresPorDefecto[sel];
+                      if (!def) return;
+                      actualizarValor(v.id, "codigo", sel);
+                      actualizarValor(v.id, "concepto", def.concepto);
+                      actualizarValor(v.id, "montoVenta", def.montoVenta);
+                      actualizarValor(v.id, "montoCosto", def.montoCosto);
+                      // conservamos descuentos previos
+                    }
+                  }}
                 >
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Concepto *
-                    </label>
-                    <select
-                      className="input w-full"
-                      value={isCustom ? "custom" : valor.concepto}
-                      onChange={(e) => {
-                        const selected = e.target.value;
-                        if (selected === "custom") {
-                          actualizarValor(valor.id, "concepto", "");
-                          actualizarValor(valor.id, "monto", 0);
-                        } else {
-                          const def = conceptosDisponibles.find(
-                            (c) => c.concepto === selected
-                          );
-                          if (def) {
-                            actualizarValor(valor.id, "concepto", def.concepto);
-                            actualizarValor(valor.id, "monto", def.monto);
-                          }
-                        }
-                      }}
-                    >
-                      {conceptosDisponibles.map((c) => (
-                        <option key={c.codigo} value={c.concepto}>
-                          {c.concepto}
-                        </option>
-                      ))}
-                      <option value="custom">Otro (personalizado)</option>
-                    </select>
-                    {isCustom && (
-                      <input
-                        className="input mt-2 w-full"
-                        type="text"
-                        placeholder="Concepto personalizado"
-                        value={valor.concepto}
-                        onChange={(e) =>
-                          actualizarValor(valor.id, "concepto", e.target.value)
-                        }
-                      />
-                    )}
-                  </div>
+                  <option value="">-- elige concepto --</option>
+                  {Object.entries(valoresPorDefecto).map(([key, def]) => (
+                    <option key={key} value={key}>
+                      {def.concepto}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Monto
-                    </label>
+              {/* Venta */}
+              <div>
+                <label className="block text-sm font-medium">Venta</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  className="input mt-1"
+                  value={v.montoVenta}
+                  onChange={(e) =>
+                    actualizarValor(
+                      v.id,
+                      "montoVenta",
+                      parseFloat(e.target.value) || 0
+                    )
+                  }
+                />
+              </div>
+
+              {/* Costo */}
+              <div>
+                <label className="block text-sm font-medium">Costo</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  className="input mt-1"
+                  value={v.montoCosto}
+                  onChange={(e) =>
+                    actualizarValor(
+                      v.id,
+                      "montoCosto",
+                      parseFloat(e.target.value) || 0
+                    )
+                  }
+                />
+              </div>
+
+              {/* Fecha Emisión */}
+              <div>
+                <label className="block text-sm font-medium">Fecha</label>
+                <input
+                  type="date"
+                  className="input mt-1"
+                  value={v.fechaEmision}
+                  onChange={(e) =>
+                    actualizarValor(v.id, "fechaEmision", e.target.value)
+                  }
+                />
+              </div>
+
+              {/* Eliminar */}
+              <div className="flex items-end">
+                <button
+                  onClick={() => eliminarValor(v.id)}
+                  className="text-red-600"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+
+            {/* Descuentos por valor */}
+            <div>
+              <h3 className="font-medium mb-2">Descuentos de este valor</h3>
+              {(descPorValor[v.id] || []).map((d) => (
+                <div key={d.id} className="flex gap-2 items-center mb-2">
+                  <div className="relative">
                     <input
                       type="number"
-                      value={valor.monto}
+                      min={0}
+                      max={100}
+                      step={1.0}
+                      className="input w-20 pr-6 mt-1"
+                      value={d.porcentaje}
                       onChange={(e) =>
-                        actualizarValor(
-                          valor.id,
-                          "monto",
-                          parseFloat(e.target.value) || 0
-                        )
-                      }
-                      className="input w-full"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Fecha emisión
-                    </label>
-                    <input
-                      type="date"
-                      value={valor.fechaEmision}
-                      onChange={(e) =>
-                        actualizarValor(
-                          valor.id,
-                          "fechaEmision",
+                        actualizarDescValor(
+                          v.id,
+                          d.id,
+                          "porcentaje",
                           e.target.value
                         )
                       }
-                      className="input w-full"
                     />
+                    <span className="absolute top-1/2 right-2 -translate-y-1/2 text-gray-500">
+                      %
+                    </span>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Tipo
-                    </label>
-                    <div className="flex gap-2">
-                      <label className="flex items-center gap-1">
-                        <input
-                          type="radio"
-                          name={`tipo-${valor.id}`}
-                          value="costo"
-                          checked={valor.tipo === "costo"}
-                          onChange={() =>
-                            actualizarValor(valor.id, "tipo", "costo")
-                          }
-                        />
-                        Costo
-                      </label>
-                      <label className="flex items-center gap-1">
-                        <input
-                          type="radio"
-                          name={`tipo-${valor.id}`}
-                          value="venta"
-                          checked={valor.tipo === "venta"}
-                          onChange={() =>
-                            actualizarValor(valor.id, "tipo", "venta")
-                          }
-                        />
-                        Venta
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="flex items-end">
-                    <button
-                      onClick={() => eliminarValor(valor.id)}
-                      className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
+                  <input
+                    type="text"
+                    className="input flex-1 mt-1"
+                    placeholder="Razón"
+                    value={d.razon}
+                    onChange={(e) =>
+                      actualizarDescValor(v.id, d.id, "razon", e.target.value)
+                    }
+                  />
+                  <button
+                    onClick={() => eliminarDescValor(v.id, d.id)}
+                    className="text-red-600"
+                  >
+                    ×
+                  </button>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+              ))}
+              <button
+                onClick={() => agregarDescValor(v.id)}
+                className="btn-secondary text-sm"
+              >
+                + Añadir descuento
+              </button>
+            </div>
 
+            <div className="text-right font-semibold">
+              Valor: {formatCLP(calcItem(v))}
+            </div>
+          </div>
+        ))}
+      </section>
+
+      {/* Descuentos totales */}
+      <section className="bg-white p-4 rounded shadow space-y-3">
+        <h2 className="font-semibold">Descuentos al total de servicio</h2>
+        {descTotal.map((d) => (
+          <div key={d.id} className="flex gap-2 items-center mb-2">
+            <div className="relative">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                className="input w-20 pr-6 mt-1"
+                value={d.porcentaje}
+                onChange={(e) =>
+                  actualizarDescTotal(
+                    d.id,
+                    "porcentaje",
+                    parseFloat(e.target.value) || 0
+                  )
+                }
+              />
+              <span className="absolute top-1/2 right-2 -translate-y-1/2 text-gray-500">
+                %
+              </span>
+            </div>
+            <input
+              type="text"
+              className="input flex-1 mt-1"
+              placeholder="Razón"
+              value={d.razon}
+              onChange={(e) =>
+                actualizarDescTotal(d.id, "razon", e.target.value)
+              }
+            />
+            <button
+              onClick={() => eliminarDescTotal(d.id)}
+              className="text-red-600 mt-1"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button onClick={agregarDescTotal} className="btn-secondary text-sm">
+          + Añadir descuento al total
+        </button>
+      </section>
+
+      {/* Resumen Detallado */}
+      <section className="bg-white p-4 rounded shadow space-y-2">
+        <h2 className="font-semibold text-lg">Resumen Detallado</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div>
+            <p className="font-medium">Venta total:</p>
+            <p>{formatCLP(totalVenta)}</p>
+          </div>
+          <div>
+            <p className="font-medium">Costo total:</p>
+            <p>{formatCLP(totalCosto)}</p>
+          </div>
+          <div>
+            <p className="font-medium">Subtotal bruto:</p>
+            <p>{formatCLP(subtotalBruto)}</p>
+          </div>
+          <div>
+            <p className="font-medium">Descuento por valor:</p>
+            <p>-{formatCLP(descuentoPorValorTotal)}</p>
+          </div>
+          <div>
+            <p className="font-medium">
+              Subtotal neto (antes descuentos generales):
+            </p>
+            <p>{formatCLP(calcSubtotal())}</p>
+          </div>
+          <div>
+            <p className="font-medium">Descuento general:</p>
+            <p>-{formatCLP(calcSubtotal() - calcTotal())}</p>
+          </div>
+          <div>
+            <p className="font-medium">Total final:</p>
+            <p className="font-bold">{formatCLP(calcTotal())}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Acciones */}
       <div className="flex justify-end gap-4">
         <button
           onClick={handleGuardar}
-          className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+          className="px-4 py-2 bg-gray-300 rounded"
         >
           Guardar
         </button>
-        <button
-          onClick={handleEnviar}
-          disabled={valores.length === 0}
-          className={`px-4 py-2 rounded ${
-            valores.length === 0
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-green-600 hover:bg-green-700 text-white"
-          }`}
-        >
-          Enviar
-        </button>
+        {!isOperacion && (
+          <button
+            onClick={handleEnviar}
+            disabled={valores.length === 0}
+            className={`px-4 py-2 rounded ${
+              valores.length === 0
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-green-600 text-white"
+            }`}
+          >
+            Enviar
+          </button>
+        )}
       </div>
     </div>
   );

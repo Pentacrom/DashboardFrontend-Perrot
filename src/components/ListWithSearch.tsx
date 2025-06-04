@@ -1,3 +1,4 @@
+// src/components/ListWithSearch.tsx
 import { useState, useMemo, useEffect, useRef, ChangeEvent } from "react";
 import ReactDOM from "react-dom";
 
@@ -12,61 +13,49 @@ export interface SearchFilter<T> {
   key: keyof T;
   type: "text" | "date";
   placeholder?: string;
-  /** Para filtros de fecha: "gte" (desde) o "lte" (hasta). Por defecto se usa "gte". */
   comparator?: "gte" | "lte";
 }
 
 export interface CheckboxFilterGroup<T> {
-  label?: string; // opcional, se muestra como título del grupo
+  label?: string;
   key: keyof T;
   options: string[];
 }
 
-/** Cada opción del dropdown ahora recibe el item correspondiente. */
 export interface DropdownOption<T = any> {
   label: string;
   onClick: (item: T) => void;
 }
 
-/**
- * Ahora, dropdownOptions puede ser un arreglo o una función que reciba un item y retorne un arreglo de opciones.
- */
 export type DropdownOptionsType<T> =
   | DropdownOption<T>[]
   | ((item: T) => DropdownOption<T>[]);
 
 export interface ListWithSearchProps<T> {
   data: T[];
-  columns: Column<T>[];
+  columns?: Column<T>[];
+  defaultVisibleColumns?: Array<keyof T>;
   searchFilters?: SearchFilter<T>[];
   checkboxFilterGroups?: CheckboxFilterGroup<T>[];
+  defaultCheckboxSelections?: Partial<Record<keyof T, string[]>>;
   onDownloadExcel?: () => void;
   onSearch?: () => void;
   searchButtonDisabled?: boolean;
   showExcelButton?: boolean;
-  /**
-   * Configuración de colores para una columna.
-   * - field: el campo cuyo valor se usará para mapear colores.
-   * - bgMapping: mapeo de valor a clases de fondo.
-   * - textMapping: mapeo de valor a clases de color de texto.
-   * - mode: "cell" (aplicar solo en la celda) o "row" (aplicar a toda la fila).
-   */
   colorConfig?: {
     field: keyof T;
     bgMapping: Record<string, string>;
     textMapping: Record<string, string>;
     mode?: "cell" | "row";
   };
-  /** Opciones para desplegar en el menú (dropdown) de acciones por fila */
   dropdownOptions?: DropdownOptionsType<T>;
-  /** Título para la sección de filtros, se muestra centrado arriba */
   filterTitle?: string;
-  /** Título para la tabla */
   tableTitle?: string;
-  /** Botón o elementos custom globales, se muestran encima de la tabla */
   globalButtons?: React.ReactNode;
-  /** Función que recibe el item y retorna un array de botones custom (por fila) */
   customButtons?: (item: T) => React.ReactNode[];
+  customSortOrder?: Partial<Record<keyof T, T[keyof T][]>>;
+  defaultSortKey?: keyof T;
+  defaultSortOrder?: "asc" | "desc";
 }
 
 function ListWithSearch<T extends Record<string, any>>({
@@ -84,8 +73,50 @@ function ListWithSearch<T extends Record<string, any>>({
   tableTitle,
   globalButtons,
   customButtons,
+  customSortOrder,
+  defaultSortKey,
+  defaultSortOrder,
+  defaultCheckboxSelections,
 }: ListWithSearchProps<T>) {
-  // Estado para cada filtro de búsqueda (inputs de texto o fecha)
+  // Construir lista completa de columnas
+  const allColumns = useMemo<Column<T>[]>(() => {
+    if (columns && columns.length > 0) {
+      return columns;
+    }
+    if (data.length > 0) {
+      return Object.keys(data[0]!).map((k) => ({
+        key: k as keyof T,
+        label: String(k),
+        sortable: false,
+      }));
+    }
+    return [];
+  }, [columns, data]);
+
+  // Estado para mostrar/ocultar el selector de columnas
+  const [showColumnSelector, setShowColumnSelector] = useState(false);
+
+  const [visibleKeys, setVisibleKeys] = useState<Array<keyof T>>(
+    allColumns.map((c) => c.key)
+  );
+
+  useEffect(() => {
+    setVisibleKeys(allColumns.map((c) => c.key));
+  }, [allColumns]);
+
+  const toggleVisible = (key: keyof T) => {
+    setVisibleKeys((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  };
+
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+
+  // Filtros de texto/fecha
   const [searchValues, setSearchValues] = useState<Record<string, string>>(
     () => {
       const initial: Record<string, string> = {};
@@ -95,43 +126,27 @@ function ListWithSearch<T extends Record<string, any>>({
       return initial;
     }
   );
+  const handleSearchChange =
+    (key: keyof T) => (e: ChangeEvent<HTMLInputElement>) => {
+      setSearchValues((prev) => ({
+        ...prev,
+        [key as string]: e.target.value,
+      }));
+    };
 
-  // Estado para los grupos de checkbox.
+  // Filtros de checkbox
   const [checkboxValues, setCheckboxValues] = useState<
     Record<string, string[]>
   >(() => {
     const initial: Record<string, string[]> = {};
     checkboxFilterGroups.forEach((group) => {
-      initial[group.key as string] = [...group.options];
+      const key = group.key as keyof T;
+      initial[key as string] = defaultCheckboxSelections?.[key] ?? [
+        ...group.options,
+      ];
     });
     return initial;
   });
-
-  // Ordenación
-  const [sortKey, setSortKey] = useState<keyof T | "">("");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-
-  const handleSort = (key: keyof T) => {
-    if (sortKey === key) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortKey(key);
-      setSortOrder("asc");
-    }
-  };
-
-  const renderSortIndicator = (key: keyof T) => {
-    if (sortKey === key) {
-      return sortOrder === "asc" ? " ▲" : " ▼";
-    }
-    return null;
-  };
-
-  const handleSearchChange =
-    (key: keyof T) => (e: ChangeEvent<HTMLInputElement>) => {
-      setSearchValues((prev) => ({ ...prev, [key as string]: e.target.value }));
-    };
-
   const toggleCheckbox = (groupKey: keyof T, option: string) => {
     setCheckboxValues((prev) => {
       const current = prev[groupKey as string] ?? [];
@@ -141,7 +156,10 @@ function ListWithSearch<T extends Record<string, any>>({
           [groupKey as string]: current.filter((v) => v !== option),
         };
       } else {
-        return { ...prev, [groupKey as string]: [...current, option] };
+        return {
+          ...prev,
+          [groupKey as string]: [...current, option],
+        };
       }
     });
   };
@@ -150,7 +168,6 @@ function ListWithSearch<T extends Record<string, any>>({
     [key: string]: HTMLInputElement | null;
   }
   const masterRefs = useRef<MasterCheckboxRefs>({});
-
   useEffect(() => {
     checkboxFilterGroups.forEach((group) => {
       const key = group.key as string;
@@ -175,14 +192,103 @@ function ListWithSearch<T extends Record<string, any>>({
     }));
   };
 
-  // Estado para controlar qué fila tiene abierto su dropdown
+  // Ordenación
+  const [sortKey, setSortKey] = useState<keyof T | "">(defaultSortKey ?? "");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(
+    defaultSortOrder ?? "asc"
+  );
+  const handleSort = (key: keyof T) => {
+    if (sortKey === key) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortOrder("asc");
+    }
+  };
+  const renderSortIndicator = (key: keyof T) => {
+    if (sortKey === key) {
+      return sortOrder === "asc" ? " ▲" : " ▼";
+    }
+    return null;
+  };
+
+  // Filtrado de datos
+  const filteredData = useMemo(() => {
+    let filtered = data;
+
+    searchFilters.forEach((filter) => {
+      const value = searchValues[filter.key as string];
+      if (value) {
+        filtered = filtered.filter((item) => {
+          const itemValue = item[filter.key];
+          if (filter.type === "date") {
+            if (filter.comparator === "lte") {
+              return new Date(itemValue).getTime() <= new Date(value).getTime();
+            }
+            return new Date(itemValue).getTime() >= new Date(value).getTime();
+          }
+          return String(itemValue).toLowerCase().includes(value.toLowerCase());
+        });
+      }
+    });
+
+    checkboxFilterGroups.forEach((group) => {
+      const key = group.key as string;
+      const selected = checkboxValues[key] ?? [];
+      if (selected.length === 0) {
+        filtered = [];
+      } else {
+        filtered = filtered.filter((item) =>
+          selected.includes(item[key] as string)
+        );
+      }
+    });
+
+    return filtered;
+  }, [data, searchFilters, searchValues, checkboxFilterGroups, checkboxValues]);
+
+  // Ordenar datos
+  const sortedData = useMemo(() => {
+    if (!sortKey) return filteredData;
+
+    const order = customSortOrder?.[sortKey];
+    if (order) {
+      return [...filteredData].sort((a, b) => {
+        const ai = order.indexOf(a[sortKey]);
+        const bi = order.indexOf(b[sortKey]);
+        return sortOrder === "asc" ? ai - bi : bi - ai;
+      });
+    }
+
+    return [...filteredData].sort((a, b) => {
+      const aVal = a[sortKey];
+      const bVal = b[sortKey];
+      if (
+        sortKey === "fecha" &&
+        typeof aVal === "string" &&
+        typeof bVal === "string"
+      ) {
+        const diff = new Date(aVal).getTime() - new Date(bVal).getTime();
+        return sortOrder === "asc" ? diff : -diff;
+      }
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        return sortOrder === "asc"
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      }
+      return 0;
+    });
+  }, [filteredData, sortKey, sortOrder, customSortOrder]);
+
+  // Paginación
+  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
+  const paginatedData = sortedData.slice(startIndex, endIndex);
+
+  // Dropdown acciones por fila
   const [openDropdownRow, setOpenDropdownRow] = useState<number | null>(null);
-  // Ref para el contenedor del dropdown
   const dropdownRef = useRef<HTMLDivElement | null>(null);
-  // Ref para los botones de dropdown en cada fila
   const dropdownButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // Efecto para cerrar el dropdown al hacer click fuera
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -205,58 +311,6 @@ function ListWithSearch<T extends Record<string, any>>({
     };
   }, [openDropdownRow]);
 
-  const filteredData = useMemo(() => {
-    let filtered = data;
-    searchFilters.forEach((filter) => {
-      const value = searchValues[filter.key as string];
-      if (value) {
-        filtered = filtered.filter((item) => {
-          const itemValue = item[filter.key];
-          if (filter.type === "date") {
-            if (filter.comparator === "lte") {
-              return new Date(itemValue).getTime() <= new Date(value).getTime();
-            }
-            return new Date(itemValue).getTime() >= new Date(value).getTime();
-          }
-          return String(itemValue).toLowerCase().includes(value.toLowerCase());
-        });
-      }
-    });
-    checkboxFilterGroups.forEach((group) => {
-      const key = group.key as string;
-      const selected = checkboxValues[key] ?? [];
-      if (selected.length === 0) {
-        filtered = [];
-      } else {
-        filtered = filtered.filter((item) => selected.includes(item[key]));
-      }
-    });
-    return filtered;
-  }, [data, searchFilters, searchValues, checkboxFilterGroups, checkboxValues]);
-
-  const sortedData = useMemo(() => {
-    if (!sortKey) return filteredData;
-    return [...filteredData].sort((a, b) => {
-      let aVal = a[sortKey];
-      let bVal = b[sortKey];
-      if (aVal && typeof aVal === "string" && sortKey === "fecha") {
-        const aTime = new Date(aVal).getTime();
-        const bTime = new Date(bVal).getTime();
-        return sortOrder === "asc" ? aTime - bTime : bTime - aTime;
-      }
-      if (typeof aVal === "string" && typeof bVal === "string") {
-        return sortOrder === "asc"
-          ? aVal.localeCompare(bVal)
-          : bVal.localeCompare(aVal);
-      }
-      return 0;
-    });
-  }, [filteredData, sortKey, sortOrder]);
-
-  const showFiltersContainer =
-    (searchFilters && searchFilters.length > 0) ||
-    (checkboxFilterGroups && checkboxFilterGroups.length > 0);
-
   const headerDropdownVisible = data.some((item) => {
     const opts =
       typeof dropdownOptions === "function"
@@ -267,8 +321,12 @@ function ListWithSearch<T extends Record<string, any>>({
   const customButtonsProvided = typeof customButtons === "function";
   const extraColumnVisible = headerDropdownVisible || customButtonsProvided;
 
+  const showFiltersContainer =
+    (searchFilters && searchFilters.length > 0) ||
+    (checkboxFilterGroups && checkboxFilterGroups.length > 0);
+
   return (
-    <div className="p-6 relative">
+    <div className="p-6 relative max-w-full">
       {filterTitle && showFiltersContainer && (
         <h2 className="text-xl font-bold text-center mb-4">{filterTitle}</h2>
       )}
@@ -370,8 +428,40 @@ function ListWithSearch<T extends Record<string, any>>({
         <h3 className="text-lg font-bold mb-4 text-center">{tableTitle}</h3>
       )}
 
-      {/* Render global custom buttons, si se proporcionan */}
       {globalButtons && <div className="mb-4 text-right">{globalButtons}</div>}
+
+      {/* Selector de columnas visibles (colapsable) */}
+      {allColumns.length > 0 && (
+        <div className="mb-4">
+          <button
+            onClick={() => setShowColumnSelector((v) => !v)}
+            className="flex items-center space-x-1 text-sm font-medium text-gray-700 hover:text-gray-900"
+          >
+            <span>Columnas</span>
+            <span>{showColumnSelector ? "▲" : "▼"}</span>
+          </button>
+          {showColumnSelector && (
+            <div className="mt-2 p-4 border rounded bg-gray-50 max-h-48 overflow-y-auto">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {allColumns.map((col) => (
+                  <label
+                    key={col.key as string}
+                    className="inline-flex items-center text-sm text-gray-700"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={visibleKeys.includes(col.key)}
+                      onChange={() => toggleVisible(col.key)}
+                      className="h-4 w-4 text-blue-600"
+                    />
+                    <span className="ml-1">{col.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {colorConfig && (
         <div className="flex flex-wrap items-center mb-4">
@@ -386,162 +476,272 @@ function ListWithSearch<T extends Record<string, any>>({
         </div>
       )}
 
-      <div className="bg-white p-6 rounded shadow overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-100">
-            <tr>
-              {columns
-                .map((col) => (
-                  <th
-                    key={col.key as string}
-                    onClick={() => col.sortable && handleSort(col.key)}
-                    className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase ${
-                      col.sortable ? "hover:text-gray-700" : ""
-                    }`}
-                  >
-                    {col.label}
-                    {col.sortable && renderSortIndicator(col.key)}
-                  </th>
-                ))
-                .concat(
-                  extraColumnVisible
-                    ? [
-                        <th
-                          key="actions"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                        >
-                          Acciones
-                        </th>,
-                      ]
-                    : []
-                )}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {sortedData.map((item, idx) => {
-              let rowClass = "";
-              if (colorConfig && colorConfig.mode === "row") {
-                const value = String(item[colorConfig.field]);
-                const bgClass = colorConfig.bgMapping[value] || "";
-                const textClass = colorConfig.textMapping[value] || "";
-                rowClass = `${bgClass} ${textClass}`;
-              }
-              const rowOptions =
-                typeof dropdownOptions === "function"
-                  ? dropdownOptions(item)
-                  : dropdownOptions;
-              return (
-                <tr key={idx} className={rowClass}>
-                  {columns
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          Mostrando del{" "}
+          <strong>{Math.min(startIndex + 1, sortedData.length)}</strong> al{" "}
+          <strong>{Math.min(endIndex, sortedData.length)}</strong> de{" "}
+          <strong>{sortedData.length}</strong>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-700">Ítems por página:</label>
+          <input
+            type="number"
+            value={itemsPerPage}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              setItemsPerPage(Math.max(1, val));
+              setCurrentPage(1);
+            }}
+            className="w-16 border rounded p-1 text-sm"
+            min={1}
+          />
+          <label className="text-sm text-gray-700">Página:</label>
+          <input
+            type="number"
+            value={currentPage}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              setCurrentPage(Math.min(Math.max(1, val), totalPages));
+            }}
+            className="w-16 border rounded p-1 text-sm"
+            min={1}
+          />
+        </div>
+      </div>
+
+      {/* Contenedor del bloque de datos (tabla + paginación) */}
+      <div className="bg-white p-6 rounded shadow min-w-full max-w-full">
+        {/* Sólo la tabla queda en un contenedor con overflow-x-auto */}
+        <div className="overflow-x-auto w-full">
+          <div className="inline-block w-full">
+            <table className="divide-y divide-gray-200 max-w-full min-w-full">
+              <thead className="bg-gray-100">
+                <tr>
+                  {allColumns
+                    .filter((col) => visibleKeys.includes(col.key))
                     .map((col) => (
-                      <td
+                      <th
                         key={col.key as string}
-                        className="px-6 py-4 whitespace-nowrap"
+                        onClick={() => col.sortable && handleSort(col.key)}
+                        className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase ${
+                          col.sortable ? "hover:text-gray-700" : ""
+                        }`}
                       >
-                        {colorConfig &&
-                        colorConfig.mode === "cell" &&
-                        col.key === colorConfig.field ? (
-                          <span
-                            className={`${
-                              colorConfig.bgMapping[String(item[col.key])] || ""
-                            } ${
-                              colorConfig.textMapping[String(item[col.key])] ||
-                              ""
-                            } px-2 inline-flex text-xs leading-5 font-semibold rounded-full`}
-                          >
-                            {String(item[col.key])}
-                          </span>
-                        ) : (
-                          String(item[col.key])
-                        )}
-                      </td>
+                        {col.label}
+                        {col.sortable && renderSortIndicator(col.key)}
+                      </th>
                     ))
                     .concat(
                       extraColumnVisible
                         ? [
-                            <td
+                            <th
                               key="actions"
-                              className="px-6 py-4 whitespace-nowrap relative"
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
                             >
-                              {headerDropdownVisible &&
-                                rowOptions.length > 0 && (
-                                  <button
-                                    ref={(el) => {
-                                      dropdownButtonRefs.current[idx] = el;
-                                    }}
-                                    onClick={() =>
-                                      setOpenDropdownRow((prev) =>
-                                        prev === idx ? null : idx
-                                      )
-                                    }
-                                    className="p-2 rounded hover:bg-gray-200"
-                                  >
-                                    ⋮
-                                  </button>
-                                )}
-                              {customButtonsProvided &&
-                                customButtons(item).map((btn, index) => (
-                                  <span
-                                    key={index}
-                                    className="ml-2 inline-block"
-                                  >
-                                    {btn}
-                                  </span>
-                                ))}
-                              {headerDropdownVisible &&
-                                openDropdownRow === idx &&
-                                dropdownButtonRefs.current[idx] &&
-                                ReactDOM.createPortal(
-                                  <div
-                                    ref={dropdownRef}
-                                    className="bg-white border rounded shadow-lg z-50 flex flex-col"
-                                    style={{
-                                    position: "fixed",
-                                    top: Math.min(
-                                      dropdownButtonRefs.current[idx]!.getBoundingClientRect().bottom + 4,
-                                      window.innerHeight - 200 // margen inferior mínimo
-                                    ),
-                                    left: Math.min(
-                                      dropdownButtonRefs.current[idx]!.getBoundingClientRect().left,
-                                      window.innerWidth - 192 // 12rem = 192px, margen lateral mínimo
-                                    ),
-                                    width: "12rem",
-                                  }}
-                                  >
-                                    {rowOptions.map((option, dIdx) => (
-                                      <button
-                                        key={dIdx}
-                                        onClick={() => {
-                                          option.onClick(item!);
-                                          setOpenDropdownRow(null);
-                                        }}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                      >
-                                        {option.label}
-                                      </button>
-                                    ))}
-                                  </div>,
-                                  document.body
-                                )}
-                            </td>,
+                              Acciones
+                            </th>,
                           ]
                         : []
                     )}
                 </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {paginatedData.map((item, idx) => {
+                  let rowClass = "";
+                  if (colorConfig && colorConfig.mode === "row") {
+                    const value = String(item[colorConfig.field]);
+                    const bgClass = colorConfig.bgMapping[value] || "";
+                    const textClass = colorConfig.textMapping[value] || "";
+                    rowClass = `${bgClass} ${textClass}`;
+                  }
+                  const rowOptions =
+                    typeof dropdownOptions === "function"
+                      ? dropdownOptions(item)
+                      : dropdownOptions;
+                  return (
+                    <tr key={idx} className={rowClass}>
+                      {allColumns
+                        .filter((col) => visibleKeys.includes(col.key))
+                        .map((col) => (
+                          <td
+                            key={col.key as string}
+                            className="px-6 py-4 whitespace-nowrap"
+                          >
+                            {colorConfig &&
+                            colorConfig.mode === "cell" &&
+                            col.key === colorConfig.field ? (
+                              <span
+                                className={`${
+                                  colorConfig.bgMapping[
+                                    String(item[col.key])
+                                  ] || ""
+                                } ${
+                                  colorConfig.textMapping[
+                                    String(item[col.key])
+                                  ] || ""
+                                } px-2 inline-flex text-xs leading-5 font-semibold rounded-full`}
+                              >
+                                {String(item[col.key])}
+                              </span>
+                            ) : (
+                              String(item[col.key])
+                            )}
+                          </td>
+                        ))
+                        .concat(
+                          extraColumnVisible
+                            ? [
+                                <td
+                                  key="actions"
+                                  className="px-6 py-4 whitespace-nowrap relative"
+                                >
+                                  {headerDropdownVisible &&
+                                    rowOptions.length > 0 && (
+                                      <button
+                                        ref={(el) => {
+                                          dropdownButtonRefs.current[idx] = el;
+                                        }}
+                                        onClick={() =>
+                                          setOpenDropdownRow((prev) =>
+                                            prev === idx ? null : idx
+                                          )
+                                        }
+                                        className="p-2 rounded hover:bg-gray-200"
+                                      >
+                                        ⋮
+                                      </button>
+                                    )}
+                                  {customButtonsProvided &&
+                                    customButtons(item).map((btn, index) => (
+                                      <span
+                                        key={index}
+                                        className="ml-2 inline-block"
+                                      >
+                                        {btn}
+                                      </span>
+                                    ))}
+                                  {headerDropdownVisible &&
+                                    openDropdownRow === idx &&
+                                    dropdownButtonRefs.current[idx] &&
+                                    ReactDOM.createPortal(
+                                      <div
+                                        ref={dropdownRef}
+                                        className="bg-white border rounded shadow-lg z-50 flex flex-col"
+                                        style={{
+                                          position: "fixed",
+                                          top: Math.min(
+                                            dropdownButtonRefs.current[
+                                              idx
+                                            ]!.getBoundingClientRect().bottom +
+                                              4,
+                                            window.innerHeight - 200
+                                          ),
+                                          left: Math.min(
+                                            dropdownButtonRefs.current[
+                                              idx
+                                            ]!.getBoundingClientRect().left,
+                                            window.innerWidth - 192
+                                          ),
+                                          width: "12rem",
+                                        }}
+                                      >
+                                        {rowOptions.map((option, dIdx) => (
+                                          <button
+                                            key={dIdx}
+                                            onClick={() => {
+                                              option.onClick(item!);
+                                              setOpenDropdownRow(null);
+                                            }}
+                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                          >
+                                            {option.label}
+                                          </button>
+                                        ))}
+                                      </div>,
+                                      document.body
+                                    )}
+                                </td>,
+                              ]
+                            : []
+                        )}
+                    </tr>
+                  );
+                })}
+                {sortedData.length === 0 && (
+                  <tr>
+                    <td
+                      className="px-6 py-4 text-center text-gray-500"
+                      colSpan={
+                        allColumns.filter((c) => visibleKeys.includes(c.key))
+                          .length + (extraColumnVisible ? 1 : 0)
+                      }
+                    >
+                      No se encontraron resultados.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Paginación fuera del contenedor con overflow */}
+        <div className="mt-4 flex justify-center items-center space-x-1 text-sm">
+          <button
+            className="px-2 py-1 border rounded disabled:opacity-50"
+            onClick={() => setCurrentPage(1)}
+            disabled={currentPage === 1}
+          >
+            {"<<"}
+          </button>
+          <button
+            className="px-2 py-1 border rounded disabled:opacity-50"
+            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+          >
+            {"<"}
+          </button>
+
+          {Array.from({ length: totalPages })
+            .slice(
+              Math.max(0, currentPage - 3),
+              Math.min(totalPages, currentPage + 2)
+            )
+            .map((_, idx) => {
+              const page = Math.max(1, currentPage - 2) + idx;
+              return (
+                <button
+                  key={page}
+                  className={`px-3 py-1 border rounded ${
+                    page === currentPage
+                      ? "bg-blue-600 text-white"
+                      : "hover:bg-gray-200"
+                  }`}
+                  onClick={() => setCurrentPage(page)}
+                >
+                  {page}
+                </button>
               );
             })}
-            {sortedData.length === 0 && (
-              <tr>
-                <td
-                  className="px-6 py-4 text-center text-gray-500"
-                  colSpan={columns.length + (extraColumnVisible ? 1 : 0)}
-                >
-                  No se encontraron resultados.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+
+          <button
+            className="px-2 py-1 border rounded disabled:opacity-50"
+            onClick={() =>
+              setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+            }
+            disabled={currentPage === totalPages}
+          >
+            {">"}
+          </button>
+          <button
+            className="px-2 py-1 border rounded disabled:opacity-50"
+            onClick={() => setCurrentPage(totalPages)}
+            disabled={currentPage === totalPages}
+          >
+            {">>"}
+          </button>
+        </div>
       </div>
     </div>
   );

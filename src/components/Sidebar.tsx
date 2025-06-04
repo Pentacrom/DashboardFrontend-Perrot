@@ -1,135 +1,158 @@
-import React, { useContext } from "react";
+import React, { useContext, useState } from "react";
 import { NavLink } from "react-router-dom";
 import LogoPerrot from "../assets/perrot-logo.png";
-import { AuthContext } from "../context/AuthContext"; // Ajusta la ruta según tu estructura
+import { AuthContext } from "../context/AuthContext";
 
 const Sidebar: React.FC = () => {
   const { roles } = useContext(AuthContext);
-  // Si el usuario tiene el rol 'administracion', se muestra todo
   const isAdmin = roles.includes("administracion");
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const linkClasses = ({ isActive }: { isActive: boolean }) =>
-    "flex items-center justify-between text-black px-2 py-1 rounded group cursor-pointer " +
-    (isActive ? "bg-gray-300" : "hover:bg-gray-200");
+    `flex items-center justify-between text-black px-2 py-1 rounded group cursor-pointer ${
+      isActive ? "bg-gray-300" : "hover:bg-gray-200"
+    }`;
 
-  return (
-    <aside className="w-72 h-screen text-black bg-white flex flex-col z-2">
-      {/* Logo en la parte superior */}
-      <div className="h-20 flex justify-center bg-gray-100 border-b border-gray-300">
-        <img
-          src={LogoPerrot}
-          alt="Logo Perrot"
-          className="w-32 h-auto object-contain"
-        />
+  const menuContent = (
+    <>
+      {/* Logo */}
+      <div className="h-20 flex justify-center bg-gray-100 border-b border-gray-300 w-4xl">
+        <NavLink to="/home">
+          <img
+            src={LogoPerrot}
+            alt="Logo Perrot"
+            className="w-32 h-auto object-contain cursor-pointer"
+          />
+        </NavLink>
       </div>
 
-      <nav className="p-4 flex-1 overflow-y-auto border-r border-gray-300 drop-shadow-md">
-        {/* Sección Cliente 
-        {(isAdmin || roles.includes("cliente")) && (
-          <div>
-            <h2 className="font-bold uppercase border-b border-gray-300 pb-1">
-              Cliente
-            </h2>
-            <ul className="mt-2 ml-4">
-              <li>
-                <NavLink to="/cliente/ingresoServicios" className={linkClasses}>
-                  <span>Ingreso de servicios</span>
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/servicios-pendientes" className={linkClasses}>
-                  <span>Servicios pendientes</span>
-                </NavLink>
-              </li>
-            </ul>
-          </div>
-        )}*/}
+      <nav className="p-4 flex-1 overflow-y-auto">
+        {/* Inicio */}
+        <Section title="">
+          <NavLink to="/home" className={linkClasses}>
+            <span>Inicio</span>
+          </NavLink>
+        </Section>
 
-        {/* Sección Comercial */}
+        {/* Comercial */}
         {(isAdmin || roles.includes("comercial")) && (
-          <div className="mt-4">
-            <h2 className="font-bold uppercase border-b border-gray-300 pb-1">
-              Comercial
-            </h2>
-            <ul className="mt-2 ml-4">
-              <li>
-                <NavLink
-                  to="/comercial/ingresoServicios"
-                  className={linkClasses}
-                >
-                  <span>Ingreso de servicios</span>
-                </NavLink>
-              </li>
-            </ul>
-          </div>
+          <Section title="Comercial">
+            <NavLink to="/comercial/gestion-servicios" className={linkClasses}>
+              <span>Ingreso de servicios</span>
+            </NavLink>
+          </Section>
         )}
 
-        {/* Sección Torre de control */}
+        {/* Torre de Control */}
         {(isAdmin || roles.includes("torre de control")) && (
-          <div className="mt-4">
-            <h2 className="font-bold uppercase border-b border-gray-300 pb-1">
-              Torre de control
-            </h2>
-            <ul className="mt-2 ml-4">
-              <li>
-                <NavLink to="/torre-de-control/servicios" className={linkClasses}>
-                  <span>Servicios en proceso</span>
-                </NavLink>
-              </li>
-            </ul>
-          </div>
+          <Section title="Torre de control">
+            <NavLink
+              to="/torre-de-control/gestion-servicios"
+              className={linkClasses}
+            >
+              <span>Seguimiento de servicios</span>
+            </NavLink>
+          </Section>
         )}
 
-        {/* Sección Operaciones */}
+        {/* Operaciones */}
         {(isAdmin || roles.includes("operaciones")) && (
-          <div className="mt-4">
-            <h2 className="font-bold uppercase border-b border-gray-300 pb-1">
-              Operaciones
-            </h2>
-            <ul className="mt-2 ml-4">
-              <li>
-                <NavLink
-                  to="/operaciones/servicios"
-                  className={linkClasses}
-                >
-                  <span>Servicios</span>
-                </NavLink>
-              </li>
-            </ul>
-          </div>
-        )}
-
-        {/* Sección Contabilidad */}
-        {(isAdmin || roles.includes("contabilidad")) && (
-          <div className="mt-4">
-            <h2 className="font-bold uppercase border-b border-gray-300 pb-1">
-              Contabilidad
-            </h2>
-            <ul className="mt-2 ml-4">
-              <li>
-                <NavLink to="/servicios-por-facturar" className={linkClasses}>
-                  <span>Servicios por facturar</span>
-                </NavLink>
-              </li>
-            </ul>
-          </div>
-        )}
-
-        {/* Sección Informe de servicio (asumida para todos los roles autenticados) */}
-        {(isAdmin || roles.length > 0) && (
-          <div className="mt-4 border-t border-gray-300 pt-1">
-            <ul className="mt-2 ml-4">
-              <li>
-                <NavLink to="/informe-servicio" className={linkClasses}>
-                  <span>Informe de servicio</span>
-                </NavLink>
-              </li>
-            </ul>
-          </div>
+          <Section title="Operaciones">
+            <NavLink
+              to="/operaciones/gestion-servicios"
+              className={linkClasses}
+            >
+              <span>Gestión de servicios</span>
+            </NavLink>
+          </Section>
         )}
       </nav>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Barra superior mobile */}
+      <header className="lg:hidden flex items-center justify-between px-4 py-2 bg-white border-b">
+        <button onClick={() => setMobileOpen(true)} aria-label="Abrir menú">
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 6h16M4 12h16M4 18h16"
+            />
+          </svg>
+        </button>
+        <NavLink to="/home">
+          <img
+            src={LogoPerrot}
+            alt="Logo Perrot"
+            className="w-24 object-contain cursor-pointer"
+          />
+        </NavLink>
+      </header>
+
+      {/* Sidebar escritorio */}
+      <aside className="hidden lg:flex flex-col w-72 h-full bg-white border-r border-gray-300 drop-shadow-md z-20">
+        {menuContent}
+      </aside>
+
+      {/* Drawer mobile */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-30 flex">
+          {/* backdrop */}
+          <div
+            className="fixed inset-0 bg-black opacity-50"
+            onClick={() => setMobileOpen(false)}
+          />
+          {/* drawer */}
+          <aside className="relative w-64 h-full bg-white shadow-lg">
+            <button
+              className="absolute top-2 right-2 p-2"
+              onClick={() => setMobileOpen(false)}
+              aria-label="Cerrar menú"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+            {menuContent}
+          </aside>
+        </div>
+      )}
+    </>
   );
 };
+
+interface SectionProps {
+  title: string;
+  children: React.ReactNode;
+}
+const Section: React.FC<SectionProps> = ({ title, children }) => (
+  <div className="mt-4">
+    {title && (
+      <h2 className="font-bold uppercase border-b border-gray-300 pb-1">
+        {title}
+      </h2>
+    )}
+    <ul className="mt-2 ml-4 space-y-1">{children}</ul>
+  </div>
+);
 
 export default Sidebar;

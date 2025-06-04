@@ -4,11 +4,12 @@ import {
   loadDrafts,
   loadSent,
   Payload,
-  Punto,
   ValorFactura,
+  Descuento,
   mockCatalogos,
+  Lugar,
 } from "../utils/ServiceDrafts";
-import { Lugar } from "../utils/ServiceDrafts";
+import { formatCLP } from "../utils/format";
 
 const DetalleServicio: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -33,13 +34,11 @@ const DetalleServicio: React.FC = () => {
     }
   }, [id]);
 
-  // Lookup para catálogos con `codigo`
-  const lookupCodigo = (
-    arr: { codigo: number; nombre: string }[],
+  const lookup = <T extends { codigo: number; nombre: string }>(
+    arr: T[],
     code: number
   ) => arr.find((x) => x.codigo === code)?.nombre || code.toString();
 
-  // Lookup para catálogo `Lugares` con `id`
   const lookupLugar = (arr: Lugar[], id: number) =>
     arr.find((x) => x.id === id)?.nombre || id.toString();
 
@@ -50,7 +49,6 @@ const DetalleServicio: React.FC = () => {
       </div>
     );
   }
-
   if (error || !service) {
     return (
       <div className="p-6">
@@ -67,158 +65,242 @@ const DetalleServicio: React.FC = () => {
     );
   }
 
-  const { form, puntos, estado, valores = [], chofer, movil } = service;
+  const {
+    form,
+    puntos,
+    estado,
+    valores = [],
+    chofer,
+    movil,
+    descuentoServicioPorcentaje = [],
+  } = service;
 
-  // Arreglo de lugares válidos para puntos: zonas portuarias + centros del cliente
-  const puntosOptions = mockCatalogos.Lugares.filter(
-    (l) =>
-      l.tipo === "Zona Portuaria" ||
-      (l.tipo === "Centro" && l.cliente === form.cliente)
+  // 1) Sumar porcentajes de descuento en cada ValorFactura
+  const pctDescuentoPorValor = (v: ValorFactura): number =>
+    (v.descuentoPorcentaje || []).reduce(
+      (sum, d: Descuento) => sum + d.porcentajeDescuento,
+      0
+    );
+
+  // 2) Calcular neto por valor: aplicas el % sumado, luego restas costo
+  const calcNetoPorValor = (v: ValorFactura): number => {
+    const pct = pctDescuentoPorValor(v); // ej. 10 + 5 = 15%
+    const ventaConDesc = v.montoVenta * (1 - pct / 100);
+    return ventaConDesc - v.montoCosto;
+  };
+
+  // Totales básicos
+  const totalVenta = valores.reduce((s, v) => s + v.montoVenta, 0);
+  const totalCosto = valores.reduce((s, v) => s + v.montoCosto, 0);
+  const totalNetoBruto = valores.reduce(
+    (s, v) => s + (v.montoVenta - v.montoCosto),
+    0
   );
 
-  // Determinar punto actual: primero sin 'salida'
-  const puntoActual: Punto | null = puntos.find((p) => !p.salida) || null;
+  // 3) Neto agregado antes de descuento general
+  const totalPreGeneral = valores.reduce((s, v) => s + calcNetoPorValor(v), 0);
+
+  // 4) Aplicar descuentos generales compuestos sobre totalPreGeneral
+  const totalNeto = descuentoServicioPorcentaje.reduce(
+    (acc, d) => acc * (1 - d.porcentajeDescuento / 100),
+    totalPreGeneral
+  );
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Detalle Servicio #{service.id}</h1>
-        <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full">
-          Estado: {estado}
+    <div className="p-6 space-y-8">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <h1 className="text-3xl font-bold">Detalle Servicio #{service.id}</h1>
+        <span className="px-4 py-2 bg-blue-100 text-blue-800 rounded-full font-medium">
+          {estado}
         </span>
-      </div>
+      </header>
 
       {/* Información General */}
-      <div className="bg-white p-6 rounded shadow">
-        <h2 className="text-lg font-semibold mb-4">Información General</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <p className="font-medium">Cliente:</p>
-            <p>{lookupCodigo(mockCatalogos.empresas, form.cliente)}</p>
-          </div>
-          <div>
-            <p className="font-medium">Tipo de operación:</p>
-            <p>{lookupCodigo(mockCatalogos.Operación, form.tipoOperacion)}</p>
-          </div>
-          <div>
-            <p className="font-medium">Origen:</p>
-            <p>
-              {form.tipoOperacion === 2
-                ? lookupLugar(mockCatalogos.Lugares, form.origen)
-                : lookupCodigo(mockCatalogos.Zona, form.origen)}
-            </p>
-          </div>
-          <div>
-            <p className="font-medium">Destino:</p>
-            <p>
-              {form.tipoOperacion === 1
-                ? lookupLugar(mockCatalogos.Lugares, form.destino)
-                : lookupCodigo(mockCatalogos.Zona, form.destino)}
-            </p>
-          </div>
-          <div>
-            <p className="font-medium">Fecha Solicitud:</p>
-            <p>{form.fechaSol}</p>
-          </div>
-          <div>
-            <p className="font-medium">Fecha Creación:</p>
-            <p>{form.fechaIng}</p>
-          </div>
-          <div>
-            <p className="font-medium">Tipo Contenedor:</p>
-            <p>
-              {lookupCodigo(mockCatalogos.Tipo_contenedor, form.tipoContenedor)}
-            </p>
-          </div>
-          <div>
-            <p className="font-medium">Chofer Asignado:</p>
-            <p>{chofer || "No asignado"}</p>
-          </div>
-          <div>
-            <p className="font-medium">Móvil Asignado:</p>
-            <p>{movil || "No asignado"}</p>
-          </div>
+      <section className="grid grid-cols-1 gap-6 bg-white p-6 rounded-lg shadow">
+        <div className="w-full">
+          <h2 className="text-xl font-semibold mb-4">Información General</h2>
+          <dl className="grid grid-cols-4 gap-x-4 gap-y-2">
+            <dt className="font-medium">Cliente:</dt>
+            <dd>{lookup(mockCatalogos.empresas, form.cliente)}</dd>
+            <dt className="font-medium">Tipo Operación:</dt>
+            <dd>{lookup(mockCatalogos.Operación, form.tipoOperacion)}</dd>
+            <dt className="font-medium">Origen:</dt>
+            <dd>{lookupLugar(mockCatalogos.Lugares, form.origen)}</dd>
+            <dt className="font-medium">Destino:</dt>
+            <dd>{lookupLugar(mockCatalogos.Lugares, form.destino)}</dd>
+            <dt className="font-medium">País:</dt>
+            <dd>{form.pais}</dd>
+            <dt className="font-medium">Fecha Solicitud:</dt>
+            <dd>{form.fechaSol}</dd>
+            <dt className="font-medium">Guía:</dt>
+            <dd>{form.guia || "—"}</dd>
+            <dt className="font-medium">Interchange:</dt>
+            <dd className="whitespace-pre-line">{form.interchange || "—"}</dd>
+            <dt className="font-medium">Observación:</dt>
+            <dd className="whitespace-pre-line">{form.observacion || "—"}</dd>
+            <dt className="font-medium">Chofer:</dt>
+            <dd className="whitespace-pre-line">{chofer || "—"}</dd>
+            <dt className="font-medium">Movil:</dt>
+            <dd className="whitespace-pre-line">{movil || "—"}</dd>
+            <dt className="font-medium">Creado por:</dt>
+            <dd>{service.createdBy || "—"}</dd>
+          </dl>
         </div>
-      </div>
+      </section>
 
       {/* Valores / Facturación */}
-      <div className="bg-white p-6 rounded shadow">
-        <h2 className="text-lg font-semibold mb-4">Valores / Facturación</h2>
+      <section className="bg-white p-6 rounded-lg shadow">
+        <h2 className="text-xl font-semibold mb-4">Valores / Facturación</h2>
         {valores.length === 0 ? (
           <p className="text-gray-500">No hay valores cargados.</p>
         ) : (
-          <table className="w-full table-fixed border-collapse">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border px-2 py-1 text-left">Concepto</th>
-                <th className="border px-2 py-1 text-right">Monto</th>
-                <th className="border px-2 py-1 text-right">Impuesto (%)</th>
-                <th className="border px-2 py-1 text-center">Fecha emisión</th>
-              </tr>
-            </thead>
-            <tbody>
-              {valores.map((v: ValorFactura) => (
-                <tr key={v.id}>
-                  <td className="border px-2 py-1">{v.concepto}</td>
-                  <td className="border px-2 py-1 text-right">
-                    ${v.monto.toFixed(2)}
-                  </td>
-                  <td className="border px-2 py-1 text-right">{v.impuesto}%</td>
-                  <td className="border px-2 py-1 text-center">
-                    {v.fechaEmision}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="min-w-full table-auto border-collapse">
+              <thead className="bg-gray-200">
+                <tr>
+                  <th className="border px-3 py-2 text-left">Concepto</th>
+                  <th className="border px-3 py-2 text-right">Venta</th>
+                  <th className="border px-3 py-2 text-right">Costo</th>
+                  <th className="border px-3 py-2">Descuentos %</th>
+                  <th className="border px-3 py-2 text-right">Neto</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* Puntos y estado actual */}
-      <div className="bg-white p-6 rounded shadow">
-        <h2 className="text-lg font-semibold mb-4">
-          Recorrido y Estado de Puntos
-        </h2>
-
-        {puntoActual && (
-          <div className="mb-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
-            Punto actual:{" "}
-            <strong>
-              {lookupLugar(puntosOptions, puntoActual.idLugar)} — acción{" "}
-              {lookupCodigo(mockCatalogos.acciones, puntoActual.accion)}
-            </strong>
+              </thead>
+              <tbody>
+                {valores.map((v, idx) => (
+                  <tr
+                    key={v.id}
+                    className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                  >
+                    <td className="border px-3 py-2">{v.concepto}</td>
+                    <td className="border px-3 py-2 text-right">
+                      {formatCLP(v.montoVenta)}
+                    </td>
+                    <td className="border px-3 py-2 text-right">
+                      {formatCLP(v.montoCosto)}
+                    </td>
+                    <td className="border px-3 py-2">
+                      {pctDescuentoPorValor(v) > 0
+                        ? `${pctDescuentoPorValor(v)}%`
+                        : "—"}
+                    </td>
+                    <td className="border px-3 py-2 text-right font-medium">
+                      {formatCLP(calcNetoPorValor(v))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
-        <ul className="space-y-2">
-          {puntos.map((p, i) => (
-            <li
-              key={i}
-              className={`p-3 rounded ${
-                p === puntoActual
-                  ? "bg-blue-50 border-l-4 border-blue-400"
-                  : "bg-gray-50"
-              }`}
-            >
-              <p>
-                <strong>Punto {i + 1}:</strong>{" "}
-                {lookupLugar(puntosOptions, p.idLugar)}
-              </p>
-              <p>
-                Acción: {lookupCodigo(mockCatalogos.acciones, p.accion)} —
-                Estado interno: {p.estado}
-              </p>
-              <p>ETA: {p.eta}</p>
-              <p>Llegada: {p.llegada || "—"}</p>
-              <p>Salida: {p.salida || "—"}</p>
-            </li>
-          ))}
-        </ul>
-      </div>
+        {/* Resumen de Totales */}
+        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-gray-50 p-4 rounded">
+            <p className="text-sm text-gray-600">Total Venta</p>
+            <p className="text-lg font-semibold">{formatCLP(totalVenta)}</p>
+          </div>
+          <div className="bg-gray-50 p-4 rounded">
+            <p className="text-sm text-gray-600">Total Costo</p>
+            <p className="text-lg font-semibold">{formatCLP(totalCosto)}</p>
+          </div>
+          <div className="bg-gray-50 p-4 rounded">
+            <p className="text-sm text-gray-600">Neto Bruto</p>
+            <p className="text-lg font-semibold">{formatCLP(totalNetoBruto)}</p>
+          </div>
+          <div className="bg-gray-50 p-4 rounded">
+            <p className="text-sm text-gray-600">
+              Neto antes descuento general
+            </p>
+            <p className="text-lg font-semibold">
+              {formatCLP(totalPreGeneral)}
+            </p>
+          </div>
+          <div className="bg-gray-50 p-4 rounded">
+            <p className="text-sm text-gray-600">Total Neto</p>
+            <p className="text-lg font-semibold text-green-600">
+              {formatCLP(totalNeto)}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Descuentos generales del servicio */}
+      <section className="bg-white p-6 rounded-lg shadow">
+        <h2 className="text-xl font-semibold mb-4">Descuentos del Servicio</h2>
+        {descuentoServicioPorcentaje.length === 0 ? (
+          <p className="text-gray-500">No hay descuentos generales.</p>
+        ) : (
+          <ul className="list-disc list-inside space-y-2">
+            {descuentoServicioPorcentaje.map((d, i) => (
+              <li key={i} className="text-sm">
+                <strong>{d.porcentajeDescuento}%</strong> –{" "}
+                {d.razon || "sin razón"}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Recorrido y estado de puntos */}
+      <section className="bg-white p-6 rounded-lg shadow ">
+        <h2 className="text-xl font-semibold mb-4">Recorrido y Puntos</h2>
+        <div className="space-y-4">
+          {puntos.map((p, i) => {
+            const arrival = p.llegada ? new Date(p.llegada) : null;
+            const eta = p.eta ? new Date(p.eta) : null;
+            const isLate = !!(arrival && eta && arrival > eta);
+            return (
+              <div
+                key={i}
+                className={`p-4 rounded-lg border-l-4 ${
+                  isLate
+                    ? "border-red-400 bg-red-50"
+                    : "border-blue-400 bg-blue-50"
+                }`}
+              >
+                <h3 className="font-black mb-2">Punto {i + 1}</h3>
+                <div className="grid grid-cols-2 text-left">
+                  <p>
+                    <strong>Lugar:</strong>{" "}
+                    {lookupLugar(mockCatalogos.Lugares, p.idLugar)}
+                  </p>
+                  <p>
+                    <strong>Acción:</strong>{" "}
+                    {lookup(mockCatalogos.acciones, p.accion)}
+                  </p>
+                  <p>
+                    <strong>Estado:</strong> {p.estado}
+                  </p>
+                  <p>
+                    <strong>ETA:</strong> {p.eta}
+                  </p>
+                  <p>
+                    <strong>Llegada:</strong> {p.llegada || "—"}
+                  </p>
+                  <p>
+                    <strong>Salida:</strong> {p.salida || "—"}
+                  </p>
+                  {p.observacion && (
+                    <p>
+                      <strong>Observación:</strong> {p.observacion}
+                    </p>
+                  )}
+                  {isLate && (
+                    <p className="mt-1 text-red-600">
+                      <strong>Razón de tardía:</strong>{" "}
+                      {p.razonDeTardia || "sin razón"}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       <button
         onClick={() => navigate(-1)}
-        className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+        className="mt-4 px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
       >
         Volver
       </button>

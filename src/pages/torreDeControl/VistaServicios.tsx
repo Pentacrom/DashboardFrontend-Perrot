@@ -1,4 +1,3 @@
-// src/pages/VistaServicios.tsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ListWithSearch, {
@@ -12,6 +11,7 @@ import {
   loadSent,
   Payload,
   mockCatalogos,
+  EstadoServicio,
 } from "../../utils/ServiceDrafts";
 import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
 
@@ -37,6 +37,15 @@ const columns: Column<ServiceRow>[] = [
     label: "Estado",
     key: "estado",
     sortable: true,
+    render: (value: string) => (
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${
+          estadoStyles[value as EstadoServicio] || ""
+        } ${badgeTextColor[value as EstadoServicio] || ""}`}
+      >
+        {value}
+      </span>
+    ),
   },
 ];
 
@@ -57,29 +66,23 @@ const VistaServicios: React.FC = () => {
   const [rows, setRows] = useState<ServiceRow[]>([]);
 
   useEffect(() => {
+    // lookup genéricos
     const lookup = (arr: { codigo: number; nombre: string }[], code: number) =>
       arr.find((x) => x.codigo === code)?.nombre || code.toString();
+    const lookupLugar = (arr: { id: number; nombre: string }[], id: number) =>
+      arr.find((x) => x.id === id)?.nombre || id.toString();
 
     const drafts = loadDrafts();
     const sent = loadSent();
-    // Mostrar solo los servicios "En Proceso"
-    const inProcess = [...drafts, ...sent].filter(
-      (p) => p.estado === "En Proceso"
-    );
 
-    const mapped: ServiceRow[] = inProcess.map((p) => {
+    const mapped: ServiceRow[] = sent.map((p) => {
       const f = p.form;
       const tipoOp = f.tipoOperacion;
       const clienteName = lookup(mockCatalogos.empresas, f.cliente);
-      const origenName =
-        tipoOp === 2
-          ? lookup(mockCatalogos.Zona_portuaria, f.origen)
-          : lookup(mockCatalogos.Zona, f.origen);
-      const destinoName =
-        tipoOp === 1
-          ? lookup(mockCatalogos.Zona_portuaria, f.destino)
-          : lookup(mockCatalogos.Zona, f.destino);
+      const origenName = lookupLugar(mockCatalogos.Lugares, f.origen);
+      const destinoName = lookupLugar(mockCatalogos.Lugares, f.destino);
       const tipoName = lookup(mockCatalogos.Operación, tipoOp);
+
       return {
         id: p.id.toString(),
         cliente: clienteName,
@@ -95,15 +98,28 @@ const VistaServicios: React.FC = () => {
     setRows(mapped);
   }, []);
 
-  const dropdownOptions = (row: ServiceRow): DropdownOption<ServiceRow>[] => [
+  const dropdownOptions = (row: ServiceRow): DropdownOption<ServiceRow>[] => {
+    const opts: DropdownOption<ServiceRow>[] = [
+      {
+        label: "Ver detalle",
+        onClick: () => navigate(`/detalle-servicio/${row.id}`),
+      },
+    ];
+    if (row.estado === "En Proceso") {
+      opts.push({
+        label: "Hacer seguimiento",
+        onClick: () =>
+          navigate(`/torre-de-control/seguimiento-servicio/${row.id}`),
+      });
+    }
+    return opts;
+  };
+
+  const estadoCheckboxFilter = [
     {
-      label: "Ver detalle",
-      onClick: () => navigate(`/detalle-servicio/${row.id}`),
-    },
-    {
-      label: "Hacer seguimiento",
-      onClick: () =>
-        navigate(`/torre-de-control/seguimiento-servicio/${row.id}`),
+      label: "Filtrar por estado",
+      key: "estado" as keyof ServiceRow,
+      options: Object.keys(estadoStyles) as EstadoServicio[],
     },
   ];
 
@@ -117,6 +133,10 @@ const VistaServicios: React.FC = () => {
         data={rows}
         columns={columns}
         searchFilters={searchFilters}
+        checkboxFilterGroups={estadoCheckboxFilter}
+        defaultCheckboxSelections={{
+          estado: ["Sin Asignar", "En Proceso"],
+        }}
         dropdownOptions={dropdownOptions as DropdownOptionsType<ServiceRow>}
         colorConfig={{
           field: "estado",
@@ -126,6 +146,18 @@ const VistaServicios: React.FC = () => {
         }}
         onDownloadExcel={() => alert("Descarga de Excel (stub)")}
         onSearch={() => alert("Buscar (stub)")}
+        customSortOrder={{
+          estado: [
+            "En Proceso",
+            "Pendiente",
+            "Sin Asignar",
+            "Falso Flete",
+            "Por facturar",
+            "Completado",
+          ],
+        }}
+        defaultSortKey="estado"
+        defaultSortOrder="asc"
       />
     </div>
   );

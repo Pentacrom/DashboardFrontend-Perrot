@@ -11,6 +11,17 @@ import {
 } from "../../utils/ServiceDrafts";
 import { Modal } from "../../components/Modal";
 
+const formatDateTimeLocal = (dateStr: string): string => {
+  const d = new Date(dateStr);
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const YYYY = d.getFullYear();
+  const MM = pad(d.getMonth() + 1);
+  const DD = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const mm = pad(d.getMinutes());
+  return `${YYYY}-${MM}-${DD}T${hh}:${mm}`;
+};
+
 const SeguimientoServicio: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -20,6 +31,10 @@ const SeguimientoServicio: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+
+  // Extrae el primer segmento de la ruta
+  const segments = location.pathname.split("/").filter(Boolean);
+  const perfilActual = segments[1] || "";
 
   // carga inicial
   useEffect(() => {
@@ -50,38 +65,36 @@ const SeguimientoServicio: React.FC = () => {
     code.toString();
 
   const updatePunto = useCallback(
-    (idx: number, key: "llegada" | "salida", value: string) => {
+    (idx: number, key: keyof Punto, value: string) =>
       setPuntos((prev) =>
-        prev.map((p, i) =>
-          i === idx
-            ? {
-                ...p,
-                [key]: value,
-              }
-            : p
-        )
-      );
-    },
+        prev.map((p, i) => (i === idx ? { ...p, [key]: value } : p))
+      ),
     []
   );
 
+  const validarFechas = () =>
+    puntos.every((p, idx) => {
+      const minArrivalRaw =
+        idx === 0 ? service?.form.fechaSol : puntos[idx - 1]?.salida || "";
+      return (
+        !!p.llegada &&
+        !!p.salida &&
+        new Date(p.llegada) >= new Date(minArrivalRaw!) &&
+        new Date(p.salida) >= new Date(p.llegada)
+      );
+    });
+
   const handleGuardar = useCallback(() => {
     if (!service) return;
-    const updated: Payload = {
-      ...service,
-      puntos,
-    };
+    const updated: Payload = { ...service, puntos };
     saveOrUpdateSent(updated);
     alert("Seguimiento guardado correctamente.");
     navigate(-1);
   }, [service, puntos, navigate]);
 
-  const validarFechas = () =>
-    puntos.every((p) => p.llegada?.length && p.salida?.length);
-
   const handleCompletar = () => {
     if (!validarFechas()) {
-      alert("Todas las fechas de llegada y salida deben estar completas.");
+      alert("Todas las fechas deben respetar el orden y estar completas.");
       return;
     }
     setShowModal(true);
@@ -97,7 +110,7 @@ const SeguimientoServicio: React.FC = () => {
     saveOrUpdateSent(actualizado);
     setShowModal(false);
     alert("Servicio marcado como Completado.");
-    navigate("/comercial/ingresoServicios");
+    navigate(`/${perfilActual}/gestion-servicios`);
   };
 
   if (loading) {
@@ -135,44 +148,153 @@ const SeguimientoServicio: React.FC = () => {
         </span>
       </div>
 
+      {/* Fecha de solicitud */}
+      <div className="bg-white p-4 rounded shadow">
+        <p className="text-sm font-medium mb-1">Fecha de Solicitud</p>
+        <input
+          type="datetime-local"
+          className="input w-full bg-gray-100 cursor-not-allowed"
+          value={formatDateTimeLocal(service.form.fechaSol)}
+          disabled
+        />
+      </div>
+
       <div className="bg-white p-6 rounded shadow">
         <h2 className="text-lg font-semibold mb-4">Puntos del Recorrido</h2>
         <div className="space-y-4">
-          {puntos.map((p, idx) => (
-            <div
-              key={idx}
-              className="grid md:grid-cols-4 gap-4 items-end p-4 bg-gray-50 rounded"
-            >
-              <div>
-                <p className="text-sm font-medium">Lugar:</p>
-                <p>{lookupLugar(p.idLugar)}</p>
+          {puntos.map((p, idx) => {
+            // --- calculamos el mínimo bruto para llegada y salida ---
+            const minRawLlegada =
+              idx === 0
+                ? service!.form.fechaSol // fecha de solicitud (YYYY-MM-DD)
+                : puntos[idx - 1]!.salida!; // salida del punto anterior (YYYY-MM-DDTHH:mm)
+            const minLlegada = formatDateTimeLocal(minRawLlegada);
+
+            // para salida el mínimo es la llegada misma
+            const minRawSalida = p.llegada || "";
+            const minSalida = minRawSalida && formatDateTimeLocal(minRawSalida);
+
+            const etaDate = p.eta;
+            const minArrivalRaw =
+              idx === 0 ? service.form.fechaSol : puntos[idx - 1]?.salida || "";
+            const minArrival = minArrivalRaw
+              ? formatDateTimeLocal(minArrivalRaw)
+              : undefined;
+            const isLate =
+              !!p.llegada &&
+              !!etaDate &&
+              new Date(p.llegada) > new Date(etaDate);
+            const invalidArrival =
+              !!p.llegada &&
+              minArrival &&
+              new Date(p.llegada) < new Date(minArrivalRaw);
+            
+            const invalidSalida =
+              !!p.salida &&
+              !!p.llegada &&
+              new Date(p.salida) < new Date(p.llegada);
+
+            return (
+              <div
+                key={idx}
+                className={`grid md:grid-cols-5 gap-4 items-end p-4 rounded ${
+                  isLate || invalidArrival
+                    ? "bg-red-50 border border-red-400"
+                    : "bg-gray-50"
+                }`}
+              >
+                <div>
+                  <p className="text-sm font-medium">Lugar:</p>
+                  <p>{lookupLugar(p.idLugar)}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Acción:</p>
+                  <p>{lookupAccion(p.accion)}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">ETA:</p>
+                  <input
+                    type="datetime-local"
+                    className="input w-full bg-gray-100 cursor-not-allowed"
+                    value={etaDate ? formatDateTimeLocal(etaDate) : ""}
+                    disabled
+                    title="ETA asignada"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Llegada
+                  </label>
+                  <input
+                    type="datetime-local"
+                    className={`
+      input w-full
+      ${invalidArrival ? "border-red-800" : ""}
+      ${isLate ? "bg-red-50 border-red-400" : ""}
+    `}
+                    value={p.llegada || ""}
+                    min={minArrival}
+                    onChange={(e) =>
+                      updatePunto(idx, "llegada", e.target.value)
+                    }
+                  />
+                  {invalidArrival && (
+                    <p className="text-sm text-red-800 mt-1">
+                      La llegada no puede ser anterior a&nbsp;
+                      {minArrival?.replace("T", " ")}
+                    </p>
+                  )}
+                  {isLate && (
+                    <p className="text-sm text-red-600 mt-1">
+                      Llegada tardía respecto a la ETA (
+                      {formatDateTimeLocal(etaDate!)})
+                    </p>
+                  )}
+                </div>
+
+                {/* SALIDA */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Salida
+                  </label>
+                  <input
+                    type="datetime-local"
+                    className={`
+      input w-full
+      ${!p.llegada ? "bg-gray-100 cursor-not-allowed" : ""}
+      ${invalidSalida ? "border-red-800" : ""}
+    `}
+                    value={p.salida || ""}
+                    min={p.llegada ? formatDateTimeLocal(p.llegada) : undefined}
+                    disabled={!p.llegada}
+                    onChange={(e) => updatePunto(idx, "salida", e.target.value)}
+                  />
+                  {invalidSalida && (
+                    <p className="text-sm text-red-800 mt-1">
+                      La salida no puede ser anterior a la llegada (
+                      {p.llegada?.replace("T", " ")})
+                    </p>
+                  )}
+                </div>
+                {isLate && (
+                  <div className="md:col-span-5">
+                    <label className="block text-sm font-medium mb-1">
+                      Razón de retraso *
+                    </label>
+                    <input
+                      type="text"
+                      className="input w-full border-red-600"
+                      value={p.razonDeTardia || ""}
+                      onChange={(e) =>
+                        updatePunto(idx, "razonDeTardia", e.target.value)
+                      }
+                      placeholder="Explica por qué llegó tarde"
+                    />
+                  </div>
+                )}
               </div>
-              <div>
-                <p className="text-sm font-medium">Acción:</p>
-                <p>{lookupAccion(p.accion)}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Llegada
-                </label>
-                <input
-                  type="datetime-local"
-                  className="input w-full"
-                  value={p.llegada || ""}
-                  onChange={(e) => updatePunto(idx, "llegada", e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Salida</label>
-                <input
-                  type="datetime-local"
-                  className="input w-full"
-                  value={p.salida || ""}
-                  onChange={(e) => updatePunto(idx, "salida", e.target.value)}
-                />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

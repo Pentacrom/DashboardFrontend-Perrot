@@ -48,10 +48,9 @@ const columns: CustomColumn<ServiceRow>[] = [
     sortable: true,
     render: (value: EstadoServicio) => (
       <span
-        className={`
-          px-2 py-1 rounded-full text-xs font-medium
-          ${estadoStyles[value] || ""} ${badgeTextColor[value] || ""}
-        `}
+        className={`px-2 py-1 rounded-full text-xs font-medium ${
+          estadoStyles[value] || ""
+        } ${badgeTextColor[value] || ""}`}
       >
         {value}
       </span>
@@ -87,55 +86,38 @@ const VistaServiciosPendientes: React.FC = () => {
 
   const confirmarFalsoFlete = () => {
     if (!confirmFalsoFleteId) return;
-
     setRows((prev) =>
-      prev.map((r) =>
-        r.id === confirmFalsoFleteId
-          ? {
-              ...r,
-              estado: "Falso Flete",
-              raw: { ...r.raw, estado: "Falso Flete" },
-            }
-          : r
-      )
+      prev.map((r) => {
+        if (r.id !== confirmFalsoFleteId) return r;
+        // actualizar raw y persistir
+        const updatedRaw: Payload = {
+          ...r.raw,
+          estado: "Falso Flete"
+        };
+        saveOrUpdateSent(updatedRaw);
+        return {
+          ...r,
+          estado: "Falso Flete",
+          raw: updatedRaw,
+        };
+      })
     );
-
-    // Persistir cambio
-    const drafts = loadDrafts();
-    const sent = loadSent();
-    const idNum = Number(confirmFalsoFleteId);
-    const foundInDrafts = drafts.find((s) => s.id === idNum);
-    const foundInSent = sent.find((s) => s.id === idNum);
-    const updatedService = {
-      ...(foundInDrafts || foundInSent)!,
-      estado: "Falso Flete" as EstadoServicio,
-    };
-    saveOrUpdateSent(updatedService);
-
     closeConfirmFalsoFlete();
   };
 
   useEffect(() => {
-    // Lookup para catálogos con `codigo`
     const lookupCodigo = (
       arr: { codigo: number; nombre: string }[],
       code: number
     ) => arr.find((x) => x.codigo === code)?.nombre || code.toString();
-
-    // Lookup para Lugares por `id`
     const lookupLugar = (arr: Lugar[], id: number) =>
       arr.find((x) => x.id === id)?.nombre || id.toString();
 
-    // Zonas portuarias extraídas de Lugares
     const zonasPortuarias = mockCatalogos.Lugares.filter(
       (l) => l.tipo === "Zona Portuaria"
     );
-
-    // Combina borradores y enviados
     const all = [...loadDrafts(), ...loadSent()];
-
-    // Mapear a filas
-    const mapped: ServiceRow[] = all.map((p) => {
+    const mapped = all.map((p) => {
       const f = p.form;
       const tipoOp = f.tipoOperacion;
       const clienteName = lookupCodigo(mockCatalogos.empresas, f.cliente);
@@ -160,7 +142,6 @@ const VistaServiciosPendientes: React.FC = () => {
         raw: p,
       };
     });
-
     setRows(mapped);
   }, []);
 
@@ -171,16 +152,15 @@ const VistaServiciosPendientes: React.FC = () => {
         onClick: () => navigate(`/detalle-servicio/${row.id}`),
       },
     ];
-
     if (row.estado === "En Proceso") {
       opts.push(
         {
           label: "Ver/Editar Servicio",
-          onClick: () => navigate(`/comercial/modificar-servicio/${row.id}`),
+          onClick: () => navigate(`/operaciones/modificar-servicio/${row.id}`),
         },
         {
           label: "Gestionar Valores",
-          onClick: () => navigate(`/comercial/agregar-valores/${row.id}`),
+          onClick: () => navigate(`/operaciones/gestionar-valores/${row.id}`),
         },
         {
           label: "Marcar como Falso Flete",
@@ -188,14 +168,12 @@ const VistaServiciosPendientes: React.FC = () => {
         }
       );
     }
-
     if (row.estado === "Sin Asignar") {
       opts.push({
         label: "Asignar chofer y móvil",
         onClick: () => openModal(Number(row.id)),
       });
     }
-
     return opts;
   };
 
@@ -214,7 +192,7 @@ const VistaServiciosPendientes: React.FC = () => {
           Servicios en Proceso / Sin Asignar
         </h1>
         <button
-          onClick={() => navigate("/comercial/nuevo-servicio")}
+          onClick={() => navigate("/operaciones/nuevo-servicio")}
           className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
         >
           Nuevo Servicio
@@ -235,6 +213,18 @@ const VistaServiciosPendientes: React.FC = () => {
         }}
         onDownloadExcel={() => alert("Descarga de Excel (stub)")}
         onSearch={() => alert("Buscar (stub)")}
+        customSortOrder={{
+          estado: [
+            "Pendiente",
+            "Sin Asignar",
+            "En Proceso",
+            "Falso Flete",
+            "Por facturar",
+            "Completado",
+          ],
+        }}
+        defaultSortKey="estado"
+        defaultSortOrder="asc"
       />
 
       <AsignarChoferMovilModal

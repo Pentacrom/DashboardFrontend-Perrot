@@ -1,3 +1,15 @@
+
+
+html, body, #root {
+  margin: 0;
+  min-height: 100vh;    /* al menos el viewport, pero deja crecer */
+}
+
+body {
+  margin: 0;
+  background-color: #242424; /* tu gris de fondo */
+}
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -11,14 +23,6 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
 }
 
 h1 {

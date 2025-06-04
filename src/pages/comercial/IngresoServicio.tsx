@@ -1,5 +1,5 @@
 // src/pages/IngresoServicio.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ListWithSearch, {
   Column,
@@ -15,8 +15,11 @@ import {
   Payload,
   EstadoServicio,
   Lugar,
+  mockPaises
 } from "../../utils/ServiceDrafts";
 import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
+import { ServiceRow, payloadToRow } from "../../utils/ServiceUtils";
+import { formatCLP } from "../../utils/format";
 
 // Extendemos Column para permitir un render personalizado
 interface CustomColumn<T> extends Column<T> {
@@ -27,40 +30,8 @@ interface CustomDropdownOption extends DropdownOption {
   disabled?: boolean;
 }
 
-interface ServiceRow {
-  id: string;
-  origen: string;
-  destino: string;
-  fecha: string;
-  tipo: string;
-  estado: EstadoServicio;
-  raw: Payload;
-}
-
-// Queremos mostrar sólo estos dos estados
+// Sólo mostramos estados pendientes o sin asignar
 const estadosFiltrados: EstadoServicio[] = ["Pendiente", "Sin Asignar"];
-
-const columns: CustomColumn<ServiceRow>[] = [
-  { label: "ID", key: "id", sortable: true },
-  { label: "Origen", key: "origen", sortable: true },
-  { label: "Destino", key: "destino", sortable: true },
-  { label: "Fecha", key: "fecha", sortable: true },
-  { label: "Tipo", key: "tipo", sortable: true },
-  {
-    label: "Estado",
-    key: "estado",
-    sortable: true,
-    render: (value: EstadoServicio) => (
-      <span
-        className={`px-2 py-1 rounded-full text-xs font-medium ${
-          estadoStyles[value] || ""
-        } ${badgeTextColor[value] || ""}`}
-      >
-        {value}
-      </span>
-    ),
-  },
-];
 
 const searchFilters: SearchFilter<ServiceRow>[] = [
   { label: "ID", key: "id", type: "text", placeholder: "Buscar ID" },
@@ -80,9 +51,9 @@ const searchFilters: SearchFilter<ServiceRow>[] = [
 
 const checkboxFilterGroups: CheckboxFilterGroup<ServiceRow>[] = [
   {
-    label: "Estados",
-    key: "estado",
-    options: estadosFiltrados,
+    label: "Filtrar por estado",
+    key: "estado" as keyof ServiceRow,
+    options: Object.keys(estadoStyles) as EstadoServicio[],
   },
 ];
 
@@ -91,56 +62,128 @@ const IngresoServicio: React.FC = () => {
   const [rows, setRows] = useState<ServiceRow[]>([]);
 
   useEffect(() => {
-    // Lookup para catálogos con `codigo`
     const lookupCodigo = (
       arr: { codigo: number; nombre: string }[],
       code: number
     ) => arr.find((x) => x.codigo === code)?.nombre || code.toString();
 
-    // Lookup para Lugares por `id`
     const lookupLugar = (arr: Lugar[], id: number) =>
       arr.find((x) => x.id === id)?.nombre || id.toString();
 
-    // Zonas portuarias extraídas de Lugares
     const zonasPortuarias = mockCatalogos.Lugares.filter(
       (l) => l.tipo === "Zona Portuaria"
     );
 
-    // Cargo borradores y enviados, filtro sólo los pendientes y sin asignar
-    const payloads: Payload[] = [...loadDrafts(), ...loadSent()].filter((p) =>
-      estadosFiltrados.includes(p.estado)
-    );
+    const payloads: Payload[] = [...loadDrafts(), ...loadSent()];
 
     const mapped = payloads.map((p) => {
+      // Aplanar todo el Payload a primitivos + raw
+      const baseRow = payloadToRow(p);
       const f = p.form;
+
+      // Reemplazar cliente (número) por nombre de empresa
+      const empresa = mockCatalogos.empresas.find(
+        (e) => e.codigo === f.cliente
+      );
+      baseRow.cliente = empresa ? empresa.nombre : f.cliente.toString();
+
+      // Reemplazar tipoOperacion (número) por nombre de operación
+      const operacion = mockCatalogos.Operación.find(
+        (op) => op.codigo === f.tipoOperacion
+      );
+      baseRow.tipoOperacion = operacion
+        ? operacion.nombre
+        : f.tipoOperacion.toString();
+
+      // Reemplazar pais (número) por nombre del país
+      const paisItem = mockPaises.find((p) => p.codigo === f.pais);
+      baseRow.pais = paisItem ? paisItem.nombre : f.pais.toString();
+
+      // Reemplazar tipoContenedor (número) por nombre de tipo de contenedor
+      const cont = mockCatalogos.Tipo_contenedor.find(
+        (t) => t.codigo === f.tipoContenedor
+      );
+      baseRow.tipoContenedor = cont ? cont.nombre : f.tipoContenedor.toString();
+
+      // Luego sobreescribimos origen/destino por sus nombres
       const tipoOp = f.tipoOperacion;
-      const origenName =
+      baseRow.origen =
         tipoOp === 2
           ? lookupLugar(zonasPortuarias, f.origen)
           : lookupCodigo(mockCatalogos.Zona, f.origen);
-      const destinoName =
+      baseRow.destino =
         tipoOp === 1
           ? lookupLugar(zonasPortuarias, f.destino)
           : lookupCodigo(mockCatalogos.Zona, f.destino);
-      return {
-        id: p.id.toString(),
-        origen: origenName,
-        destino: destinoName,
-        fecha: f.fechaSol,
-        tipo: lookupCodigo(mockCatalogos.Operación, tipoOp),
-        estado: p.estado,
-        raw: p,
-      };
+
+      // Convertimos id a string (payloadToRow deja id como number)
+      baseRow.id = p.id.toString();
+      // Agregamos fecha a partir de fechaSol
+      baseRow.fecha = f.fechaSol;
+      // Agregamos tipo legible (nombre de operación)
+      baseRow.tipo = lookupCodigo(mockCatalogos.Operación, tipoOp);
+
+      return baseRow;
     });
 
-    setRows(mapped);
+    // Filtramos sólo los estados indicados
+    const filtered = mapped.filter((r) =>
+      estadosFiltrados.includes(r.estado as EstadoServicio)
+    );
+    setRows(filtered);
   }, []);
+
+  // Generamos columnas dinámicamente según las claves de la primera fila.
+  // Usamos el operador "!" para indicar a TypeScript que rows[0] no es undefined
+  const columns: CustomColumn<ServiceRow>[] = useMemo(() => {
+    if (rows.length === 0) return [];
+
+    const sample = rows[0]!;
+    const allKeys = Object.keys(sample).filter((k) => k !== "raw");
+
+    return allKeys.map((key) => {
+      if (key === "precioCarga") {
+        return {
+          label: "Precio Carga",
+          key: "precioCarga",
+          sortable: true,
+          render: (value: any) => {
+            const num = typeof value === "number" ? value : Number(value);
+            return formatCLP(num);
+          },
+        } as CustomColumn<ServiceRow>;
+      }
+
+      if (key === "estado") {
+        return {
+          label: "Estado",
+          key: "estado",
+          sortable: true,
+          render: (value: EstadoServicio) => (
+            <span
+              className={`px-2 py-1 rounded-full text-xs font-medium ${
+                estadoStyles[value] || ""
+              } ${badgeTextColor[value] || ""}`}
+            >
+              {value}
+            </span>
+          ),
+        } as CustomColumn<ServiceRow>;
+      }
+
+      const label = key.charAt(0).toUpperCase() + key.slice(1);
+      return {
+        label,
+        key,
+        sortable: true,
+      } as CustomColumn<ServiceRow>;
+    });
+  }, [rows]);
 
   const handleDelete = (row: ServiceRow) => {
     if (!window.confirm(`¿Eliminar servicio ${row.id}?`)) return;
     const idNum = Number(row.id);
 
-    // Si existe en borradores, lo borro de ahí, si no, de enviados
     const drafts = loadDrafts();
     if (drafts.some((d) => d.id === idNum)) {
       deleteDraft(idNum);
@@ -153,7 +196,8 @@ const IngresoServicio: React.FC = () => {
   };
 
   const dropdownOptions = (row: ServiceRow): CustomDropdownOption[] => {
-    if (row.estado === "Pendiente") {
+    const est = row.estado as EstadoServicio;
+    if (["Pendiente", "Sin Asignar", "En Proceso"].includes(est)) {
       return [
         {
           label: "Ver/Editar Servicio",
@@ -161,13 +205,17 @@ const IngresoServicio: React.FC = () => {
         },
         {
           label: "Gestionar Valores",
-          onClick: () => navigate(`/comercial/agregar-valores/${row.id}`),
+          onClick: () => navigate(`/comercial/gestionar-valores/${row.id}`),
           disabled: false,
         },
         {
           label: "Eliminar",
           onClick: () => handleDelete(row),
           disabled: false,
+        },
+        {
+          label: "Ver Detalle",
+          onClick: () => navigate(`/detalle-servicio/${row.id}`),
         },
       ];
     } else {
@@ -181,7 +229,7 @@ const IngresoServicio: React.FC = () => {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-6 w-full">
       <div className="mb-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold">Servicios</h1>
         <Link
@@ -197,7 +245,20 @@ const IngresoServicio: React.FC = () => {
         columns={columns}
         searchFilters={searchFilters}
         checkboxFilterGroups={checkboxFilterGroups}
+        defaultCheckboxSelections={{
+          estado: ["Sin Asignar", "Pendiente"],
+        }}
         dropdownOptions={dropdownOptions}
+        customSortOrder={{
+          estado: [
+            "Pendiente",
+            "Sin Asignar",
+            "En Proceso",
+            "Falso Flete",
+            "Por facturar",
+            "Completado",
+          ],
+        }}
         colorConfig={{
           field: "estado",
           bgMapping: estadoStyles,

@@ -6,7 +6,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 // Páginas del dashboard
 import HomePage from "./pages/HomePage";
 import IngresoServicioCliente from "./pages/cliente/IngresoServicio";
-import IngresoServicioComercial from "./pages/comercial/IngresoServicio";
+import GestionServiciosComercial from "./pages/comercial/IngresoServicio";
 import VistaTorreDeControl from "./pages/torreDeControl/VistaServicios";
 import ServiciosPendientesComercial from "./pages/comercial/VistaServiciosPendientes";
 import ServiciosPendientesOperacion from "./pages/operaciones/VistaServiciosPendientes";
@@ -22,6 +22,7 @@ import NuevoServicio from "./pages/NuevoServicio";
 import AgregarValores from "./pages/AgregarValoresServicio";
 import SeguimientoServicio from "./pages/torreDeControl/SeguimientoServicio";
 import AsignarChoferMovil from "./pages/operaciones/AsignarChoferMovil";
+import Profile from "./pages/Profile"
 
 // Inicio de sesión
 import InicioSesion from "./pages/InicioSesion";
@@ -39,9 +40,9 @@ function App() {
           <Route
             path="/*"
             element={
-              <div className="flex h-screen w-screen">
+              <div className="flex h-full w-full min-w-0">
                 <Sidebar />
-                <div className="flex flex-col flex-1">
+                <div className="flex flex-col flex-1 w-full min-w-0">
                   <TopMenu />
                   <main className="p-4 flex-1 overflow-auto bg-white text-black">
                     <Routes>
@@ -51,8 +52,12 @@ function App() {
                         element={<IngresoServicioCliente />}
                       />
                       <Route
-                        path="/comercial/ingresoServicios"
-                        element={<IngresoServicioComercial />}
+                        path="/comercial/gestion-servicios"
+                        element={<GestionServiciosComercial />}
+                      />
+                      <Route
+                        path="/comercial/modificar-servicio/:id"
+                        element={<NuevoServicio />}
                       />
                       <Route path="/servicios" element={<VistaServicios />} />
                       <Route
@@ -60,7 +65,7 @@ function App() {
                         element={<VistaServiciosTest />}
                       />
                       <Route
-                        path="/torre-de-control/servicios"
+                        path="/torre-de-control/gestion-servicios"
                         element={<VistaTorreDeControl />}
                       />
                       <Route
@@ -72,12 +77,24 @@ function App() {
                         element={<ServiciosPendientesComercial />}
                       />
                       <Route
-                        path="/operaciones/servicios"
+                        path="/operaciones/gestion-servicios"
                         element={<ServiciosPendientesOperacion />}
                       />
                       <Route
                         path="/operaciones/asignar/:id"
                         element={<AsignarChoferMovil />}
+                      />
+                      <Route
+                        path="/operaciones/gestionar-valores/:id"
+                        element={<AgregarValores />}
+                      />
+                      <Route
+                        path="/operaciones/nuevo-servicio"
+                        element={<NuevoServicio />}
+                      />
+                      <Route
+                        path="/operaciones/modificar-servicio/:id"
+                        element={<NuevoServicio />}
                       />
                       <Route
                         path="/completar-entrega"
@@ -104,17 +121,14 @@ function App() {
                         element={<FacturarServicio />}
                       />
                       <Route
-                        path="/comercial/modificar-servicio/:id"
-                        element={<NuevoServicio />}
-                      />
-                      <Route
-                        path="/comercial/agregar-valores/:id"
+                        path="/comercial/gestionar-valores/:id"
                         element={<AgregarValores />}
                       />
                       <Route
                         path="/comercial/nuevo-servicio"
                         element={<NuevoServicio />}
                       />
+                      <Route path="/profile" element={<Profile />} />
                     </Routes>
                   </main>
                 </div>

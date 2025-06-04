@@ -20,3 +20,17 @@ select:disabled {
 .input{ @apply mt-1 w-full border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500 }
 .btn-primary{ @apply px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 }
 .btn-secondary{ @apply px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 }
+
+/* para que todos los elementos puedan crecer más allá del viewport */
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+}
+
+/* opcional: asegúrate de que el fondo sea blanco */
+body {
+  @apply bg-white;
+}

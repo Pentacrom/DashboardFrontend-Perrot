@@ -1,121 +1,124 @@
+// src/pages/HomePage.tsx
 import React, { useEffect, useState, useContext } from "react";
-import { AuthContext } from "../context/AuthContext"; // Ajusta la ruta según tu estructura
+import { AuthContext } from "../context/AuthContext";
+import { loadDrafts, loadSent, Payload } from "../utils/ServiceDrafts";
+
+interface Stats {
+  totalIngresados: number;
+  completados: number;
+  valorados: number;
+  porFacturar: number;
+  pendientes: number;
+  activos: number;
+}
 
 const HomePage: React.FC = () => {
-  const [isLoading, setIsLoading] = useState(true);
   const { userName, roles } = useContext(AuthContext);
+  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState<Stats>({
+    totalIngresados: 0,
+    completados: 0,
+    valorados: 0,
+    porFacturar: 0,
+    pendientes: 0,
+    activos: 0,
+  });
 
-  // Simulamos la carga de datos con un retraso (aquí 1 segundo)
   useEffect(() => {
+    // Simula tiempo de carga
     const timer = setTimeout(() => {
+      const drafts = loadDrafts();
+      const sent = loadSent();
+
+      const all: Payload[] = [...drafts, ...sent];
+      const totalIngresados = all.length;
+      const completados = all.filter((s) => s.estado === "Completado").length;
+      const porFacturar = all.filter((s) => s.estado === "Por facturar").length;
+      const pendientes = all.filter((s) => s.estado === "Pendiente").length;
+      // "valorados" = tienen valores
+      const valorados = all.filter((s) => (s.valores?.length || 0) > 0).length;
+      // "activos" lo definimos como enviados que aún no están completados
+      const activos = sent.filter((s) => s.estado !== "Completado").length;
+
+      setStats({
+        totalIngresados,
+        completados,
+        valorados,
+        porFacturar,
+        pendientes,
+        activos,
+      });
       setIsLoading(false);
-    }, 1000);
+    }, 500);
+
     return () => clearTimeout(timer);
   }, []);
 
   if (isLoading) {
     return (
       <div className="p-6 animate-pulse">
-        {/* Placeholder para el título */}
         <div className="h-10 bg-gray-300 rounded w-1/2 mb-6"></div>
-        {/* Placeholder para el párrafo */}
         <div className="h-6 bg-gray-300 rounded w-full mb-4"></div>
-        {/* Placeholder para las tarjetas */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="h-24 bg-gray-300 rounded"></div>
-          <div className="h-24 bg-gray-300 rounded"></div>
-          <div className="h-24 bg-gray-300 rounded"></div>
-          <div className="h-24 bg-gray-300 rounded"></div>
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-24 bg-gray-300 rounded"></div>
+          ))}
         </div>
-        {/* Placeholder para el texto final */}
         <div className="mt-8 h-4 bg-gray-300 rounded w-full"></div>
       </div>
     );
   }
 
-  // Función para renderizar tarjetas según el rol del usuario.
+  const {
+    totalIngresados,
+    completados,
+    valorados,
+    porFacturar,
+    pendientes,
+    activos,
+  } = stats;
+
+  // Renderiza tarjetas según el rol
   const renderCards = () => {
     if (roles.includes("administracion")) {
-      // Administrador ve todas las tarjetas
       return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold mb-2">Servicios Ingresados</h2>
-            <p className="text-2xl">120</p>
-          </div>
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold mb-2">Entregas Completadas</h2>
-            <p className="text-2xl">95</p>
-          </div>
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold mb-2">Servicios Valorados</h2>
-            <p className="text-2xl">80</p>
-          </div>
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold mb-2">
-              Servicios por Facturar
-            </h2>
-            <p className="text-2xl">25</p>
-          </div>
+          <Card title="Servicios Ingresados" value={totalIngresados} />
+          <Card title="Entregas Completadas" value={completados} />
+          <Card title="Servicios Valorados" value={valorados} />
+          <Card title="Servicios por Facturar" value={porFacturar} />
         </div>
       );
     } else if (roles.includes("cliente")) {
       return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold mb-2">
-              Tus Servicios Ingresados
-            </h2>
-            <p className="text-2xl">50</p>
-          </div>
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold mb-2">Entregas Completadas</h2>
-            <p className="text-2xl">45</p>
-          </div>
+          <Card title="Tus Servicios Ingresados" value={totalIngresados} />
+          <Card title="Entregas Completadas" value={completados} />
         </div>
       );
     } else if (roles.includes("comercial")) {
       return (
         <div className="grid grid-cols-1 gap-6">
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold mb-2">Servicios Pendientes</h2>
-            <p className="text-2xl">30</p>
-          </div>
+          <Card title="Servicios Pendientes" value={pendientes} />
         </div>
       );
     } else if (roles.includes("torre de control")) {
       return (
         <div className="grid grid-cols-1 gap-6">
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold mb-2">Servicios Activos</h2>
-            <p className="text-2xl">60</p>
-          </div>
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold mb-2">Servicios Test</h2>
-            <p className="text-2xl">10</p>
-          </div>
+          <Card title="Servicios Activos" value={activos} />
+          <Card title="Servicios Test" value={0} />
         </div>
       );
     } else if (roles.includes("operaciones")) {
       return (
         <div className="grid grid-cols-1 gap-6">
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold mb-2">
-              Servicios por Facturar
-            </h2>
-            <p className="text-2xl">25</p>
-          </div>
+          <Card title="Servicios por Facturar" value={porFacturar} />
         </div>
       );
     } else if (roles.includes("contabilidad")) {
       return (
         <div className="grid grid-cols-1 gap-6">
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold mb-2">
-              Facturación Pendiente
-            </h2>
-            <p className="text-2xl">15</p>
-          </div>
+          <Card title="Facturación Pendiente" value={porFacturar} />
         </div>
       );
     } else {
@@ -131,9 +134,7 @@ const HomePage: React.FC = () => {
       <p className="text-lg mb-4">
         Este es el panel de control para la administración de servicios
         logísticos.{" "}
-        {roles && roles.length > 0 && (
-          <span>Tus roles: {roles.join(", ")}.</span>
-        )}
+        {roles.length > 0 && <span>Tus roles: {roles.join(", ")}.</span>}
       </p>
       {renderCards()}
       <div className="mt-8">
@@ -145,5 +146,17 @@ const HomePage: React.FC = () => {
     </div>
   );
 };
+
+interface CardProps {
+  title: string;
+  value: number;
+}
+
+const Card: React.FC<CardProps> = ({ title, value }) => (
+  <div className="bg-white p-4 rounded shadow">
+    <h2 className="text-xl font-semibold mb-2">{title}</h2>
+    <p className="text-2xl">{value}</p>
+  </div>
+);
 
 export default HomePage;
