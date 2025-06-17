@@ -105,11 +105,11 @@ const SeguimientoServicio: React.FC = () => {
     const actualizado: Payload = {
       ...service,
       puntos,
-      estado: "Completado",
+      estado: "Por validar",
     };
     saveOrUpdateSent(actualizado);
     setShowModal(false);
-    alert("Servicio marcado como Completado.");
+    alert("Servicio marcado como Por validar.");
     navigate(`/${perfilActual}/gestion-servicios`);
   };
 

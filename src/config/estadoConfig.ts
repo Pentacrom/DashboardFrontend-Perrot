@@ -5,7 +5,8 @@ export const estadoStyles: Record<string, string> = {
   "Por facturar": "bg-green-500",
   Completado:     "bg-green-700",
   "Sin Asignar":  "bg-blue-500",
-  "Falso Flete":  "text-white",
+  "Falso Flete": "bg-gray-600",
+  "Por validar":  "bg-purple-500",
 };
 
 // Color de texto para cada badge
@@ -16,5 +17,6 @@ export const badgeTextColor: Record<string, string> = {
   Completado:     "text-white",
   Cancelado:      "text-white",
   "Sin Asignar":  "text-white",
-  "Falso Flete":  "bg-gray-600",
+  "Falso Flete": "text-white",
+  "Por validar":  "text-white",
 };

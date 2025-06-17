@@ -1,24 +1,33 @@
 import { useEffect, useState, useCallback } from "react";
+    
 // Interfaces
 export interface Item {
   codigo: number;
   nombre: string;
 }
 
-export interface Lugar{
+export interface Lugar {
   id: number;
   nombre: string;
   tipo: TipoLugar;
   cliente?: number;
 }
+
+export interface Cliente {
+  id: number;
+  nombre: string;
+  grupo: number;
+}
+
 export interface Catalogos {
   Operación: Item[];
   Zona: Item[];
   Lugares: Lugar[];
   Tipo_contenedor: Item[];
   acciones: Item[];
-  empresas: Item[];
+  empresas: Cliente[];
   proveedores_extras: Item[];
+  grupoCliente: Item[];
 }
 
 export interface Centro {
@@ -39,6 +48,7 @@ export interface Punto {
 }
 
 export interface FormState {
+  grupoCliente: number;
   cliente: number;
   tipoOperacion: number;
   origen: number;
@@ -64,10 +74,19 @@ export interface FormState {
   imoCargo: boolean;
   imoCategoria: number;
   tipoServicio: number;
+  folio: number;
+  fechaFolio: string;
 }
 
-export type EstadoServicio = 'Pendiente' | 'En Proceso' | 'Por facturar' | 'Completado' | 'Sin Asignar' | 'Falso Flete';
-export type TipoLugar = 'Zona Portuaria' | 'Centro' | 'Proveedor'
+export type EstadoServicio =
+  | "Pendiente"
+  | "En Proceso"
+  | "Por facturar"
+  | "Completado"
+  | "Sin Asignar"
+  | "Falso Flete"
+  | "Por validar";
+export type TipoLugar = "Zona Portuaria" | "Centro" | "Proveedor";
 
 export interface ValorFactura {
   id: string;
@@ -77,7 +96,7 @@ export interface ValorFactura {
   fechaEmision: string;
   tipo: "costo" | "venta";
   codigo?: string;
-  descuentoPorcentaje?: Descuento[] /** Descuento porcentual aplicado a este ítem (0-100) */;
+  descuentoPorcentaje?: Descuento[];
 }
 
 export interface Descuento {
@@ -85,21 +104,17 @@ export interface Descuento {
   razon: string;
 }
 
-
-
 export interface Payload {
   id: number;
   form: FormState;
   puntos: Punto[];
   estado: EstadoServicio;
   valores?: ValorFactura[];
-  chofer?: string; // lista de nombres o IDs de choferes asignados
-  movil?: string; // lista de patentes o IDs de móviles asignados
-  /** Descuento porcentual aplicado al total del servicio (0-100) */
+  chofer?: string;
+  movil?: string;
   descuentoServicioPorcentaje?: Descuento[];
   createdBy: string;
 }
-
 
 // Datos mock completos
 export const mockCatalogos: Catalogos = {
@@ -159,15 +174,23 @@ export const mockCatalogos: Catalogos = {
     { codigo: 11, nombre: "retirar carga" },
     { codigo: 12, nombre: "dejar carga" },
   ],
-
   empresas: [
-    { codigo: 1, nombre: "Perrot1" },
-    { codigo: 2, nombre: "Perrot2" },
+    { id: 1, nombre: "Perrot1", grupo: 1 },
+    { id: 2, nombre: "Perrot2", grupo: 1 },
+    { id: 3, nombre: "Perrot3", grupo: 2 },
+    { id: 4, nombre: "Perrot4", grupo: 2 },
+    { id: 5, nombre: "Perrot5", grupo: 3 },
+    { id: 6, nombre: "Perrot6", grupo: 3 },
   ],
   proveedores_extras: [
     { codigo: 0, nombre: "Proveedor 1" },
     { codigo: 1, nombre: "Proveedor 2" },
     { codigo: 2, nombre: "Proveedor 3" },
+  ],
+  grupoCliente: [
+    { codigo: 1, nombre: "grupo Cliente 1" },
+    { codigo: 2, nombre: "grupo Cliente 2" },
+    { codigo: 3, nombre: "grupo Cliente 3" },
   ],
 };
 
@@ -184,13 +207,25 @@ export const mockPaises: Item[] = [
   { codigo: 3, nombre: "Perú" },
 ];
 
-// Implementación de las funciones
+// Formateo de fechas a HH:mm dd/MM/yyyy
+export function formatFechaISO(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(
+    d.getMonth() + 1
+  )}/${d.getFullYear()}`;
+}
+
+// Implementación de funciones de almacenamiento y migración
 const STORAGE = {
   borradores: "serviciosBorradores",
   legacy: "nuevoServicioBorrador",
   ultimoId: "ultimoIdServicio",
   enviados: "serviciosEnviados",
 };
+
+export const grupoCliente: Item[] = [];
 
 export interface ValorPorDefecto {
   concepto: string;
@@ -200,7 +235,6 @@ export interface ValorPorDefecto {
 }
 
 export const valoresPorDefecto: Record<number | string, ValorPorDefecto> = {
-  // Valores por acción de punto (ejemplos)
   1: {
     concepto: "Retiro de container vacío",
     montoVenta: 60000,
@@ -255,8 +289,6 @@ export const valoresPorDefecto: Record<number | string, ValorPorDefecto> = {
     montoCosto: 6000,
     aplicaA: "punto",
   },
-
-  // Servicios extras (ejemplos)
   doc: {
     concepto: "Gestión documental",
     montoVenta: 15000,
@@ -293,49 +325,48 @@ export const imoCategorias = [
   {
     code: 1,
     label:
-      "1 – Explosivos (sustancias que pueden detonar o iniciar reacción explosiva)",
+      "1 – Explosivos",
   },
   {
     code: 2,
     label:
-      "2 – Gases (inflamables, no inflamables o tóxicos, envasados a presión)",
+      "2 – Gases",
   },
   {
     code: 3,
-    label: "3 – Líquidos inflamables (petróleo, solventes, alcoholes, etc.)",
+    label: "3 – Líquidos inflamables",
   },
   {
     code: 4,
     label:
-      "4 – Sólidos inflamables o que emiten gases inflamables al mojarse (pólvoras, sulfuro, etc.)",
+      "4 – Sólidos inflamables o que emiten gases inflamables al mojarse",
   },
   {
     code: 5,
     label:
-      "5 – Sustancias comburentes y peróxidos orgánicos (oxidantes que promueven combustión)",
+      "5 – Sustancias comburentes y peróxidos orgánicos",
   },
   {
     code: 6,
     label:
-      "6 – Sustancias tóxicas e infecciosas (venenos, agentes patógenos, etc.)",
+      "6 – Sustancias tóxicas e infecciosas",
   },
   {
     code: 7,
     label:
-      "7 – Material radiactivo (residuos nucleares, fuentes radiactivas industriales, etc.)",
+      "7 – Material radiactivo",
   },
   {
     code: 8,
     label:
-      "8 – Sustancias corrosivas (ácidos fuertes, álcalis, etc., que destruyen tejidos o metales)",
+      "8 – Sustancias corrosivas",
   },
   {
     code: 9,
     label:
-      "9 – Sustancias y objetos peligrosos diversos (mercancías peligrosas que no encajan en clases anteriores)",
+      "9 – Sustancias y objetos peligrosos diversos",
   },
 ];
-
 
 /** Genera un ID autoincremental */
 export function getNextId(): number {
@@ -380,6 +411,8 @@ export function loadSent(): Payload[] {
 }
 
 export function saveOrUpdateSent(payload: Payload): void {
+  payload.form.fechaSol = formatFechaISO(safeIso(payload.form.fechaSol));
+  payload.form.fechaIng = formatFechaISO(safeIso(payload.form.fechaIng));
   const sent = loadSent();
   const idx = sent.findIndex((p) => p.id === payload.id);
   if (idx >= 0) sent[idx] = payload;
@@ -387,7 +420,45 @@ export function saveOrUpdateSent(payload: Payload): void {
   localStorage.setItem(STORAGE.enviados, JSON.stringify(sent));
 }
 
-/** Hook personalizado */
+/** Migra todas las fechas existentes a formato HH:mm dd/MM/yyyy */
+export const migrateAllFechas = (): void => {
+  const servicios = [...loadSent(),...loadDrafts()] ;
+  const now = new Date();
+  const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+  const startLastWeek = new Date(now.getTime() - 2 * oneWeekMs);
+  const endLastWeek = new Date(now.getTime() - oneWeekMs);
+  const startThisWeek = endLastWeek;
+  const endThisWeek = now;
+
+  servicios.forEach((s) => {
+    // Fecha solicitud: si inválida, asignar random en semana pasada
+    const oldSol = new Date(s.form.fechaSol);
+    const solDate = isNaN(oldSol.getTime())
+      ? randomDateBetween(startLastWeek, endLastWeek)
+      : oldSol;
+    // Fecha ingreso: si inválida, random en esta semana
+    const oldIng = new Date(s.form.fechaIng);
+    const ingDate = isNaN(oldIng.getTime())
+      ? randomDateBetween(startThisWeek, endThisWeek)
+      : oldIng;
+
+    s.form.fechaSol = formatFechaISO(safeIso(solDate.toISOString()));
+    s.form.fechaIng = formatFechaISO(safeIso(ingDate.toISOString()));
+    saveOrUpdateSent(s);
+  });
+};
+
+const safeIso = (raw: string) =>
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(raw)
+    ? raw
+    : new Date().toISOString().slice(0, 16);
+
+// Helper: genera fecha aleatoria entre dos fechas
+function randomDateBetween(start: Date, end: Date): Date {
+  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+}
+
+/** Hook personalizado para drafts */
 export function useServiceDrafts() {
   const [drafts, setDrafts] = useState<Payload[]>([]);
 

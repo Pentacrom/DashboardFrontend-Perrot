@@ -1,19 +1,40 @@
+// src/pages/DetalleServicio.tsx
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   loadDrafts,
   loadSent,
+  saveOrUpdateSent,
   Payload,
   ValorFactura,
   Descuento,
   mockCatalogos,
   Lugar,
+  Cliente,
+  imoCategorias,
 } from "../utils/ServiceDrafts";
 import { formatCLP } from "../utils/format";
+
+const lookup = <T extends { codigo: number; nombre: string }>(
+  arr: T[],
+  code: number
+): string => arr.find((x) => x.codigo === code)?.nombre || code.toString();
+
+const lookupLugar = (arr: Lugar[], id: number): string =>
+  arr.find((x) => x.id === id)?.nombre || id.toString();
+
+const lookupCliente = (arr: Cliente[], id: number): string =>
+  arr.find((x) => x.id === id)?.nombre || id.toString();
 
 const DetalleServicio: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Extrae segmento de perfil ("operacion" o "comercial")
+  const segments = location.pathname.split("/").filter(Boolean);
+  const perfilActual = segments[0] || "";
+
   const [service, setService] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,13 +55,20 @@ const DetalleServicio: React.FC = () => {
     }
   }, [id]);
 
-  const lookup = <T extends { codigo: number; nombre: string }>(
-    arr: T[],
-    code: number
-  ) => arr.find((x) => x.codigo === code)?.nombre || code.toString();
-
-  const lookupLugar = (arr: Lugar[], id: number) =>
-    arr.find((x) => x.id === id)?.nombre || id.toString();
+  const handleCompletar = () => {
+    if (!service) return;
+    const confirmado = window.confirm(
+      "¿Estás seguro que quieres completar el servicio? Esta acción cambiará el estado a 'Completado'."
+    );
+    if (!confirmado) return;
+    const actualizado: Payload = {
+      ...service,
+      estado: "Completado",
+    };
+    saveOrUpdateSent(actualizado);
+    alert("Servicio marcado como Completado.");
+    navigate(-1);
+  };
 
   if (loading) {
     return (
@@ -75,35 +103,37 @@ const DetalleServicio: React.FC = () => {
     descuentoServicioPorcentaje = [],
   } = service;
 
-  // 1) Sumar porcentajes de descuento en cada ValorFactura
+  const esContainerRefrigerado = (): boolean =>
+    mockCatalogos.Tipo_contenedor.filter(
+      (c) => c.codigo === form.tipoContenedor
+    ).some((c) => c.nombre.includes("RF") || c.nombre.includes("FR"));
+
   const pctDescuentoPorValor = (v: ValorFactura): number =>
     (v.descuentoPorcentaje || []).reduce(
       (sum, d: Descuento) => sum + d.porcentajeDescuento,
       0
     );
 
-  // 2) Calcular neto por valor: aplicas el % sumado, luego restas costo
   const calcNetoPorValor = (v: ValorFactura): number => {
-    const pct = pctDescuentoPorValor(v); // ej. 10 + 5 = 15%
+    const pct = pctDescuentoPorValor(v);
     const ventaConDesc = v.montoVenta * (1 - pct / 100);
     return ventaConDesc - v.montoCosto;
   };
 
-  // Totales básicos
   const totalVenta = valores.reduce((s, v) => s + v.montoVenta, 0);
   const totalCosto = valores.reduce((s, v) => s + v.montoCosto, 0);
   const totalNetoBruto = valores.reduce(
     (s, v) => s + (v.montoVenta - v.montoCosto),
     0
   );
-
-  // 3) Neto agregado antes de descuento general
   const totalPreGeneral = valores.reduce((s, v) => s + calcNetoPorValor(v), 0);
-
-  // 4) Aplicar descuentos generales compuestos sobre totalPreGeneral
   const totalNeto = descuentoServicioPorcentaje.reduce(
     (acc, d) => acc * (1 - d.porcentajeDescuento / 100),
     totalPreGeneral
+  );
+  const totalDescuentoGeneral = descuentoServicioPorcentaje.reduce(
+    (s, d) => s + d.porcentajeDescuento,
+    0
   );
 
   return (
@@ -117,35 +147,87 @@ const DetalleServicio: React.FC = () => {
 
       {/* Información General */}
       <section className="grid grid-cols-1 gap-6 bg-white p-6 rounded-lg shadow">
-        <div className="w-full">
-          <h2 className="text-xl font-semibold mb-4">Información General</h2>
-          <dl className="grid grid-cols-4 gap-x-4 gap-y-2">
-            <dt className="font-medium">Cliente:</dt>
-            <dd>{lookup(mockCatalogos.empresas, form.cliente)}</dd>
-            <dt className="font-medium">Tipo Operación:</dt>
-            <dd>{lookup(mockCatalogos.Operación, form.tipoOperacion)}</dd>
-            <dt className="font-medium">Origen:</dt>
-            <dd>{lookupLugar(mockCatalogos.Lugares, form.origen)}</dd>
-            <dt className="font-medium">Destino:</dt>
-            <dd>{lookupLugar(mockCatalogos.Lugares, form.destino)}</dd>
-            <dt className="font-medium">País:</dt>
-            <dd>{form.pais}</dd>
-            <dt className="font-medium">Fecha Solicitud:</dt>
-            <dd>{form.fechaSol}</dd>
-            <dt className="font-medium">Guía:</dt>
-            <dd>{form.guia || "—"}</dd>
-            <dt className="font-medium">Interchange:</dt>
-            <dd className="whitespace-pre-line">{form.interchange || "—"}</dd>
-            <dt className="font-medium">Observación:</dt>
-            <dd className="whitespace-pre-line">{form.observacion || "—"}</dd>
-            <dt className="font-medium">Chofer:</dt>
-            <dd className="whitespace-pre-line">{chofer || "—"}</dd>
-            <dt className="font-medium">Movil:</dt>
-            <dd className="whitespace-pre-line">{movil || "—"}</dd>
-            <dt className="font-medium">Creado por:</dt>
-            <dd>{service.createdBy || "—"}</dd>
-          </dl>
-        </div>
+        <h2 className="text-xl font-semibold mb-4">Información General</h2>
+        <dl className="grid grid-cols-4 gap-x-4 gap-y-2">
+          <dt className="font-medium">Cliente:</dt>
+          <dd>{lookupCliente(mockCatalogos.empresas, form.cliente)}</dd>
+
+          <dt className="font-medium">Tipo Operación:</dt>
+          <dd>{lookup(mockCatalogos.Operación, form.tipoOperacion)}</dd>
+
+          <dt className="font-medium">Origen:</dt>
+          <dd>{lookupLugar(mockCatalogos.Lugares, form.origen)}</dd>
+
+          <dt className="font-medium">Destino:</dt>
+          <dd>{lookupLugar(mockCatalogos.Lugares, form.destino)}</dd>
+
+          <dt className="font-medium">País:</dt>
+          <dd>{form.pais}</dd>
+
+          <dt className="font-medium">Fecha Solicitud:</dt>
+          <dd>{form.fechaSol}</dd>
+
+          <dt className="font-medium">Guía:</dt>
+          <dd>{form.guiaDeDespacho || "—"}</dd>
+
+          <dt className="font-medium">Interchange:</dt>
+          <dd className="whitespace-pre-line">{form.interchange || "—"}</dd>
+
+          <dt className="font-medium">Observación:</dt>
+          <dd className="whitespace-pre-line">{form.observacion || "—"}</dd>
+
+          <dt className="font-medium">Chofer:</dt>
+          <dd>{chofer || "—"}</dd>
+
+          <dt className="font-medium">Móvil:</dt>
+          <dd>{movil || "—"}</dd>
+
+          <dt className="font-medium">Creado por:</dt>
+          <dd>{service.createdBy || "—"}</dd>
+
+          {/* Nuevos campos */}
+          <dt className="font-medium">Precio de Carga:</dt>
+          <dd>{formatCLP(form.precioCarga)}</dd>
+
+          <dt className="font-medium">Temperatura:</dt>
+          <dd>
+            {form.temperatura}°C
+            {esContainerRefrigerado() ? " (Refrigerado)" : ""}
+          </dd>
+
+          <dt className="font-medium">Cargo IMO:</dt>
+          <dd>{form.imoCargo ? "Sí" : "No"}</dd>
+
+          {form.imoCargo && (
+            <>
+              <dt className="font-medium">Categoría IMO:</dt>
+              <dd>
+                {imoCategorias.find((c) => c.code === form.imoCategoria)
+                  ?.label || form.imoCategoria}
+              </dd>
+            </>
+          )}
+
+          <dt className="font-medium">Documentos por Contenedor:</dt>
+          <dd>
+            {form.documentoPorContenedor.length > 0 ? (
+              <ul className="list-disc list-inside">
+                {form.documentoPorContenedor.map((d, i) => (
+                  <li key={i}>{d}</li>
+                ))}
+              </ul>
+            ) : (
+              "—"
+            )}
+          </dd>
+
+          {/* Folio y Fecha Folio */}
+          <dt className="font-medium">Folio:</dt>
+          <dd>{form.folio}</dd>
+
+          <dt className="font-medium">Fecha de Folio:</dt>
+          <dd>{form.fechaFolio || "—"}</dd>
+        </dl>
       </section>
 
       {/* Valores / Facturación */}
@@ -230,19 +312,23 @@ const DetalleServicio: React.FC = () => {
         {descuentoServicioPorcentaje.length === 0 ? (
           <p className="text-gray-500">No hay descuentos generales.</p>
         ) : (
-          <ul className="list-disc list-inside space-y-2">
-            {descuentoServicioPorcentaje.map((d, i) => (
-              <li key={i} className="text-sm">
-                <strong>{d.porcentajeDescuento}%</strong> –{" "}
-                {d.razon || "sin razón"}
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="list-disc list-inside space-y-2">
+              {descuentoServicioPorcentaje.map((d, i) => (
+                <li key={i} className="text-sm">
+                  <strong>{d.porcentajeDescuento}%</strong> – {d.razon}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 font-medium">
+              Descuento total aplicado: {totalDescuentoGeneral}%
+            </p>
+          </>
         )}
       </section>
 
-      {/* Recorrido y estado de puntos */}
-      <section className="bg-white p-6 rounded-lg shadow ">
+      {/* Recorrido y Puntos */}
+      <section className="bg-white p-6 rounded-lg shadow">
         <h2 className="text-xl font-semibold mb-4">Recorrido y Puntos</h2>
         <div className="space-y-4">
           {puntos.map((p, i) => {
@@ -259,7 +345,7 @@ const DetalleServicio: React.FC = () => {
                 }`}
               >
                 <h3 className="font-black mb-2">Punto {i + 1}</h3>
-                <div className="grid grid-cols-2 text-left">
+                <div className="grid grid-cols-2 text-left gap-2">
                   <p>
                     <strong>Lugar:</strong>{" "}
                     {lookupLugar(mockCatalogos.Lugares, p.idLugar)}
@@ -269,16 +355,16 @@ const DetalleServicio: React.FC = () => {
                     {lookup(mockCatalogos.acciones, p.accion)}
                   </p>
                   <p>
-                    <strong>Estado:</strong> {p.estado}
+                    <strong>ETA:</strong> {p.eta}
                   </p>
                   <p>
-                    <strong>ETA:</strong> {p.eta}
+                    <strong>Salida:</strong> {p.salida || "—"}
                   </p>
                   <p>
                     <strong>Llegada:</strong> {p.llegada || "—"}
                   </p>
                   <p>
-                    <strong>Salida:</strong> {p.salida || "—"}
+                    <strong>Estado:</strong> {p.estado}
                   </p>
                   {p.observacion && (
                     <p>
@@ -286,9 +372,8 @@ const DetalleServicio: React.FC = () => {
                     </p>
                   )}
                   {isLate && (
-                    <p className="mt-1 text-red-600">
-                      <strong>Razón de tardía:</strong>{" "}
-                      {p.razonDeTardia || "sin razón"}
+                    <p className="text-red-600">
+                      <strong>Razón de tardía:</strong> {p.razonDeTardia || "—"}
                     </p>
                   )}
                 </div>
@@ -298,12 +383,23 @@ const DetalleServicio: React.FC = () => {
         </div>
       </section>
 
-      <button
-        onClick={() => navigate(-1)}
-        className="mt-4 px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-      >
-        Volver
-      </button>
+      <div className="flex gap-4 mt-4">
+        {
+          /*service.estado === "Por validar" &&
+          (perfilActual === "operacion" || perfilActual === "comercial") && */ <button
+            onClick={handleCompletar}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Completar Servicio
+          </button>
+        }
+        <button
+          onClick={() => navigate(-1)}
+          className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+        >
+          Volver
+        </button>
+      </div>
     </div>
   );
 };

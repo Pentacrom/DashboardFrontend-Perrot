@@ -1,47 +1,8 @@
+// src/pages/InicioSesion.tsx
 import React, { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import LogoPerrot from "../assets/perrot-logo.png";
-import { AuthContext } from "../context/AuthContext"; // Ajusta la ruta según tu estructura
-
-// Usuarios de prueba
-const testUsers = [
-  {
-    username: "cliente",
-    password: "cliente123",
-    roles: ["cliente"],
-    userName: "Cliente Test",
-  },
-  {
-    username: "comercial",
-    password: "comercial123",
-    roles: ["comercial"],
-    userName: "Comercial Test",
-  },
-  {
-    username: "torre",
-    password: "torre123",
-    roles: ["torre de control"],
-    userName: "Torre Test",
-  },
-  {
-    username: "operaciones",
-    password: "operaciones123",
-    roles: ["operaciones"],
-    userName: "Operaciones Test",
-  },
-  {
-    username: "contabilidad",
-    password: "contabilidad123",
-    roles: ["contabilidad"],
-    userName: "Contabilidad Test",
-  },
-  {
-    username: "administracion",
-    password: "administracion123",
-    roles: ["administracion"],
-    userName: "Administracion Test",
-  },
-];
+import { AuthContext } from "../context/AuthContext";
 
 const InicioSesion: React.FC = () => {
   const navigate = useNavigate();
@@ -49,76 +10,99 @@ const InicioSesion: React.FC = () => {
 
   const [usuario, setUsuario] = useState("");
   const [contrasena, setContrasena] = useState("");
+  const [error, setError] = useState("");
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    // Aquí podrías reemplazar testUsers por la fuente real de usuarios
+    const testUsers = JSON.parse(localStorage.getItem("perrot-users") || "[]");
     const user = testUsers.find(
-      (u) => u.username === usuario && u.password === contrasena
+      (u: any) => u.username === usuario && u.password === contrasena
     );
 
     if (user) {
-      // Actualizar el contexto con el perfil del usuario
       setAuth({
         hasAccess: true,
         roles: user.roles,
         userName: user.userName,
       });
-      // Redirigir al dashboard o home
       navigate("/home");
     } else {
-      alert("Credenciales incorrectas");
+      setError("Usuario o contraseña incorrectos");
     }
   };
 
   return (
-    <div className="min-h-screen min-w-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded shadow-md w-full max-w-md text-black">
-        {/* Logo en la parte superior */}
-        <div className="flex justify-center mb-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 space-y-6">
+        <div className="flex justify-center">
           <img
             src={LogoPerrot}
-            alt="Logo Perrot"
-            className="w-32 h-auto object-contain"
+            alt="Perrot Logo"
+            className="w-28 h-auto animate-fade-in"
           />
         </div>
-        <h1 className="text-2xl font-bold text-black mb-6 text-center">
-          Iniciar Sesión
+        <h1 className="text-3xl font-extrabold text-center text-gray-800">
+          Bienvenido
         </h1>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label htmlFor="usuario" className="block text-gray-700 mb-2">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label
+              htmlFor="usuario"
+              className="block text-sm font-medium text-gray-700"
+            >
               Usuario
             </label>
             <input
               id="usuario"
               type="text"
-              placeholder="Ingresa tu usuario"
-              className="w-full p-2 border border-gray-300 rounded"
+              placeholder="Tu usuario"
+              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition"
               value={usuario}
               onChange={(e) => setUsuario(e.target.value)}
+              required
             />
           </div>
-          <div className="mb-4">
-            <label htmlFor="contrasena" className="block text-gray-700 mb-2">
+          <div>
+            <label
+              htmlFor="contrasena"
+              className="block text-sm font-medium text-gray-700"
+            >
               Contraseña
             </label>
             <input
               id="contrasena"
               type="password"
-              placeholder="Ingresa tu contraseña"
-              className="w-full p-2 border border-gray-300 rounded"
+              placeholder="Tu contraseña"
+              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition"
               value={contrasena}
               onChange={(e) => setContrasena(e.target.value)}
+              required
             />
           </div>
+          {error && <p className="text-sm text-red-600 text-center">{error}</p>}
           <button
             type="submit"
-            className="w-full bg-gray-700 text-white py-2 rounded hover:bg-gray-800 transition-colors"
+            className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg shadow hover:bg-blue-700 transition"
           >
             Iniciar Sesión
           </button>
         </form>
+        <div className="flex justify-between text-sm text-gray-600">
+          <button
+            onClick={() => navigate("/recuperar-contrasena")}
+            className="hover:underline"
+          >
+            ¿Olvidaste tu contraseña?
+          </button>
+          <button
+            onClick={() => navigate("/crear-cuenta")}
+            className="hover:underline"
+          >
+            Crear cuenta
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -31,7 +31,6 @@ interface CustomDropdownOption extends DropdownOption {
 }
 
 // Sólo mostramos estados pendientes o sin asignar
-const estadosFiltrados: EstadoServicio[] = ["Pendiente", "Sin Asignar"];
 
 const searchFilters: SearchFilter<ServiceRow>[] = [
   { label: "ID", key: "id", type: "text", placeholder: "Buscar ID" },
@@ -70,10 +69,6 @@ const IngresoServicio: React.FC = () => {
     const lookupLugar = (arr: Lugar[], id: number) =>
       arr.find((x) => x.id === id)?.nombre || id.toString();
 
-    const zonasPortuarias = mockCatalogos.Lugares.filter(
-      (l) => l.tipo === "Zona Portuaria"
-    );
-
     const payloads: Payload[] = [...loadDrafts(), ...loadSent()];
 
     const mapped = payloads.map((p) => {
@@ -83,7 +78,7 @@ const IngresoServicio: React.FC = () => {
 
       // Reemplazar cliente (número) por nombre de empresa
       const empresa = mockCatalogos.empresas.find(
-        (e) => e.codigo === f.cliente
+        (e) => e.id === f.cliente
       );
       baseRow.cliente = empresa ? empresa.nombre : f.cliente.toString();
 
@@ -107,14 +102,8 @@ const IngresoServicio: React.FC = () => {
 
       // Luego sobreescribimos origen/destino por sus nombres
       const tipoOp = f.tipoOperacion;
-      baseRow.origen =
-        tipoOp === 2
-          ? lookupLugar(zonasPortuarias, f.origen)
-          : lookupCodigo(mockCatalogos.Zona, f.origen);
-      baseRow.destino =
-        tipoOp === 1
-          ? lookupLugar(zonasPortuarias, f.destino)
-          : lookupCodigo(mockCatalogos.Zona, f.destino);
+      baseRow.origen = lookupLugar(mockCatalogos.Lugares, f.origen);
+      baseRow.destino = lookupLugar(mockCatalogos.Lugares, f.destino);
 
       // Convertimos id a string (payloadToRow deja id como number)
       baseRow.id = p.id.toString();
@@ -127,10 +116,7 @@ const IngresoServicio: React.FC = () => {
     });
 
     // Filtramos sólo los estados indicados
-    const filtered = mapped.filter((r) =>
-      estadosFiltrados.includes(r.estado as EstadoServicio)
-    );
-    setRows(filtered);
+    setRows(mapped);
   }, []);
 
   // Generamos columnas dinámicamente según las claves de la primera fila.
@@ -267,6 +253,7 @@ const IngresoServicio: React.FC = () => {
         }}
         onDownloadExcel={() => alert("Descarga de Excel (stub)")}
         onSearch={() => alert("Buscar (stub)")}
+        preferencesKey="Preferences"
       />
     </div>
   );

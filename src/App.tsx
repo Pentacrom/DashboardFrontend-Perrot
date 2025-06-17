@@ -23,6 +23,7 @@ import AgregarValores from "./pages/AgregarValoresServicio";
 import SeguimientoServicio from "./pages/torreDeControl/SeguimientoServicio";
 import AsignarChoferMovil from "./pages/operaciones/AsignarChoferMovil";
 import Profile from "./pages/Profile"
+import AdministrarCuentas from "./pages/AdministrarCuentas"
 
 // Inicio de sesión
 import InicioSesion from "./pages/InicioSesion";
@@ -127,6 +128,11 @@ function App() {
                       <Route
                         path="/comercial/nuevo-servicio"
                         element={<NuevoServicio />}
+                      />
+
+                      <Route
+                        path="/admin/cuentas"
+                        element={<AdministrarCuentas />}
                       />
                       <Route path="/profile" element={<Profile />} />
                     </Routes>

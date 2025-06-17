@@ -16,10 +16,14 @@ import {
   ValorFactura,
   Lugar,
   Descuento,
-  imoCategorias
+  imoCategorias,
+  Cliente,
+  migrateAllFechas
 } from "../utils/ServiceDrafts";
-import { MoreVertical } from "lucide-react";
 import { AuthContext } from "../context/AuthContext";
+import { MoreVertical } from "lucide-react";
+import { SearchableDropdown } from "../components/SearchableDropdown";
+
 
 const NuevoServicio: React.FC = () => {
   const { id: paramId } = useParams<{ id?: string }>();
@@ -31,6 +35,7 @@ const NuevoServicio: React.FC = () => {
 
   const [idService, setIdService] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>({
+    grupoCliente: 0,
     cliente: 0,
     tipoOperacion: 0,
     origen: 0,
@@ -56,6 +61,8 @@ const NuevoServicio: React.FC = () => {
     imoCargo: false,
     imoCategoria: 0,
     tipoServicio: 0,
+    folio: 0,
+    fechaFolio: ""
   });
   const [puntos, setPuntos] = useState<Punto[]>([]);
   const { userName } = useContext(AuthContext);
@@ -72,6 +79,8 @@ const NuevoServicio: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    
+    // migrateAllFechas();
     if (!form.fechaSol || puntos.length === 0) return;
     const minFirst = `${form.fechaSol}T00:00`;
     setPuntos((prev) => {
@@ -149,16 +158,35 @@ const NuevoServicio: React.FC = () => {
     []
   );
 
+  const optCliente = useCallback(
+    (arr?: Cliente[]) =>
+      arr?.map((i) => (
+        <option key={i.id} value={i.id}>
+          {i.nombre}
+        </option>
+      )),
+    []
+  );
+
   // Filtrado de catálogos según cliente y operación
   const centrosFiltrados = mockCatalogos.Lugares.filter(
     (c) => c.cliente === form.cliente && c.tipo === "Centro"
   );
+
+  const esContainerRefrigerado = (): boolean => {
+    return mockCatalogos.Tipo_contenedor.filter(
+      (c) => c.nombre.includes("RF") || c.nombre.includes("FR")
+    ).some((c) => c.codigo === form.tipoContenedor);
+  };
+
 
   const ZonasPortuarias = mockCatalogos.Lugares.filter(
     (c) => c.tipo == "Zona Portuaria"
   );
 
   const ambos = [...ZonasPortuarias, ...centrosFiltrados];
+
+  const clienteOptions = mockCatalogos.empresas.filter((c) => c.grupo === form.grupoCliente);
 
   const origenOptions = (() => {
     if (form.tipoOperacion === 1) return centrosFiltrados;
@@ -297,7 +325,7 @@ const NuevoServicio: React.FC = () => {
         sentList.find((s) => s.id === newId) ||
         drafts.find((d) => d.id === newId);
       const hasValores = Boolean((existing as Payload)?.valores?.length);
-      const createdBy = existing?.createdBy || userName;
+      const createdBy = userName;
 
       if (!hasValores) {
         const valores = generarValoresDesdePuntos(puntos);
@@ -416,38 +444,58 @@ const NuevoServicio: React.FC = () => {
         onSubmit={handleEnviar}
         className="space-y-6 bg-white p-6 shadow rounded"
       >
-        {/* Cliente y operación */}
+        {/* Grupo de cliente */}
         <div className="grid md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium">Cliente *</label>
-            <select
-              className="input"
-              value={form.cliente}
-              onChange={upd("cliente")}
-              required
-            >
-              <option value={0}>—</option>
-              {opt(mockCatalogos.empresas)}
-            </select>
-          </div>
-          <div>
             <label className="block text-sm font-medium">
-              Tipo de operación *
+              Grupo de Cliente *
             </label>
             <select
               className="input"
-              value={form.tipoOperacion}
-              onChange={upd("tipoOperacion")}
+              value={form.grupoCliente}
+              onChange={upd("grupoCliente")}
               required
             >
               <option value={0}>—</option>
-              {opt(mockCatalogos.Operación)}
+              {opt(mockCatalogos.grupoCliente)}
             </select>
           </div>
+
+          {/* Cliente y operación */}
+          {form.grupoCliente != 0 && (
+            <div>
+              <div>
+                <label className="block text-sm font-medium">Cliente *</label>
+                <select
+                  className="input"
+                  value={form.cliente}
+                  onChange={upd("cliente")}
+                  required
+                >
+                  <option value={0}>—</option>
+                  {optCliente(clienteOptions)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium">
+                  Tipo de operación *
+                </label>
+                <select
+                  className="input"
+                  value={form.tipoOperacion}
+                  onChange={upd("tipoOperacion")}
+                  required
+                >
+                  <option value={0}>—</option>
+                  {opt(mockCatalogos.Operación)}
+                </select>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Origen / Destino */}
-        {form.cliente > 0 && form.tipoOperacion > 0 && (
+        {form.cliente > 0 && form.tipoOperacion > 0 && form.grupoCliente && (
           <div className="grid md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium">Origen *</label>
@@ -493,6 +541,36 @@ const NuevoServicio: React.FC = () => {
                 <option value={2}>Indirecto</option>
               </select>
             </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="imoCargo"
+                checked={form.imoCargo}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, imoCargo: e.target.checked }))
+                }
+              />
+              <label htmlFor="imoCargo">Cargo IMO (Carga peligrosa)</label>
+            </div>
+            {form.imoCargo && (
+              <div>
+                <label htmlFor="imoCategoria">Categoría IMO *</label>
+                <select
+                  id="imoCategoria"
+                  value={form.imoCategoria}
+                  onChange={upd("imoCategoria")}
+                  required
+                  className="input"
+                >
+                  <option value={0}>—</option>
+                  {imoCategorias.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             {/*<div>
               <label className="block text-sm font-medium">ODV *</label>
               <input
@@ -519,7 +597,7 @@ const NuevoServicio: React.FC = () => {
                 Fecha de Solicitud *
               </label>
               <input
-                type="date"
+                type="datetime-local"
                 className="input"
                 value={form.fechaSol}
                 onChange={upd("fechaSol")}
@@ -563,7 +641,7 @@ const NuevoServicio: React.FC = () => {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
-                Temperatura (°C) *
+                Temperatura (°C) {esContainerRefrigerado() && "*"}
               </label>
               <div className="flex items-center space-x-4">
                 {/* Slider */}
@@ -603,9 +681,33 @@ const NuevoServicio: React.FC = () => {
                 </div>
               </div>
             </div>
-            {form.tipoContenedor != 11 &&
+            <div>
+              <label className="block text-sm font-medium">N° de Folio *</label>
+              <input
+                type="number"
+                className="input"
+                value={form.folio}
+                onChange={upd("folio")}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">
+                Fecha de Folio *
+              </label>
+              <input
+                type="date"
+                className="input"
+                value={form.fechaFolio}
+                onChange={upd("fechaFolio")}
+                required
+              />
+            </div>
+            {form.tipoContenedor != 11 && (
               <div>
-                <label className="block text-sm font-medium">Nro. Contenedor *</label>
+                <label className="block text-sm font-medium">
+                  Nro. Contenedor *
+                </label>
                 <input
                   className="input"
                   value={form.nroContenedor}
@@ -613,9 +715,11 @@ const NuevoServicio: React.FC = () => {
                   required
                 />
               </div>
-            }
+            )}
             <div>
-              <label className="block text-sm font-medium">Guía de despacho</label>
+              <label className="block text-sm font-medium">
+                Guía de despacho
+              </label>
               <input
                 className="input"
                 value={form.guiaDeDespacho}
@@ -744,27 +848,74 @@ const NuevoServicio: React.FC = () => {
           return (
             <div
               key={idx}
-              className="flex p-3 bg-white rounded shadow items-center"
+              className="relative flex p-3 bg-white rounded shadow items-start"
+              onClick={(e) => e.stopPropagation()}
             >
-              {/* Izquierda: Lugar, Acción, ETA y Observación */}
+              {/* ⋮ toggle */}
+              <div className="absolute top-2 right-2">
+                <MoreVertical
+                  className="cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMenuIdx(idx);
+                  }}
+                />
+              </div>
+
+              {/* menú desplegable */}
+              {showMenuIdx === idx && (
+                <div
+                  className="absolute top-8 right-2 w-36 bg-white border rounded shadow-lg z-20"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    className="block w-full text-left px-3 py-1 hover:bg-gray-100"
+                    onClick={() => {
+                      insertPunto(idx);
+                      setShowMenuIdx(null);
+                    }}
+                  >
+                    Agregar arriba
+                  </button>
+                  <button
+                    className="block w-full text-left px-3 py-1 hover:bg-gray-100 text-red-600"
+                    onClick={() => {
+                      removePunto(idx);
+                      setShowMenuIdx(null);
+                    }}
+                  >
+                    Eliminar punto
+                  </button>
+                </div>
+              )}
+
+              {/* Campos del punto */}
               <div className="grid grid-cols-4 gap-4 flex-grow">
+                {/* Lugar */}
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Lugar del Punto {idx + 1} *
                   </label>
-                  <select
-                    className="input w-full"
-                    value={p.idLugar}
-                    onChange={(e) =>
-                      updatePunto(idx, "idLugar", +e.target.value)
+                  <SearchableDropdown
+                    options={lugaresPuntos}
+                    value={
+                      lugaresPuntos.find((l) => l.id === p.idLugar) || null
                     }
-                    required
-                  >
-                    <option value={0}>Seleccione un lugar</option>
-                    {optLugar(lugaresPuntos)}
-                  </select>
+                    onChange={(sel) => {
+                      if (sel) {
+                        updatePunto(idx, "idLugar", sel.id);
+                      } else {
+                        // si deseleccionas (sel===null), recupera último valor o deja vacío:
+                        const last = p.idLugar;
+                        updatePunto(idx, "idLugar", last);
+                      }
+                    }}
+                    getOptionLabel={(l) => l.nombre}
+                    placeholder="Buscar lugar..."
+                  />
                 </div>
 
+                {/* Acción */}
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Acción *
@@ -782,6 +933,7 @@ const NuevoServicio: React.FC = () => {
                   </select>
                 </div>
 
+                {/* ETA */}
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     ETA *
@@ -796,6 +948,7 @@ const NuevoServicio: React.FC = () => {
                   />
                 </div>
 
+                {/* Observación */}
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Observación
@@ -809,63 +962,6 @@ const NuevoServicio: React.FC = () => {
                     }
                   />
                 </div>
-
-                {/* Mostrar Cargo IMO y Categoría solo si la acción conlleva retirar una carga */}
-                {(p.accion === 2 || p.accion === 6 || p.accion === 11) && (
-                  <>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={`imoCargo-${idx}`}
-                        checked={form.imoCargo}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setForm((f) => ({
-                            ...f,
-                            imoCargo: checked,
-                            imoCategoria: checked ? f.imoCategoria : 0,
-                          }));
-                        }}
-                      />
-                      <label
-                        htmlFor={`imoCargo-${idx}`}
-                        className="text-sm font-medium"
-                      >
-                        Cargo IMO (Carga peligrosa)
-                      </label>
-                    </div>
-
-                    {form.imoCargo && (
-                      <div>
-                        <label
-                          htmlFor={`imoCategoria-${idx}`}
-                          className="block text-sm font-medium mb-1"
-                        >
-                          Categoría IMO *
-                        </label>
-                        <select
-                          id={`imoCategoria-${idx}`}
-                          className="input w-full"
-                          value={form.imoCategoria}
-                          onChange={(e) =>
-                            setForm((f) => ({
-                              ...f,
-                              imoCategoria: Number(e.target.value),
-                            }))
-                          }
-                          required
-                        >
-                          <option value={0}>— Elige categoría —</option>
-                          {imoCategorias.map(({ code, label }) => (
-                            <option key={code} value={code}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </>
-                )}
               </div>
             </div>
           );

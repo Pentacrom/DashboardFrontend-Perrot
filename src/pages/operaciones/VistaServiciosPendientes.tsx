@@ -1,5 +1,5 @@
 // src/pages/operaciones/VistaServiciosPendientes.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import ListWithSearch, {
   Column,
@@ -10,11 +10,11 @@ import ListWithSearch, {
 import {
   loadDrafts,
   loadSent,
-  Payload,
-  mockCatalogos,
   saveOrUpdateSent,
+  Payload,
+  Descuento,
+  mockCatalogos,
   EstadoServicio,
-  Lugar,
 } from "../../utils/ServiceDrafts";
 import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
 import { AsignarChoferMovilModal } from "../operaciones/AsignarChoferMovilModal";
@@ -28,35 +28,15 @@ interface ServiceRow {
   fecha: string;
   tipo: string;
   estado: EstadoServicio;
+  precioCarga?: number;
   raw: Payload;
 }
 
-interface CustomColumn<T> extends Column<T> {
-  render?: (value: any, row: T) => React.ReactNode;
-}
-
-const columns: CustomColumn<ServiceRow>[] = [
-  { label: "ID", key: "id", sortable: true },
-  { label: "Cliente", key: "cliente", sortable: true },
-  { label: "Origen", key: "origen", sortable: true },
-  { label: "Destino", key: "destino", sortable: true },
-  { label: "Fecha", key: "fecha", sortable: true },
-  { label: "Tipo", key: "tipo", sortable: true },
-  {
-    label: "Estado",
-    key: "estado",
-    sortable: true,
-    render: (value: EstadoServicio) => (
-      <span
-        className={`px-2 py-1 rounded-full text-xs font-medium ${
-          estadoStyles[value] || ""
-        } ${badgeTextColor[value] || ""}`}
-      >
-        {value}
-      </span>
-    ),
-  },
-];
+// formateador CLP
+const formatCLP = (v: number) =>
+  new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(
+    v
+  );
 
 const searchFilters: SearchFilter<ServiceRow>[] = [
   { label: "ID", key: "id", type: "text", placeholder: "Buscar ID" },
@@ -74,126 +54,143 @@ const VistaServiciosPendientes: React.FC = () => {
   const navigate = useNavigate();
   const [rows, setRows] = useState<ServiceRow[]>([]);
   const [modalId, setModalId] = useState<number | null>(null);
-  const [confirmFalsoFleteId, setConfirmFalsoFleteId] = useState<string | null>(
-    null
-  );
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [discount, setDiscount] = useState<number>(0);
 
   const openModal = (id: number) => setModalId(id);
   const closeModal = () => setModalId(null);
+  const openConfirm = (id: string) => {
+    setConfirmId(id);
+    setDiscount(0);
+  };
+  const closeConfirm = () => setConfirmId(null);
 
-  const openConfirmFalsoFlete = (id: string) => setConfirmFalsoFleteId(id);
-  const closeConfirmFalsoFlete = () => setConfirmFalsoFleteId(null);
+  const columns: Column<ServiceRow>[] = useMemo(() => {
+    if (rows.length === 0) return [];
+    const sample = rows[0]!; // aseguramos que no es undefined
 
-  const confirmarFalsoFlete = () => {
-    if (!confirmFalsoFleteId) return;
+    const keys = Object.keys(sample).filter(
+      (k): k is keyof ServiceRow => k !== "raw"
+    );
+
+    return keys.map((key) => {
+      if (key === "precioCarga") {
+        return {
+          label: "Precio Carga",
+          key,
+          sortable: true,
+          render: (val: number) => formatCLP(val),
+        };
+      }
+      if (key === "estado") {
+        return {
+          label: "Estado",
+          key,
+          sortable: true,
+          render: (val: EstadoServicio) => (
+            <span
+              className={`px-2 py-1 rounded-full text-xs font-medium ${
+                estadoStyles[val] || ""
+              } ${badgeTextColor[val] || ""}`}
+            >
+              {val}
+            </span>
+          ),
+        };
+      }
+      const label = key.charAt(0).toUpperCase() + key.slice(1);
+      return { label, key, sortable: true };
+    }) as Column<ServiceRow>[];
+  }, [rows]);
+
+  const confirmFalsoFlete = () => {
+    if (!confirmId) return;
     setRows((prev) =>
       prev.map((r) => {
-        if (r.id !== confirmFalsoFleteId) return r;
-        // actualizar raw y persistir
+        if (r.id !== confirmId) return r;
+        // creamos el objeto de descuento
+        const desc: Descuento = {
+          porcentajeDescuento: discount,
+          razon: "Falso Flete",
+        };
         const updatedRaw: Payload = {
           ...r.raw,
-          estado: "Falso Flete"
+          estado: "Falso Flete",
+          descuentoServicioPorcentaje: [
+            ...(r.raw.descuentoServicioPorcentaje || []),
+            desc,
+          ],
         };
         saveOrUpdateSent(updatedRaw);
-        return {
-          ...r,
-          estado: "Falso Flete",
-          raw: updatedRaw,
-        };
+        return { ...r, estado: "Falso Flete", raw: updatedRaw };
       })
     );
-    closeConfirmFalsoFlete();
+    closeConfirm();
   };
 
   useEffect(() => {
-    const lookupCodigo = (
-      arr: { codigo: number; nombre: string }[],
-      code: number
-    ) => arr.find((x) => x.codigo === code)?.nombre || code.toString();
-    const lookupLugar = (arr: Lugar[], id: number) =>
-      arr.find((x) => x.id === id)?.nombre || id.toString();
+    const lookupEmpresa = (id: number) =>
+      mockCatalogos.empresas.find((e) => e.id === id)?.nombre || id.toString();
+    const lookupLugar = (id: number) =>
+      mockCatalogos.Lugares.find((l) => l.id === id)?.nombre || id.toString();
+    const lookupOp = (code: number) =>
+      mockCatalogos.Operación.find((o) => o.codigo === code)?.nombre ||
+      code.toString();
 
-    const zonasPortuarias = mockCatalogos.Lugares.filter(
-      (l) => l.tipo === "Zona Portuaria"
-    );
     const all = [...loadDrafts(), ...loadSent()];
-    const mapped = all.map((p) => {
-      const f = p.form;
-      const tipoOp = f.tipoOperacion;
-      const clienteName = lookupCodigo(mockCatalogos.empresas, f.cliente);
-      const origenName =
-        tipoOp === 2
-          ? lookupLugar(zonasPortuarias, f.origen)
-          : lookupCodigo(mockCatalogos.Zona, f.origen);
-      const destinoName =
-        tipoOp === 1
-          ? lookupLugar(zonasPortuarias, f.destino)
-          : lookupCodigo(mockCatalogos.Zona, f.destino);
-      const tipoName = lookupCodigo(mockCatalogos.Operación, tipoOp);
-
-      return {
-        id: p.id.toString(),
-        cliente: clienteName,
-        origen: origenName,
-        destino: destinoName,
-        fecha: f.fechaSol,
-        tipo: tipoName,
-        estado: p.estado,
-        raw: p,
-      };
-    });
+    const mapped: ServiceRow[] = all.map((p) => ({
+      id: p.id.toString(),
+      cliente: lookupEmpresa(p.form.cliente),
+      origen: lookupLugar(p.form.origen),
+      destino: lookupLugar(p.form.destino),
+      fecha: p.form.fechaSol,
+      tipo: lookupOp(p.form.tipoOperacion),
+      precioCarga: p.form.precioCarga,
+      estado: p.estado,
+      raw: p,
+    }));
     setRows(mapped);
   }, []);
 
   const dropdownOptions = (row: ServiceRow): DropdownOption<ServiceRow>[] => {
+    const idStr = row.id;
+    const idNum = Number(row.id);
     const opts: DropdownOption<ServiceRow>[] = [
       {
         label: "Ver detalle",
-        onClick: () => navigate(`/detalle-servicio/${row.id}`),
+        onClick: () => navigate(`/detalle-servicio/${idStr}`),
       },
     ];
-    if (row.estado === "En Proceso") {
-      opts.push(
-        {
-          label: "Ver/Editar Servicio",
-          onClick: () => navigate(`/operaciones/modificar-servicio/${row.id}`),
-        },
-        {
-          label: "Gestionar Valores",
-          onClick: () => navigate(`/operaciones/gestionar-valores/${row.id}`),
-        },
-        {
-          label: "Marcar como Falso Flete",
-          onClick: () => openConfirmFalsoFlete(row.id),
-        }
-      );
-    }
-    if (row.estado === "Sin Asignar") {
+    if (row.estado === "Sin Asignar")
       opts.push({
         label: "Asignar chofer y móvil",
-        onClick: () => openModal(Number(row.id)),
+        onClick: () => openModal(idNum),
       });
-    }
+    if (["En Proceso", "Sin Asignar"].includes(row.estado))
+      opts.push({
+        label: "Marcar como Falso Flete",
+        onClick: () => openConfirm(idStr),
+      });
+    opts.push(
+      {
+        label: "Ver/Editar Servicio",
+        onClick: () => navigate(`/operaciones/modificar-servicio/${idStr}`),
+      },
+      {
+        label: "Gestionar Valores",
+        onClick: () => navigate(`/operaciones/gestionar-valores/${idStr}`),
+      }
+    );
     return opts;
   };
-
-  const estadoCheckboxFilter = [
-    {
-      label: "Filtrar por estado",
-      key: "estado" as keyof ServiceRow,
-      options: Object.keys(estadoStyles) as EstadoServicio[],
-    },
-  ];
 
   return (
     <div className="p-6">
       <div className="mb-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">
-          Servicios en Proceso / Sin Asignar
-        </h1>
+        <h1 className="text-2xl font-bold">Servicios Pendientes</h1>
         <button
           onClick={() => navigate("/operaciones/nuevo-servicio")}
-          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
         >
           Nuevo Servicio
         </button>
@@ -203,7 +200,6 @@ const VistaServiciosPendientes: React.FC = () => {
         data={rows}
         columns={columns}
         searchFilters={searchFilters}
-        checkboxFilterGroups={estadoCheckboxFilter}
         dropdownOptions={dropdownOptions as DropdownOptionsType<ServiceRow>}
         colorConfig={{
           field: "estado",
@@ -215,8 +211,8 @@ const VistaServiciosPendientes: React.FC = () => {
         onSearch={() => alert("Buscar (stub)")}
         customSortOrder={{
           estado: [
-            "Pendiente",
             "Sin Asignar",
+            "Pendiente",
             "En Proceso",
             "Falso Flete",
             "Por facturar",
@@ -225,6 +221,7 @@ const VistaServiciosPendientes: React.FC = () => {
         }}
         defaultSortKey="estado"
         defaultSortOrder="asc"
+        preferencesKey="preferencias"
       />
 
       <AsignarChoferMovilModal
@@ -233,25 +230,30 @@ const VistaServiciosPendientes: React.FC = () => {
         onClose={closeModal}
       />
 
-      <Modal
-        isOpen={confirmFalsoFleteId !== null}
-        onClose={closeConfirmFalsoFlete}
-      >
-        <h2 className="text-xl font-semibold mb-4">Confirmar acción</h2>
-        <p className="mb-6">
-          ¿Estás seguro de que deseas marcar este servicio como{" "}
-          <strong>Falso Flete</strong>? Esta acción no se puede deshacer.
+      <Modal isOpen={confirmId !== null} onClose={closeConfirm}>
+        <h2 className="text-xl font-semibold mb-4">Confirmar Falso Flete</h2>
+        <p className="mb-4">
+          Ingresa el porcentaje de descuento a aplicar por{" "}
+          <strong>Falso Flete</strong>:
         </p>
+        <input
+          type="number"
+          min={0}
+          max={100}
+          value={discount}
+          onChange={(e) => setDiscount(e.target.valueAsNumber || 0)}
+          className="w-full mb-4 px-2 py-1 border rounded"
+        />
         <div className="flex justify-end gap-4">
           <button
-            onClick={closeConfirmFalsoFlete}
-            className="px-4 py-2 bg-gray-300 text-black rounded hover:bg-gray-400 transition-colors"
+            onClick={closeConfirm}
+            className="px-4 py-2 bg-gray-300 rounded"
           >
             Cancelar
           </button>
           <button
-            onClick={confirmarFalsoFlete}
-            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+            onClick={confirmFalsoFlete}
+            className="px-4 py-2 bg-red-600 text-white rounded"
           >
             Confirmar
           </button>

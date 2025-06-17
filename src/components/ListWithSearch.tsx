@@ -1,6 +1,30 @@
 // src/components/ListWithSearch.tsx
-import { useState, useMemo, useEffect, useRef, ChangeEvent } from "react";
+import {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  ChangeEvent,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import ReactDOM from "react-dom";
+
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  horizontalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 export interface Column<T> {
   label: string;
@@ -56,28 +80,50 @@ export interface ListWithSearchProps<T> {
   customSortOrder?: Partial<Record<keyof T, T[keyof T][]>>;
   defaultSortKey?: keyof T;
   defaultSortOrder?: "asc" | "desc";
+  preferencesKey?: string;
 }
 
-function ListWithSearch<T extends Record<string, any>>({
-  data,
-  columns,
-  searchFilters = [],
-  checkboxFilterGroups = [],
-  onDownloadExcel,
-  onSearch,
-  searchButtonDisabled = false,
-  showExcelButton = false,
-  colorConfig,
-  dropdownOptions = [],
-  filterTitle,
-  tableTitle,
-  globalButtons,
-  customButtons,
-  customSortOrder,
-  defaultSortKey,
-  defaultSortOrder,
-  defaultCheckboxSelections,
-}: ListWithSearchProps<T>) {
+export interface ListPreferences<T> {
+  visibleKeys: Array<keyof T>;
+  itemsPerPage: number;
+  sortKey: keyof T | "";
+  sortOrder: "asc" | "desc";
+  searchValues: Record<string, string>;
+  checkboxValues: Record<string, string[]>;
+}
+
+export interface ListWithSearchHandles<T> {
+  exportPreferences: () => ListPreferences<T>;
+  updatePreferences: (prefs: Partial<ListPreferences<T>>) => void;
+}
+
+
+function ListWithSearchInner<T extends Record<string, any>>(
+  props: ListWithSearchProps<T>,
+  ref: React.Ref<ListWithSearchHandles<T>>
+) {
+  const {
+    data,
+    columns,
+    searchFilters = [],
+    checkboxFilterGroups = [],
+    onDownloadExcel,
+    onSearch,
+    searchButtonDisabled = false,
+    showExcelButton = false,
+    colorConfig,
+    dropdownOptions = [],
+    filterTitle,
+    tableTitle,
+    globalButtons,
+    customButtons,
+    customSortOrder,
+    defaultSortKey,
+    defaultSortOrder,
+    defaultCheckboxSelections,
+    preferencesKey,
+  } = props;
+
   // Construir lista completa de columnas
   const allColumns = useMemo<Column<T>[]>(() => {
     if (columns && columns.length > 0) {
@@ -96,13 +142,17 @@ function ListWithSearch<T extends Record<string, any>>({
   // Estado para mostrar/ocultar el selector de columnas
   const [showColumnSelector, setShowColumnSelector] = useState(false);
 
-  const [visibleKeys, setVisibleKeys] = useState<Array<keyof T>>(
-    allColumns.map((c) => c.key)
-  );
-
-  useEffect(() => {
-    setVisibleKeys(allColumns.map((c) => c.key));
-  }, [allColumns]);
+  const [visibleKeys, setVisibleKeys] = useState<Array<keyof T>>(() => {
+    if (preferencesKey) {
+      const stored = localStorage.getItem(preferencesKey);
+      if (stored) {
+        try {
+          return JSON.parse(stored).visibleKeys;
+        } catch {}
+      }
+    }
+    return props.defaultVisibleColumns ?? allColumns.map((c) => c.key);
+  });
 
   const toggleVisible = (key: keyof T) => {
     setVisibleKeys((prev) =>
@@ -112,20 +162,38 @@ function ListWithSearch<T extends Record<string, any>>({
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(() => {
+    if (preferencesKey) {
+      const stored = localStorage.getItem(preferencesKey);
+      if (stored) {
+        try {
+          return JSON.parse(stored).itemsPerPage;
+        } catch {}
+      }
+    }
+    return 20;
+  });
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
 
   // Filtros de texto/fecha
   const [searchValues, setSearchValues] = useState<Record<string, string>>(
     () => {
-      const initial: Record<string, string> = {};
-      searchFilters.forEach((filter) => {
-        initial[filter.key as string] = "";
-      });
-      return initial;
+      if (preferencesKey) {
+        const stored = localStorage.getItem(preferencesKey);
+        if (stored) {
+          try {
+            return JSON.parse(stored).searchValues;
+          } catch {}
+        }
+      }
+      // inicial default
+      const init: Record<string, string> = {};
+      searchFilters.forEach((f) => (init[f.key as string] = ""));
+      return init;
     }
   );
+
   const handleSearchChange =
     (key: keyof T) => (e: ChangeEvent<HTMLInputElement>) => {
       setSearchValues((prev) => ({
@@ -138,15 +206,23 @@ function ListWithSearch<T extends Record<string, any>>({
   const [checkboxValues, setCheckboxValues] = useState<
     Record<string, string[]>
   >(() => {
+    if (preferencesKey) {
+      const stored = localStorage.getItem(preferencesKey);
+      if (stored) {
+        try {
+          return JSON.parse(stored).checkboxValues;
+        } catch {}
+      }
+    }
     const initial: Record<string, string[]> = {};
     checkboxFilterGroups.forEach((group) => {
-      const key = group.key as keyof T;
-      initial[key as string] = defaultCheckboxSelections?.[key] ?? [
+      initial[group.key as string] = defaultCheckboxSelections?.[group.key] ?? [
         ...group.options,
       ];
     });
     return initial;
   });
+
   const toggleCheckbox = (groupKey: keyof T, option: string) => {
     setCheckboxValues((prev) => {
       const current = prev[groupKey as string] ?? [];
@@ -193,10 +269,31 @@ function ListWithSearch<T extends Record<string, any>>({
   };
 
   // Ordenación
-  const [sortKey, setSortKey] = useState<keyof T | "">(defaultSortKey ?? "");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(
-    defaultSortOrder ?? "asc"
-  );
+  const [sortKey, setSortKey] = useState<keyof T | "">(() => {
+    if (preferencesKey) {
+      const stored = localStorage.getItem(preferencesKey);
+      if (stored) {
+        try {
+          return (JSON.parse(stored) as ListPreferences<T>).sortKey;
+        } catch {}
+      }
+    }
+    return defaultSortKey ?? "";
+  });
+
+
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(() => {
+    if (preferencesKey) {
+      const stored = localStorage.getItem(preferencesKey);
+      if (stored) {
+        try {
+          return (JSON.parse(stored) as ListPreferences<T>).sortOrder;
+        } catch {}
+      }
+    }
+    return defaultSortOrder ?? "asc";
+  });
+
   const handleSort = (key: keyof T) => {
     if (sortKey === key) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -288,6 +385,64 @@ function ListWithSearch<T extends Record<string, any>>({
   const [openDropdownRow, setOpenDropdownRow] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const dropdownButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  useImperativeHandle(ref, () => ({
+    exportPreferences: () => ({
+      visibleKeys,
+      itemsPerPage,
+      sortKey,
+      sortOrder,
+      searchValues,
+      checkboxValues,
+    }),
+    updatePreferences: (newPrefs: Partial<ListPreferences<T>>) => {
+      newPrefs.visibleKeys && setVisibleKeys(newPrefs.visibleKeys);
+      newPrefs.itemsPerPage && setItemsPerPage(newPrefs.itemsPerPage);
+      newPrefs.sortKey !== undefined && setSortKey(newPrefs.sortKey);
+      newPrefs.sortOrder && setSortOrder(newPrefs.sortOrder);
+      newPrefs.searchValues && setSearchValues(newPrefs.searchValues);
+      newPrefs.checkboxValues && setCheckboxValues(newPrefs.checkboxValues);
+    },
+  }));
+
+  // ————————————————
+  // Guardar preferencias en localStorage
+  // ————————————————
+  useEffect(() => {
+    if (!preferencesKey) return;
+    const prefs: ListPreferences<T> = {
+      visibleKeys,
+      itemsPerPage,
+      sortKey,
+      sortOrder,
+      searchValues,
+      checkboxValues,
+    };
+    console.log("🔖 Guardando prefs:", preferencesKey, prefs);
+    localStorage.setItem(preferencesKey, JSON.stringify(prefs));
+  }, [
+    visibleKeys,
+    itemsPerPage,
+    sortKey,
+    sortOrder,
+    searchValues,
+    checkboxValues,
+    preferencesKey,
+  ]);
+
+  // Guardar orden en localStorage
+  useEffect(() => {
+    if (!preferencesKey) return;
+    const prefs: Partial<ListPreferences<T>> = {
+      visibleKeys,
+    };
+    const raw = localStorage.getItem(preferencesKey);
+    const existing = raw ? JSON.parse(raw) : {};
+    localStorage.setItem(
+      preferencesKey,
+      JSON.stringify({ ...existing, ...prefs })
+    );
+  }, [visibleKeys, preferencesKey]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -746,5 +901,9 @@ function ListWithSearch<T extends Record<string, any>>({
     </div>
   );
 }
+
+const ListWithSearch = forwardRef(ListWithSearchInner) as <T>(
+  props: ListWithSearchProps<T> & { ref?: React.Ref<ListWithSearchHandles<T>> }
+) => ReturnType<typeof ListWithSearchInner>;
 
 export default ListWithSearch;

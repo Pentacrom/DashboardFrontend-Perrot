@@ -1,3 +1,4 @@
+// src/components/Sidebar.tsx
 import React, { useContext, useState } from "react";
 import { NavLink } from "react-router-dom";
 import LogoPerrot from "../assets/perrot-logo.png";
@@ -9,14 +10,14 @@ const Sidebar: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const linkClasses = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center justify-between text-black px-2 py-1 rounded group cursor-pointer ${
+    `flex items-center justify-between text-black px-2 py-1 rounded cursor-pointer ${
       isActive ? "bg-gray-300" : "hover:bg-gray-200"
     }`;
 
   const menuContent = (
     <>
       {/* Logo */}
-      <div className="h-20 flex justify-center bg-gray-100 border-b border-gray-300 w-4xl">
+      <div className="h-20 flex justify-center bg-gray-100 border-b">
         <NavLink to="/home">
           <img
             src={LogoPerrot}
@@ -27,52 +28,72 @@ const Sidebar: React.FC = () => {
       </div>
 
       <nav className="p-4 flex-1 overflow-y-auto">
-        {/* Inicio */}
-        <Section title="">
-          <NavLink to="/home" className={linkClasses}>
-            <span>Inicio</span>
-          </NavLink>
-        </Section>
-
-        {/* Comercial */}
-        {(isAdmin || roles.includes("comercial")) && (
-          <Section title="Comercial">
-            <NavLink to="/comercial/gestion-servicios" className={linkClasses}>
-              <span>Ingreso de servicios</span>
+        <ul className="space-y-2">
+          <li>
+            <NavLink to="/home" className={linkClasses}>
+              Inicio
             </NavLink>
-          </Section>
-        )}
+          </li>
 
-        {/* Torre de Control */}
-        {(isAdmin || roles.includes("torre de control")) && (
-          <Section title="Torre de control">
-            <NavLink
-              to="/torre-de-control/gestion-servicios"
-              className={linkClasses}
-            >
-              <span>Seguimiento de servicios</span>
-            </NavLink>
-          </Section>
-        )}
+          {(isAdmin || roles.includes("comercial")) && (
+            <li>
+              <NavLink
+                to="/comercial/gestion-servicios"
+                className={linkClasses}
+              >
+                Ingreso de servicios
+              </NavLink>
+            </li>
+          )}
 
-        {/* Operaciones */}
-        {(isAdmin || roles.includes("operaciones")) && (
-          <Section title="Operaciones">
-            <NavLink
-              to="/operaciones/gestion-servicios"
-              className={linkClasses}
-            >
-              <span>Gestión de servicios</span>
-            </NavLink>
-          </Section>
-        )}
+          {(isAdmin || roles.includes("operaciones")) && (
+            <li>
+              <NavLink
+                to="/operaciones/gestion-servicios"
+                className={linkClasses}
+              >
+                Gestión de servicios
+              </NavLink>
+            </li>
+          )}
+
+          {(isAdmin || roles.includes("torre de control")) && (
+            <li>
+              <NavLink
+                to="/torre-de-control/gestion-servicios"
+                className={linkClasses}
+              >
+                Seguimiento de servicios
+              </NavLink>
+            </li>
+          )}
+
+          {(isAdmin || roles.includes("contabilidad")) && (
+            <li>
+              <NavLink to="/contabilidad/facturacion" className={linkClasses}>
+                Facturación
+              </NavLink>
+            </li>
+          )}
+
+          {isAdmin && (
+            <>
+              <hr className="my-4" />
+              <li>
+                <NavLink to="/admin/cuentas" className={linkClasses}>
+                  Administrar cuentas
+                </NavLink>
+              </li>
+            </>
+          )}
+        </ul>
       </nav>
     </>
   );
 
   return (
     <>
-      {/* Barra superior mobile */}
+      {/* Mobile top bar */}
       <header className="lg:hidden flex items-center justify-between px-4 py-2 bg-white border-b">
         <button onClick={() => setMobileOpen(true)} aria-label="Abrir menú">
           <svg
@@ -98,20 +119,20 @@ const Sidebar: React.FC = () => {
         </NavLink>
       </header>
 
-      {/* Sidebar escritorio */}
-      <aside className="hidden lg:flex flex-col w-72 h-full bg-white border-r border-gray-300 drop-shadow-md z-20">
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex flex-col w-72 h-full bg-white border-r drop-shadow z-20">
         {menuContent}
       </aside>
 
-      {/* Drawer mobile */}
+      {/* Mobile drawer */}
       {mobileOpen && (
         <div className="fixed inset-0 z-30 flex">
-          {/* backdrop */}
+          {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black opacity-50"
             onClick={() => setMobileOpen(false)}
           />
-          {/* drawer */}
+          {/* Drawer */}
           <aside className="relative w-64 h-full bg-white shadow-lg">
             <button
               className="absolute top-2 right-2 p-2"
@@ -139,20 +160,5 @@ const Sidebar: React.FC = () => {
     </>
   );
 };
-
-interface SectionProps {
-  title: string;
-  children: React.ReactNode;
-}
-const Section: React.FC<SectionProps> = ({ title, children }) => (
-  <div className="mt-4">
-    {title && (
-      <h2 className="font-bold uppercase border-b border-gray-300 pb-1">
-        {title}
-      </h2>
-    )}
-    <ul className="mt-2 ml-4 space-y-1">{children}</ul>
-  </div>
-);
 
 export default Sidebar;
