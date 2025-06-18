@@ -204,7 +204,30 @@ const IngresoServicio: React.FC = () => {
           onClick: () => navigate(`/detalle-servicio/${row.id}`),
         },
       ];
-    } else {
+    }
+    if (["Por validar"].includes(est)) {
+      return [
+        {
+          label: "Ver/Editar Servicio",
+          onClick: () => navigate(`/comercial/modificar-servicio/${row.id}`),
+        },
+        {
+          label: "Gestionar Valores",
+          onClick: () => navigate(`/comercial/gestionar-valores/${row.id}`),
+          disabled: false,
+        },
+        {
+          label: "Marcar como falso flete",
+          onClick: () => handleDelete(row),
+          disabled: false,
+        },
+        {
+          label: "Ver y/o completar Servicio",
+          onClick: () => navigate(`/detalle-servicio/${row.id}`),
+        },
+      ];
+
+     } else {
       return [
         {
           label: "Ver Detalle",

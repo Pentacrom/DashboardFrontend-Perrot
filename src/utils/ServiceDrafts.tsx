@@ -146,6 +146,10 @@ export const mockCatalogos: Catalogos = {
     { id: 14, nombre: "Centro B", tipo: "Centro", cliente: 1 },
     { id: 15, nombre: "Centro C", tipo: "Centro", cliente: 2 },
     { id: 16, nombre: "Centro D", tipo: "Centro", cliente: 2 },
+    { id: 17, nombre: "Centro E", tipo: "Centro", cliente: 3 },
+    { id: 18, nombre: "Centro F", tipo: "Centro", cliente: 3 },
+    { id: 19, nombre: "Centro G", tipo: "Centro", cliente: 4 },
+    { id: 20, nombre: "Centro H", tipo: "Centro", cliente: 4 },
   ],
   Tipo_contenedor: [
     { codigo: 1, nombre: "20 DV" },
