@@ -10,6 +10,22 @@ import {
 } from "react";
 import ReactDOM from "react-dom";
 
+export function formatDateTimeLocal(input: Date | string | number | undefined): string {
+  const d = input instanceof Date
+    ? input
+    : new Date(input ?? Date.now());
+
+  const pad = (n: number) => n.toString().padStart(2, "0");
+
+  const YYYY = d.getFullYear();
+  const MM = pad(d.getMonth() + 1);
+  const DD = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const mm = pad(d.getMinutes());
+
+  return `${YYYY}-${MM}-${DD}T${hh}:${mm}`;
+}
+
 import {
   DndContext,
   closestCenter,
@@ -124,6 +140,10 @@ function ListWithSearchInner<T extends Record<string, any>>(
     preferencesKey,
   } = props;
 
+  const dateKeys = useMemo(
+    () => new Set(searchFilters.filter(f => f.type === "date").map(f => String(f.key))),
+    [searchFilters]
+  );
   // Construir lista completa de columnas
   const allColumns = useMemo<Column<T>[]>(() => {
     if (columns && columns.length > 0) {
@@ -148,7 +168,7 @@ function ListWithSearchInner<T extends Record<string, any>>(
       if (stored) {
         try {
           return JSON.parse(stored).visibleKeys;
-        } catch {}
+        } catch { }
       }
     }
     return props.defaultVisibleColumns ?? allColumns.map((c) => c.key);
@@ -168,7 +188,7 @@ function ListWithSearchInner<T extends Record<string, any>>(
       if (stored) {
         try {
           return JSON.parse(stored).itemsPerPage;
-        } catch {}
+        } catch { }
       }
     }
     return 20;
@@ -184,7 +204,7 @@ function ListWithSearchInner<T extends Record<string, any>>(
         if (stored) {
           try {
             return JSON.parse(stored).searchValues;
-          } catch {}
+          } catch { }
         }
       }
       // inicial default
@@ -211,7 +231,7 @@ function ListWithSearchInner<T extends Record<string, any>>(
       if (stored) {
         try {
           return JSON.parse(stored).checkboxValues;
-        } catch {}
+        } catch { }
       }
     }
     const initial: Record<string, string[]> = {};
@@ -275,7 +295,7 @@ function ListWithSearchInner<T extends Record<string, any>>(
       if (stored) {
         try {
           return (JSON.parse(stored) as ListPreferences<T>).sortKey;
-        } catch {}
+        } catch { }
       }
     }
     return defaultSortKey ?? "";
@@ -288,7 +308,7 @@ function ListWithSearchInner<T extends Record<string, any>>(
       if (stored) {
         try {
           return (JSON.parse(stored) as ListPreferences<T>).sortOrder;
-        } catch {}
+        } catch { }
       }
     }
     return defaultSortOrder ?? "asc";
@@ -522,9 +542,8 @@ function ListWithSearchInner<T extends Record<string, any>>(
                       {group.options.map((option, idx) => (
                         <label
                           key={option}
-                          className={`flex items-center text-sm text-gray-700 ${
-                            idx > 0 ? "pt-1" : ""
-                          }`}
+                          className={`flex items-center text-sm text-gray-700 ${idx > 0 ? "pt-1" : ""
+                            }`}
                         >
                           <input
                             type="checkbox"
@@ -679,9 +698,8 @@ function ListWithSearchInner<T extends Record<string, any>>(
                       <th
                         key={col.key as string}
                         onClick={() => col.sortable && handleSort(col.key)}
-                        className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase ${
-                          col.sortable ? "hover:text-gray-700" : ""
-                        }`}
+                        className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase ${col.sortable ? "hover:text-gray-700" : ""
+                          }`}
                       >
                         {col.label}
                         {col.sortable && renderSortIndicator(col.key)}
@@ -690,13 +708,13 @@ function ListWithSearchInner<T extends Record<string, any>>(
                     .concat(
                       extraColumnVisible
                         ? [
-                            <th
-                              key="actions"
-                              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                            >
-                              Acciones
-                            </th>,
-                          ]
+                          <th
+                            key="actions"
+                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                          >
+                            Acciones
+                          </th>,
+                        ]
                         : []
                     )}
                 </tr>
@@ -718,106 +736,117 @@ function ListWithSearchInner<T extends Record<string, any>>(
                     <tr key={idx} className={rowClass}>
                       {allColumns
                         .filter((col) => visibleKeys.includes(col.key))
-                        .map((col) => (
-                          <td
-                            key={col.key as string}
-                            className="px-6 py-4 whitespace-nowrap"
-                          >
-                            {colorConfig &&
-                            colorConfig.mode === "cell" &&
-                            col.key === colorConfig.field ? (
-                              <span
-                                className={`${
-                                  colorConfig.bgMapping[
-                                    String(item[col.key])
-                                  ] || ""
-                                } ${
-                                  colorConfig.textMapping[
-                                    String(item[col.key])
-                                  ] || ""
-                                } px-2 inline-flex text-xs leading-5 font-semibold rounded-full`}
-                              >
-                                {String(item[col.key])}
-                              </span>
-                            ) : (
-                              String(item[col.key])
-                            )}
-                          </td>
-                        ))
+                        .map((col) => {
+                          const raw = item[col.key];
+                          // Si esta columna es de tipo fecha, formateamos
+                          // detectamos Date objetos o strings ISO
+                          const isDateObj = (raw as any) instanceof Date;
+                          const isIsoString =
+                            typeof raw === "string" &&
+                            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(raw);
+
+                          const displayValue =
+                            isDateObj || isIsoString
+                              ? formatDateTimeLocal(raw as any).replace("T", " ")
+                              : String(raw);
+
+                          // Ahora aplicamos colorConfig o simplemente mostramos el valor
+                          if (colorConfig && colorConfig.mode === "cell" && col.key === colorConfig.field) {
+                            return (
+                              <td key={col.key as string} className="px-6 py-4 whitespace-nowrap">
+                                <span
+                                  className={`
+                        ${colorConfig.bgMapping[displayValue] || ""}
+                        ${colorConfig.textMapping[displayValue] || ""}
+                        px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                      `}
+                                >
+                                  {displayValue}
+                                </span>
+                              </td>
+                            );
+                          }
+
+                          return (
+                            <td key={col.key as string} className="px-6 py-4 whitespace-nowrap">
+                              {displayValue}
+                            </td>
+                          );
+                        })
                         .concat(
                           extraColumnVisible
                             ? [
-                                <td
-                                  key="actions"
-                                  className="px-6 py-4 whitespace-nowrap relative"
-                                >
-                                  {headerDropdownVisible &&
-                                    rowOptions.length > 0 && (
-                                      <button
-                                        ref={(el) => {
-                                          dropdownButtonRefs.current[idx] = el;
-                                        }}
-                                        onClick={() =>
-                                          setOpenDropdownRow((prev) =>
-                                            prev === idx ? null : idx
-                                          )
-                                        }
-                                        className="p-2 rounded hover:bg-gray-200"
-                                      >
-                                        ⋮
-                                      </button>
-                                    )}
-                                  {customButtonsProvided &&
-                                    customButtons(item).map((btn, index) => (
-                                      <span
-                                        key={index}
-                                        className="ml-2 inline-block"
-                                      >
-                                        {btn}
-                                      </span>
-                                    ))}
-                                  {headerDropdownVisible &&
-                                    openDropdownRow === idx &&
-                                    dropdownButtonRefs.current[idx] &&
-                                    ReactDOM.createPortal(
-                                      <div
-                                        ref={dropdownRef}
-                                        className="bg-white border rounded shadow-lg z-50 flex flex-col"
-                                        style={{
-                                          position: "fixed",
-                                          top: Math.min(
-                                            dropdownButtonRefs.current[
-                                              idx
-                                            ]!.getBoundingClientRect().bottom +
-                                              4,
-                                            window.innerHeight - 200
-                                          ),
-                                          left: Math.min(
-                                            dropdownButtonRefs.current[
-                                              idx
-                                            ]!.getBoundingClientRect().left,
-                                            window.innerWidth - 192
-                                          ),
-                                          width: "12rem",
-                                        }}
-                                      >
-                                        {rowOptions.map((option, dIdx) => (
-                                          <button
-                                            key={dIdx}
-                                            onClick={() => {
-                                              option.onClick(item!);
-                                              setOpenDropdownRow(null);
-                                            }}
-                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                          >
-                                            {option.label}
-                                          </button>
-                                        ))}
-                                      </div>,
-                                      document.body
-                                    )}
-                                </td>,
-                              ]
+                              <td
+                                key="actions"
+                                className="px-6 py-4 whitespace-nowrap relative"
+                              >
+                                {headerDropdownVisible &&
+                                  rowOptions.length > 0 && (
+                                    <button
+                                      ref={(el) => {
+                                        dropdownButtonRefs.current[idx] = el;
+                                      }}
+                                      onClick={() =>
+                                        setOpenDropdownRow((prev) =>
+                                          prev === idx ? null : idx
+                                        )
+                                      }
+                                      className="p-2 rounded hover:bg-gray-200"
+                                    >
+                                      ⋮
+                                    </button>
+                                  )}
+                                {customButtonsProvided &&
+                                  customButtons(item).map((btn, index) => (
+                                    <span
+                                      key={index}
+                                      className="ml-2 inline-block"
+                                    >
+                                      {btn}
+                                    </span>
+                                  ))}
+                                {headerDropdownVisible &&
+                                  openDropdownRow === idx &&
+                                  dropdownButtonRefs.current[idx] &&
+                                  ReactDOM.createPortal(
+                                    <div
+                                      ref={dropdownRef}
+                                      className="bg-white border rounded shadow-lg z-50 flex flex-col"
+                                      style={{
+                                        position: "fixed",
+                                        top: Math.min(
+                                          dropdownButtonRefs.current[
+                                            idx
+                                          ]!.getBoundingClientRect().bottom +
+                                          4,
+                                          window.innerHeight - 200
+                                        ),
+                                        left: Math.min(
+                                          dropdownButtonRefs.current[
+                                            idx
+                                          ]!.getBoundingClientRect().left,
+                                          window.innerWidth - 192
+                                        ),
+                                        width: "12rem",
+                                      }}
+                                    >
+                                      {rowOptions.map((option, dIdx) => (
+                                        <button
+                                          key={dIdx}
+                                          onClick={() => {
+                                            option.onClick(item!);
+                                            setOpenDropdownRow(null);
+                                          }}
+                                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                        >
+                                          {option.label}
+                                        </button>
+                                      ))}
+                                    </div>,
+                                    document.body
+                                  )}
+                              </td>,
+                            ]
                             : []
                         )}
                     </tr>
@@ -868,11 +897,10 @@ function ListWithSearchInner<T extends Record<string, any>>(
               return (
                 <button
                   key={page}
-                  className={`px-3 py-1 border rounded ${
-                    page === currentPage
-                      ? "bg-blue-600 text-white"
-                      : "hover:bg-gray-200"
-                  }`}
+                  className={`px-3 py-1 border rounded ${page === currentPage
+                    ? "bg-blue-600 text-white"
+                    : "hover:bg-gray-200"
+                    }`}
                   onClick={() => setCurrentPage(page)}
                 >
                   {page}

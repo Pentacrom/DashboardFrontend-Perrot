@@ -40,9 +40,9 @@ export interface Punto {
   idLugar: number;
   accion: number;
   estado: number;
-  eta: string; // estimada
-  llegada?: string; // datetime de llegada
-  salida?: string; // datetime de salida
+  eta?: Date; // estimada
+  llegada?: Date; // datetime de llegada
+  salida?: Date; // datetime de salida
   observacion?: string;
   razonDeTardia?: string;
 }
@@ -54,8 +54,8 @@ export interface FormState {
   origen: number;
   destino: number;
   pais: number;
-  fechaSol: string;
-  fechaIng: string;
+  fechaSol: Date;
+  fechaIng: Date;
   tipoContenedor: number;
   kilos: number;
   precioCarga: number;
@@ -75,7 +75,7 @@ export interface FormState {
   imoCategoria: number;
   tipoServicio: number;
   folio: number;
-  fechaFolio: string;
+  fechaFolio: Date;
 }
 
 export type EstadoServicio =
@@ -93,7 +93,7 @@ export interface ValorFactura {
   concepto: string;
   montoCosto: number;
   montoVenta: number;
-  fechaEmision: string;
+  fechaEmision: Date;
   tipo: "costo" | "venta";
   codigo?: string;
   descuentoPorcentaje?: Descuento[];
@@ -404,17 +404,27 @@ export function clearLegacyDraft(): void {
   localStorage.removeItem(STORAGE.legacy);
 }
 
+function reviver(key: string, value: any) {
+  if (
+    (key === "fechaSol" ||
+     key === "fechaIng" ||
+     key === "fechaFolio") &&
+    typeof value === "string"
+  ) {
+    return new Date(value);
+  }
+  return value;
+}
+
 /** Sent */
 export function loadSent(): Payload[] {
   const raw = localStorage.getItem(STORAGE.enviados);
-  return raw ? JSON.parse(raw) : [];
+  return raw ? JSON.parse(raw, reviver) : [];
 }
 
 export function saveOrUpdateSent(payload: Payload): void {
-  payload.form.fechaSol = formatFechaISO(safeIso(payload.form.fechaSol));
-  payload.form.fechaIng = formatFechaISO(safeIso(payload.form.fechaIng));
   const sent = loadSent();
-  const idx = sent.findIndex((p) => p.id === payload.id);
+  const idx = sent.findIndex(p => p.id === payload.id);
   if (idx >= 0) sent[idx] = payload;
   else sent.push(payload);
   localStorage.setItem(STORAGE.enviados, JSON.stringify(sent));
@@ -422,7 +432,7 @@ export function saveOrUpdateSent(payload: Payload): void {
 
 /** Migra todas las fechas existentes a formato HH:mm dd/MM/yyyy */
 export const migrateAllFechas = (): void => {
-  const servicios = [...loadSent(),...loadDrafts()] ;
+  const servicios = [...loadSent(), ...loadDrafts()];
   const now = new Date();
   const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
   const startLastWeek = new Date(now.getTime() - 2 * oneWeekMs);
@@ -431,19 +441,34 @@ export const migrateAllFechas = (): void => {
   const endThisWeek = now;
 
   servicios.forEach((s) => {
-    // Fecha solicitud: si inválida, asignar random en semana pasada
-    const oldSol = new Date(s.form.fechaSol);
+    const oldSol =
+      s.form.fechaSol instanceof Date
+        ? s.form.fechaSol
+        : new Date(s.form.fechaSol);
     const solDate = isNaN(oldSol.getTime())
       ? randomDateBetween(startLastWeek, endLastWeek)
       : oldSol;
-    // Fecha ingreso: si inválida, random en esta semana
-    const oldIng = new Date(s.form.fechaIng);
+
+    const oldIng =
+      s.form.fechaIng instanceof Date
+        ? s.form.fechaIng
+        : new Date(s.form.fechaIng);
     const ingDate = isNaN(oldIng.getTime())
       ? randomDateBetween(startThisWeek, endThisWeek)
       : oldIng;
 
-    s.form.fechaSol = formatFechaISO(safeIso(solDate.toISOString()));
-    s.form.fechaIng = formatFechaISO(safeIso(ingDate.toISOString()));
+    s.form.fechaSol = solDate;
+    s.form.fechaIng = ingDate;
+    const oldFolio =
+    s.form.fechaFolio instanceof Date
+      ? s.form.fechaFolio
+      : new Date(s.form.fechaFolio);
+  const folioDate = isNaN(oldFolio.getTime())
+    ? now
+    : oldFolio;
+  s.form.fechaFolio = folioDate;
+  
+
     saveOrUpdateSent(s);
   });
 };
@@ -477,4 +502,11 @@ export function useServiceDrafts() {
   }, []);
 
   return { drafts, upsert, remove };
+}
+
+export function clearAllServiciosCache(): void {
+  localStorage.removeItem(STORAGE.borradores);
+  localStorage.removeItem(STORAGE.legacy);
+  localStorage.removeItem(STORAGE.enviados);
+  localStorage.removeItem(STORAGE.ultimoId);
 }

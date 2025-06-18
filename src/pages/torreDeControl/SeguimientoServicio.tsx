@@ -10,17 +10,9 @@ import {
   mockCentros,
 } from "../../utils/ServiceDrafts";
 import { Modal } from "../../components/Modal";
+import { formatDateTimeLocal } from "../../utils/format";
 
-const formatDateTimeLocal = (dateStr: string): string => {
-  const d = new Date(dateStr);
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  const YYYY = d.getFullYear();
-  const MM = pad(d.getMonth() + 1);
-  const DD = pad(d.getDate());
-  const hh = pad(d.getHours());
-  const mm = pad(d.getMinutes());
-  return `${YYYY}-${MM}-${DD}T${hh}:${mm}`;
-};
+
 
 const SeguimientoServicio: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -228,11 +220,11 @@ const SeguimientoServicio: React.FC = () => {
                   <input
                     type="datetime-local"
                     className={`
-      input w-full
-      ${invalidArrival ? "border-red-800" : ""}
-      ${isLate ? "bg-red-50 border-red-400" : ""}
-    `}
-                    value={p.llegada || ""}
+                    input w-full
+                    ${invalidArrival ? "border-red-800" : ""}
+                    ${isLate ? "bg-red-50 border-red-400" : ""}
+                  `}
+                    value={formatDateTimeLocal(p.llegada) || ""}
                     min={minArrival}
                     onChange={(e) =>
                       updatePunto(idx, "llegada", e.target.value)
@@ -260,11 +252,11 @@ const SeguimientoServicio: React.FC = () => {
                   <input
                     type="datetime-local"
                     className={`
-      input w-full
-      ${!p.llegada ? "bg-gray-100 cursor-not-allowed" : ""}
-      ${invalidSalida ? "border-red-800" : ""}
-    `}
-                    value={p.salida || ""}
+                    input w-full
+                    ${!p.llegada ? "bg-gray-100 cursor-not-allowed" : ""}
+                    ${invalidSalida ? "border-red-800" : ""}
+                  `}
+                    value={formatDateTimeLocal(p.salida) || ""}
                     min={p.llegada ? formatDateTimeLocal(p.llegada) : undefined}
                     disabled={!p.llegada}
                     onChange={(e) => updatePunto(idx, "salida", e.target.value)}
@@ -272,7 +264,7 @@ const SeguimientoServicio: React.FC = () => {
                   {invalidSalida && (
                     <p className="text-sm text-red-800 mt-1">
                       La salida no puede ser anterior a la llegada (
-                      {p.llegada?.replace("T", " ")})
+                      {formatDateTimeLocal(p.llegada)})
                     </p>
                   )}
                 </div>
@@ -325,8 +317,8 @@ const SeguimientoServicio: React.FC = () => {
             ¿Confirmar completar servicio?
           </h2>
           <p>
-            Esta acción marcará el servicio como <strong>Completado</strong> y
-            no podrá ser modificada.
+            Esta acción marcará el servicio como <strong>Por validar</strong> y
+            será enviada a comercial.
           </p>
           <div className="flex justify-end gap-4">
             <button

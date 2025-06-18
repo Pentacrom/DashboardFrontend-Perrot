@@ -41,8 +41,8 @@ const NuevoServicio: React.FC = () => {
     origen: 0,
     destino: 0,
     pais: 0,
-    fechaSol: "",
-    fechaIng: new Date().toISOString().replace("T", " ").split(".")[0] ?? "",
+    fechaSol: new Date(),
+    fechaIng: new Date(),
     tipoContenedor: 0,
     kilos: 0,
     precioCarga: 0,
@@ -62,7 +62,7 @@ const NuevoServicio: React.FC = () => {
     imoCategoria: 0,
     tipoServicio: 0,
     folio: 0,
-    fechaFolio: ""
+    fechaFolio: new Date()
   });
   const [puntos, setPuntos] = useState<Punto[]>([]);
   const { userName } = useContext(AuthContext);
@@ -82,18 +82,19 @@ const NuevoServicio: React.FC = () => {
     
     // migrateAllFechas();
     if (!form.fechaSol || puntos.length === 0) return;
-    const minFirst = `${form.fechaSol}T00:00`;
+    const minFirst = new Date(form.fechaSol);
+    minFirst.setHours(0, 0, 0, 0);
     setPuntos((prev) => {
       const first = prev[0];
       if (
-        (first!.eta && first!.eta < minFirst) ||
-        (first!.llegada && first!.llegada < minFirst)
+        (first!.eta && first!.eta.getTime() < minFirst.getTime()) ||
+        (first!.llegada && new Date(first!.llegada).getTime() < minFirst.getTime())
       ) {
         const updated = [...prev];
         updated[0] = {
           ...first,
-          eta: "",
-          llegada: "",
+          eta: new Date(),
+          llegada: new Date(),
         } as Punto;
         return updated;
       }
@@ -115,26 +116,26 @@ const NuevoServicio: React.FC = () => {
       sent.find((s) => s.id === svcId) || drafts.find((d) => d.id === svcId);
     if (found) {
       setIdService(svcId);
-      setForm(found.form as FormState);
+       setForm({
+           ...found.form,
+           fechaSol: new Date(found.form.fechaSol),
+           fechaIng: new Date(found.form.fechaIng),
+           fechaFolio: new Date(found.form.fechaFolio),
+         });
       setPuntos(found.puntos || []);
     }
   }, [paramId, drafts]);
 
   // Actualización de campos del formulario
-  function upd<K extends keyof FormState>(
-    key: K
-  ): (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
-  ) => void {
-    return (e) => {
-      const t = e.target;
-      const value =
-        t.type === "number" || typeof form[key] === "number"
-          ? (Number(t.value) as FormState[K])
-          : (t.value as FormState[K]);
-      setForm((f) => ({ ...f, [key]: value } as FormState));
+  function upd<K extends keyof FormState>(key: K) {
+    return (e: React.ChangeEvent<any>) => {
+      let value: any = e.target.value;
+      if (key === "fechaSol" || key === "fechaIng" || key === "fechaFolio") {
+        value = new Date(value);
+      } else if (e.target.type === "number" || typeof form[key] === "number") {
+        value = Number(value);
+      }
+      setForm(f => ({ ...f, [key]: value } as FormState));
     };
   }
 
@@ -214,35 +215,35 @@ const NuevoServicio: React.FC = () => {
   // Agregar punto al final
   const addPunto = useCallback(
     () =>
-      setPuntos((p) => [...p, { idLugar: 0, accion: 0, estado: 1, eta: "" }]),
+      setPuntos(p => [...p, { idLugar: 0, accion: 0, estado: 1, eta: new Date() }]),
     []
   );
   // Insertar punto antes de la posición idx
   const insertPunto = useCallback(
     (idx: number) =>
-      setPuntos((p) => [
-        ...p.slice(0, idx),
-        { idLugar: 0, accion: 0, estado: 1, eta: "" },
-        ...p.slice(idx),
-      ]),
+      setPuntos(p => [...p, { idLugar: 0, accion: 0, estado: 1, eta: new Date() }]),
     []
   );
 
   const updatePunto = useCallback(
-    (idx: number, key: keyof Punto, val: number | string) =>
-      setPuntos((prev) => {
-        // 1) clonar y actualizar solo el campo cambiado
+    (idx: number, key: keyof Punto, val: number | Date | string) =>
+      setPuntos(prev => {
         const next = prev.map((pt, i) =>
           i === idx ? ({ ...pt, [key]: val } as Punto) : pt
         );
 
-        // 2) si cambiamos ETA, vaciar posteriores que queden antes
-        if (key === "eta") {
-          const newEta = val as string;
+        // Si estamos actualizando la ETA y val es Date...
+        if (key === "eta" && val instanceof Date) {
+          const newEtaMs = val.getTime();
+          // Recorre los puntos siguientes
           for (let j = idx + 1; j < next.length; j++) {
-            // si tenían fecha y es anterior a la nueva, la limpiamos
-            if (next[j]!.eta && next[j]!.eta < newEta) {
-              next[j] = { ...next[j], eta: "" } as Punto;
+            const etaJ = next[j]!.eta;
+            // Si el punto j tiene eta anterior a la nueva, resetea
+            if (etaJ instanceof Date && etaJ.getTime() < newEtaMs) {
+              next[j] = {
+                ...next[j],
+                eta: new Date(0)    // puedes usar otra fecha por defecto
+              } as Punto;
             }
           }
         }
@@ -390,7 +391,7 @@ const NuevoServicio: React.FC = () => {
 
   function generarValoresDesdePuntos(puntos: Punto[]): ValorFactura[] {
     // asegura que nunca sea undefined
-    const hoy: string = new Date().toISOString().split("T")[0] ?? "";
+    const hoy: Date = new Date();
 
     return puntos
       .filter((p) => !!valoresPorDefecto[p.accion])
@@ -403,7 +404,7 @@ const NuevoServicio: React.FC = () => {
           montoVenta: def.montoVenta,
           montoCosto: def.montoCosto,
           impuesto: 0, // ValorPorDefecto no trae impuesto
-          fechaEmision: hoy, // Siempre string
+          fechaEmision: hoy, // Date
           tipo: "costo" as "costo", // o "venta", según convenga
           codigo: p.accion.toString(),
           descuentoPorcentaje: [] as Descuento[],
@@ -599,7 +600,7 @@ const NuevoServicio: React.FC = () => {
               <input
                 type="datetime-local"
                 className="input"
-                value={form.fechaSol}
+                value={form.fechaSol.toISOString().slice(0,16)}
                 onChange={upd("fechaSol")}
                 required
               />
@@ -698,7 +699,7 @@ const NuevoServicio: React.FC = () => {
               <input
                 type="date"
                 className="input"
-                value={form.fechaFolio}
+                value={form.fechaFolio.toISOString().slice(0,10)}
                 onChange={upd("fechaFolio")}
                 required
               />
@@ -805,7 +806,13 @@ const NuevoServicio: React.FC = () => {
           const prev = estadosPrevios[idx];
           let acciones: Item[] = [];
           let lugaresPuntos: Lugar[] = [];
-          const rawMinEta = idx === 0 ? form.fechaSol : puntos[idx - 1]!.eta;
+          // rawMinEta siempre string en formato "YYYY-MM-DDTHH:mm"
+          const rawMinEta: string | undefined =
+          idx === 0
+            ? form.fechaSol.toISOString().slice(0, 16)
+            : // si en el punto anterior hay eta, lo pasamos a ISO y recortamos
+              puntos[idx - 1]!.eta?.toISOString().slice(0, 16);
+
           const minEta = rawMinEta
             ? rawMinEta.includes("T")
               ? rawMinEta
@@ -941,11 +948,13 @@ const NuevoServicio: React.FC = () => {
                   <input
                     type="datetime-local"
                     className="input w-full"
-                    value={p.eta}
-                    min={minEta}
-                    onChange={(e) => updatePunto(idx, "eta", e.target.value)}
+                    value={p.eta!.toISOString().slice(0, 16)}
+                    onChange={e =>
+                      updatePunto(idx, "eta", new Date(e.target.value))
+                    }
                     required
                   />
+
                 </div>
 
                 {/* Observación */}
