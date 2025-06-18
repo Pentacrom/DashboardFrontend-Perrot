@@ -28,3 +28,6 @@ export function formatDateTimeLocal(input: Date | string | number | undefined): 
   return `${YYYY}-${MM}-${DD}T${hh}:${mm}`;
 }
 
+export const formatDateOnly = (d?: Date) =>
+  d instanceof Date && !isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : "";
+

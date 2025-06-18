@@ -222,11 +222,10 @@ const IngresoServicio: React.FC = () => {
           disabled: false,
         },
         {
-          label: "Ver y/o completar Servicio",
+          label: "Ver y completar Servicio",
           onClick: () => navigate(`/detalle-servicio/${row.id}`),
         },
       ];
-
      } else {
       return [
         {

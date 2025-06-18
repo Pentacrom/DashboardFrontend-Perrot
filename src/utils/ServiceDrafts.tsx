@@ -203,6 +203,14 @@ export const mockCentros: Centro[] = [
   { codigo: 2, nombre: "Centro B", cliente: 1 },
   { codigo: 3, nombre: "Centro C", cliente: 2 },
   { codigo: 4, nombre: "Centro D", cliente: 2 },
+  { codigo: 5, nombre: "Centro E", cliente: 3 },
+  { codigo: 6, nombre: "Centro F", cliente: 3 },
+  { codigo: 7, nombre: "Centro G", cliente: 4 },
+  { codigo: 8, nombre: "Centro H", cliente: 4 },
+  { codigo: 9, nombre: "Centro I", cliente: 5 },
+  { codigo: 10, nombre: "Centro J", cliente: 5 },
+  { codigo: 11, nombre: "Centro K", cliente: 6 },
+  { codigo: 12, nombre: "Centro L", cliente: 6 },
 ];
 
 export const mockPaises: Item[] = [
@@ -509,8 +517,10 @@ export function useServiceDrafts() {
 }
 
 export function clearAllServiciosCache(): void {
+  console.log("limpiando");
   localStorage.removeItem(STORAGE.borradores);
   localStorage.removeItem(STORAGE.legacy);
   localStorage.removeItem(STORAGE.enviados);
   localStorage.removeItem(STORAGE.ultimoId);
+  localStorage.clear();
 }

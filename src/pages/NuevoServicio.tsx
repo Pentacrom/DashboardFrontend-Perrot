@@ -18,11 +18,12 @@ import {
   Descuento,
   imoCategorias,
   Cliente,
-  migrateAllFechas
+  clearAllServiciosCache
 } from "../utils/ServiceDrafts";
 import { AuthContext } from "../context/AuthContext";
 import { MoreVertical } from "lucide-react";
 import { SearchableDropdown } from "../components/SearchableDropdown";
+import { formatDateTimeLocal, formatDateOnly } from "../utils/format";
 
 
 const NuevoServicio: React.FC = () => {
@@ -79,7 +80,7 @@ const NuevoServicio: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    
+    //clearAllServiciosCache();
     // migrateAllFechas();
     if (!form.fechaSol || puntos.length === 0) return;
     const minFirst = new Date(form.fechaSol);
@@ -114,16 +115,23 @@ const NuevoServicio: React.FC = () => {
     const sent = loadSent();
     const found =
       sent.find((s) => s.id === svcId) || drafts.find((d) => d.id === svcId);
-    if (found) {
-      setIdService(svcId);
-       setForm({
-           ...found.form,
-           fechaSol: new Date(found.form.fechaSol),
-           fechaIng: new Date(found.form.fechaIng),
-           fechaFolio: new Date(found.form.fechaFolio),
-         });
-      setPuntos(found.puntos || []);
-    }
+      if (found) {
+        setIdService(svcId);
+        setForm({
+          ...found.form,
+          fechaSol: new Date(found.form.fechaSol),
+          fechaIng: new Date(found.form.fechaIng),
+          fechaFolio: new Date(found.form.fechaFolio),
+        });
+        setPuntos(
+          (found.puntos || []).map((p) => ({
+            ...p,
+            eta: new Date(p.eta!),
+            llegada: p.llegada ? new Date(p.llegada) : undefined,
+            salida: p.salida ? new Date(p.salida) : undefined,
+          }))
+        );
+      }
   }, [paramId, drafts]);
 
   // Actualización de campos del formulario
@@ -354,7 +362,7 @@ const NuevoServicio: React.FC = () => {
         id: newId,
         form,
         puntos,
-        estado: estadoFinal,
+        estado: existing!.estado,
         valores: (existing as Payload).valores,
         chofer: (existing as Payload).chofer,
         movil: (existing as Payload).movil,
@@ -600,7 +608,7 @@ const NuevoServicio: React.FC = () => {
               <input
                 type="datetime-local"
                 className="input"
-                value={form.fechaSol.toISOString().slice(0,16)}
+                value={formatDateTimeLocal(form.fechaSol)}
                 onChange={upd("fechaSol")}
                 required
               />
@@ -648,8 +656,8 @@ const NuevoServicio: React.FC = () => {
                 {/* Slider */}
                 <input
                   type="range"
-                  min={-50}
-                  max={50}
+                  min={-20}
+                  max={20}
                   step={1}
                   className="flex-grow"
                   value={form.temperatura}
@@ -699,7 +707,7 @@ const NuevoServicio: React.FC = () => {
               <input
                 type="date"
                 className="input"
-                value={form.fechaFolio.toISOString().slice(0,10)}
+                value={formatDateOnly(form.fechaFolio)}
                 onChange={upd("fechaFolio")}
                 required
               />
@@ -808,10 +816,10 @@ const NuevoServicio: React.FC = () => {
           let lugaresPuntos: Lugar[] = [];
           // rawMinEta siempre string en formato "YYYY-MM-DDTHH:mm"
           const rawMinEta: string | undefined =
-          idx === 0
-            ? form.fechaSol.toISOString().slice(0, 16)
-            : // si en el punto anterior hay eta, lo pasamos a ISO y recortamos
-              puntos[idx - 1]!.eta?.toISOString().slice(0, 16);
+            idx === 0
+              ? form.fechaSol.toISOString().slice(0, 16)
+              : // si en el punto anterior hay eta, lo pasamos a ISO y recortamos
+                puntos[idx - 1]!.eta?.toISOString().slice(0, 16);
 
           const minEta = rawMinEta
             ? rawMinEta.includes("T")
@@ -948,13 +956,12 @@ const NuevoServicio: React.FC = () => {
                   <input
                     type="datetime-local"
                     className="input w-full"
-                    value={p.eta!.toISOString().slice(0, 16)}
-                    onChange={e =>
+                    value={formatDateTimeLocal(p.eta)}
+                    onChange={(e) =>
                       updatePunto(idx, "eta", new Date(e.target.value))
                     }
                     required
                   />
-
                 </div>
 
                 {/* Observación */}

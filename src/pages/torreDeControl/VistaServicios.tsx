@@ -158,6 +158,7 @@ const VistaServicios: React.FC = () => {
         }}
         defaultSortKey="estado"
         defaultSortOrder="asc"
+        preferencesKey="torre"
       />
     </div>
   );
