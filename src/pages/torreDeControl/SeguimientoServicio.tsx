@@ -12,8 +12,6 @@ import {
 import { Modal } from "../../components/Modal";
 import { formatDateTimeLocal } from "../../utils/format";
 
-
-
 const SeguimientoServicio: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -46,23 +44,29 @@ const SeguimientoServicio: React.FC = () => {
     }
   }, [id]);
 
-  const lookupLugar = (code: number) => {
-    const inPort = mockCatalogos.Lugares.find((z) => z.id === code);
-    if (inPort) return inPort.nombre;
-    const centro = mockCentros.find((c) => c.codigo === code);
-    return centro ? centro.nombre : code.toString();
-  };
-  const lookupAccion = (code: number) =>
-    mockCatalogos.acciones.find((a) => a.codigo === code)?.nombre ||
-    code.toString();
-
+  // Actualizar puntos
   const updatePunto = useCallback(
-    (idx: number, key: keyof Punto, value: string) =>
+    (idx: number, key: keyof Punto, value: any) =>
       setPuntos((prev) =>
         prev.map((p, i) => (i === idx ? { ...p, [key]: value } : p))
       ),
     []
   );
+
+  // Nuevo: actualizar campos de form
+  const updateForm = useCallback((key: keyof Payload["form"], value: any) => {
+    setService((prev) =>
+      prev
+        ? {
+            ...prev,
+            form: {
+              ...prev.form,
+              [key]: value,
+            },
+          }
+        : null
+    );
+  }, []);
 
   const validarFechas = () =>
     puntos.every((p, idx) => {
@@ -131,6 +135,7 @@ const SeguimientoServicio: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">
           Seguimiento Servicio #{service.id}
@@ -149,20 +154,42 @@ const SeguimientoServicio: React.FC = () => {
           value={formatDateTimeLocal(service.form.fechaSol)}
           disabled
         />
+
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Folio {service.form.tipoOperacion === 1 && "*"}
+          </label>
+          <input
+            type="number"
+            className="input w-full"
+            value={service.form.folio}
+            onChange={(e) => updateForm("folio", Number(e.target.value))}
+            required={service.form.tipoOperacion === 1}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Fecha de Folio {service.form.tipoOperacion === 1 && "*"}
+          </label>
+          <input
+            type="datetime-local"
+            className="input w-full"
+            value={formatDateTimeLocal(service.form.fechaFolio)}
+            onChange={(e) => updateForm("fechaFolio", new Date(e.target.value))}
+            required={service.form.tipoOperacion === 1}
+          />
+        </div>
       </div>
 
+      {/* Puntos del recorrido */}
       <div className="bg-white p-6 rounded shadow">
         <h2 className="text-lg font-semibold mb-4">Puntos del Recorrido</h2>
         <div className="space-y-4">
           {puntos.map((p, idx) => {
-            // --- calculamos el mínimo bruto para llegada y salida ---
             const minRawLlegada =
-              idx === 0
-                ? service!.form.fechaSol // fecha de solicitud (YYYY-MM-DD)
-                : puntos[idx - 1]!.salida!; // salida del punto anterior (YYYY-MM-DDTHH:mm)
+              idx === 0 ? service.form.fechaSol : puntos[idx - 1]!.salida!;
             const minLlegada = formatDateTimeLocal(minRawLlegada);
 
-            // para salida el mínimo es la llegada misma
             const minRawSalida = p.llegada || "";
             const minSalida = minRawSalida && formatDateTimeLocal(minRawSalida);
 
@@ -172,6 +199,7 @@ const SeguimientoServicio: React.FC = () => {
             const minArrival = minArrivalRaw
               ? formatDateTimeLocal(minArrivalRaw)
               : undefined;
+
             const isLate =
               !!p.llegada &&
               !!etaDate &&
@@ -180,7 +208,6 @@ const SeguimientoServicio: React.FC = () => {
               !!p.llegada &&
               minArrival &&
               new Date(p.llegada) < new Date(minArrivalRaw);
-            
             const invalidSalida =
               !!p.salida &&
               !!p.llegada &&
@@ -197,14 +224,24 @@ const SeguimientoServicio: React.FC = () => {
               >
                 <div>
                   <p className="text-sm font-medium">Lugar:</p>
-                  <p>{lookupLugar(p.idLugar)}</p>
+                  <p>
+                    {
+                      mockCatalogos.Lugares.find((z) => z.id === p.idLugar)
+                        ?.nombre
+                    }
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm font-medium">Acción:</p>
-                  <p>{lookupAccion(p.accion)}</p>
+                  <p>
+                    {
+                      mockCatalogos.acciones.find((a) => a.codigo === p.accion)
+                        ?.nombre
+                    }
+                  </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">ETA:</p>
+                  <p className="text-sm font-medium">Fecha agendada:</p>
                   <input
                     type="datetime-local"
                     className="input w-full bg-gray-100 cursor-not-allowed"
@@ -220,20 +257,20 @@ const SeguimientoServicio: React.FC = () => {
                   <input
                     type="datetime-local"
                     className={`
-                    input w-full
-                    ${invalidArrival ? "border-red-800" : ""}
-                    ${isLate ? "bg-red-50 border-red-400" : ""}
-                  `}
-                    value={formatDateTimeLocal(p.llegada) || ""}
-                    min={minArrival}
+                      input w-full
+                      ${invalidArrival ? "border-red-800" : ""}
+                      ${isLate ? "bg-red-50 border-red-400" : ""}
+                    `}
+                    value={p.llegada ? formatDateTimeLocal(p.llegada) : ""}
+                    min={minLlegada}
                     onChange={(e) =>
                       updatePunto(idx, "llegada", e.target.value)
                     }
                   />
                   {invalidArrival && (
                     <p className="text-sm text-red-800 mt-1">
-                      La llegada no puede ser anterior a&nbsp;
-                      {minArrival?.replace("T", " ")}
+                      La llegada no puede ser anterior a{" "}
+                      {minLlegada.replace("T", " ")}
                     </p>
                   )}
                   {isLate && (
@@ -243,8 +280,6 @@ const SeguimientoServicio: React.FC = () => {
                     </p>
                   )}
                 </div>
-
-                {/* SALIDA */}
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Salida
@@ -252,11 +287,11 @@ const SeguimientoServicio: React.FC = () => {
                   <input
                     type="datetime-local"
                     className={`
-                    input w-full
-                    ${!p.llegada ? "bg-gray-100 cursor-not-allowed" : ""}
-                    ${invalidSalida ? "border-red-800" : ""}
-                  `}
-                    value={formatDateTimeLocal(p.salida) || ""}
+                      input w-full
+                      ${!p.llegada ? "bg-gray-100 cursor-not-allowed" : ""}
+                      ${invalidSalida ? "border-red-800" : ""}
+                    `}
+                    value={p.salida ? formatDateTimeLocal(p.salida) : ""}
                     min={p.llegada ? formatDateTimeLocal(p.llegada) : undefined}
                     disabled={!p.llegada}
                     onChange={(e) => updatePunto(idx, "salida", e.target.value)}
@@ -264,7 +299,7 @@ const SeguimientoServicio: React.FC = () => {
                   {invalidSalida && (
                     <p className="text-sm text-red-800 mt-1">
                       La salida no puede ser anterior a la llegada (
-                      {formatDateTimeLocal(p.llegada)})
+                      {formatDateTimeLocal(p.llegada!)})
                     </p>
                   )}
                 </div>
@@ -290,6 +325,7 @@ const SeguimientoServicio: React.FC = () => {
         </div>
       </div>
 
+      {/* Botones */}
       <div className="flex justify-end gap-4">
         <button
           onClick={() => navigate(-1)}
@@ -311,6 +347,7 @@ const SeguimientoServicio: React.FC = () => {
         </button>
       </div>
 
+      {/* Modal de confirmación */}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)}>
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">

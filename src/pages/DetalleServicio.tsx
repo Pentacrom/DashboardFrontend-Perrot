@@ -13,7 +13,7 @@ import {
   Cliente,
   imoCategorias,
 } from "../utils/ServiceDrafts";
-import { formatCLP } from "../utils/format";
+import { formatCLP, formatFechaISO } from "../utils/format";
 
 const lookup = <T extends { codigo: number; nombre: string }>(
   arr: T[],
@@ -165,7 +165,7 @@ const DetalleServicio: React.FC = () => {
           <dd>{form.pais}</dd>
 
           <dt className="font-medium">Fecha Solicitud:</dt>
-          <dd>{form.fechaSol.toLocaleString()}</dd>
+          <dd>{formatFechaISO(form.fechaSol)}</dd>
 
           <dt className="font-medium">Guía:</dt>
           <dd>{form.guiaDeDespacho || "—"}</dd>
@@ -221,20 +221,16 @@ const DetalleServicio: React.FC = () => {
             )}
           </dd>
 
+          <dt className="font-medium">ETA:</dt>
+          <dd>{formatFechaISO(form.eta)}</dd>
+
           {/* Folio y Fecha Folio */}
           <dt className="font-medium">Folio:</dt>
           <dd>{form.folio}</dd>
 
           <dt className="font-medium">Fecha de Folio:</dt>
           <dd>
-            {form.fechaFolio
-              ? form.fechaFolio.toLocaleDateString() +
-              " " +
-              form.fechaFolio.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-              : "—"}
+            {formatFechaISO(form.fechaFolio)}
           </dd>
         </dl>
       </section>
@@ -296,9 +292,7 @@ const DetalleServicio: React.FC = () => {
           </div>
           <div className="bg-gray-50 p-4 rounded">
             <p className="text-sm text-gray-600">Neto Bruto</p>
-            <p className="text-lg font-semibold">
-              {formatCLP(totalNetoBruto)}
-            </p>
+            <p className="text-lg font-semibold">{formatCLP(totalNetoBruto)}</p>
           </div>
           <div className="bg-gray-50 p-4 rounded">
             <p className="text-sm text-gray-600">
@@ -319,9 +313,7 @@ const DetalleServicio: React.FC = () => {
 
       {/* Descuentos generales del servicio */}
       <section className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-xl font-semibold mb-4">
-          Descuentos del Servicio
-        </h2>
+        <h2 className="text-xl font-semibold mb-4">Descuentos del Servicio</h2>
         {descuentoServicioPorcentaje.length === 0 ? (
           <p className="text-gray-500">No hay descuentos generales.</p>
         ) : (
@@ -351,10 +343,11 @@ const DetalleServicio: React.FC = () => {
             return (
               <div
                 key={i}
-                className={`p-4 rounded-lg border-l-4 ${isLate
+                className={`p-4 rounded-lg border-l-4 ${
+                  isLate
                     ? "border-red-400 bg-red-50"
                     : "border-blue-400 bg-blue-50"
-                  }`}
+                }`}
               >
                 <h3 className="font-black mb-2">Punto {i + 1}</h3>
                 <div className="grid grid-cols-2 text-left gap-2">
@@ -367,16 +360,15 @@ const DetalleServicio: React.FC = () => {
                     {lookup(mockCatalogos.acciones, p.accion)}
                   </p>
                   <p>
-                    <strong>ETA:</strong>{" "}
-                    {eta ? eta.toLocaleString() : "—"}
+                    <strong>ETA:</strong> {eta ? formatFechaISO(eta) : "—"}
                   </p>
                   <p>
                     <strong>Salida:</strong>{" "}
-                    {p.salida ? new Date(p.salida).toLocaleString() : "—"}
+                    {p.salida ? formatFechaISO(new Date(p.salida)) : "—"}
                   </p>
                   <p>
                     <strong>Llegada:</strong>{" "}
-                    {p.llegada ? new Date(p.llegada).toLocaleString() : "—"}
+                    {p.llegada ? formatFechaISO(new Date(p.llegada)) : "—"}
                   </p>
                   <p>
                     <strong>Estado:</strong> {p.estado}

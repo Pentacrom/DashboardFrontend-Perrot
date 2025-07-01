@@ -67,14 +67,14 @@ const Sidebar: React.FC = () => {
               </NavLink>
             </li>
           )}
-
+          {/*
           {(isAdmin || roles.includes("contabilidad")) && (
             <li>
               <NavLink to="/contabilidad/facturacion" className={linkClasses}>
                 Facturación
               </NavLink>
             </li>
-          )}
+          )}*/}
 
           {isAdmin && (
             <>
@@ -82,6 +82,16 @@ const Sidebar: React.FC = () => {
               <li>
                 <NavLink to="/admin/cuentas" className={linkClasses}>
                   Administrar cuentas
+                </NavLink>
+              </li>
+            </>
+          )}
+
+          {isAdmin && (
+            <>
+              <li>
+                <NavLink to="/admin/datos" className={linkClasses}>
+                  Administrar datos
                 </NavLink>
               </li>
             </>

@@ -18,7 +18,7 @@ import {
   Descuento,
   imoCategorias,
   Cliente,
-  clearAllServiciosCache
+  GrupoLugar,
 } from "../utils/ServiceDrafts";
 import { AuthContext } from "../context/AuthContext";
 import { MoreVertical } from "lucide-react";
@@ -63,8 +63,10 @@ const NuevoServicio: React.FC = () => {
     imoCategoria: 0,
     tipoServicio: 0,
     folio: 0,
-    fechaFolio: new Date()
+    fechaFolio: new Date(),
+    eta: new Date(),
   });
+  const [grupoPuntos, setGrupoPuntos] = useState<number[]>([]);
   const [puntos, setPuntos] = useState<Punto[]>([]);
   const { userName } = useContext(AuthContext);
   const [isDragging, setIsDragging] = useState(false);
@@ -79,6 +81,21 @@ const NuevoServicio: React.FC = () => {
     }));
   }, []);
 
+  // Sincronizador de grupo de lugares
+  useEffect(() => {
+    setGrupoPuntos(
+      puntos.map((p, i) => {
+        // Si ya había group guardado, lo mantenemos
+        return (
+          grupoPuntos[i] ??
+          // si el punto ya tiene un lugar, inferimos su grupo:
+          mockCatalogos.Lugares.find((l) => l.id === p.idLugar)?.idGrupo ??
+          0
+        );
+      })
+    );
+  }, [puntos]);
+
   useEffect(() => {
     //clearAllServiciosCache();
     // migrateAllFechas();
@@ -89,7 +106,8 @@ const NuevoServicio: React.FC = () => {
       const first = prev[0];
       if (
         (first!.eta && first!.eta.getTime() < minFirst.getTime()) ||
-        (first!.llegada && new Date(first!.llegada).getTime() < minFirst.getTime())
+        (first!.llegada &&
+          new Date(first!.llegada).getTime() < minFirst.getTime())
       ) {
         const updated = [...prev];
         updated[0] = {
@@ -115,23 +133,23 @@ const NuevoServicio: React.FC = () => {
     const sent = loadSent();
     const found =
       sent.find((s) => s.id === svcId) || drafts.find((d) => d.id === svcId);
-      if (found) {
-        setIdService(svcId);
-        setForm({
-          ...found.form,
-          fechaSol: new Date(found.form.fechaSol),
-          fechaIng: new Date(found.form.fechaIng),
-          fechaFolio: new Date(found.form.fechaFolio),
-        });
-        setPuntos(
-          (found.puntos || []).map((p) => ({
-            ...p,
-            eta: new Date(p.eta!),
-            llegada: p.llegada ? new Date(p.llegada) : undefined,
-            salida: p.salida ? new Date(p.salida) : undefined,
-          }))
-        );
-      }
+    if (found) {
+      setIdService(svcId);
+      setForm({
+        ...found.form,
+        fechaSol: new Date(found.form.fechaSol),
+        fechaIng: new Date(found.form.fechaIng),
+        fechaFolio: new Date(found.form.fechaFolio),
+      });
+      setPuntos(
+        (found.puntos || []).map((p) => ({
+          ...p,
+          eta: new Date(p.eta!),
+          llegada: p.llegada ? new Date(p.llegada) : undefined,
+          salida: p.salida ? new Date(p.salida) : undefined,
+        }))
+      );
+    }
   }, [paramId, drafts]);
 
   // Actualización de campos del formulario
@@ -143,7 +161,7 @@ const NuevoServicio: React.FC = () => {
       } else if (e.target.type === "number" || typeof form[key] === "number") {
         value = Number(value);
       }
-      setForm(f => ({ ...f, [key]: value } as FormState));
+      setForm((f) => ({ ...f, [key]: value } as FormState));
     };
   }
 
@@ -188,14 +206,15 @@ const NuevoServicio: React.FC = () => {
     ).some((c) => c.codigo === form.tipoContenedor);
   };
 
-
   const ZonasPortuarias = mockCatalogos.Lugares.filter(
     (c) => c.tipo == "Zona Portuaria"
   );
 
   const ambos = [...ZonasPortuarias, ...centrosFiltrados];
 
-  const clienteOptions = mockCatalogos.empresas.filter((c) => c.grupo === form.grupoCliente);
+  const clienteOptions = mockCatalogos.empresas.filter(
+    (c) => c.grupo === form.grupoCliente
+  );
 
   const origenOptions = (() => {
     if (form.tipoOperacion === 1) return centrosFiltrados;
@@ -221,21 +240,28 @@ const NuevoServicio: React.FC = () => {
   });
 
   // Agregar punto al final
-  const addPunto = useCallback(
-    () =>
-      setPuntos(p => [...p, { idLugar: 0, accion: 0, estado: 1, eta: new Date() }]),
-    []
-  );
+  const addPunto = useCallback(() => {
+    setPuntos((p) => [
+      ...p,
+      { idLugar: 0, accion: 0, estado: 1, eta: new Date() },
+    ]);
+    setGrupoPuntos((g) => [...g, 0]);
+  }, []);
+
+
   // Insertar punto antes de la posición idx
   const insertPunto = useCallback(
     (idx: number) =>
-      setPuntos(p => [...p, { idLugar: 0, accion: 0, estado: 1, eta: new Date() }]),
+      setPuntos((p) => [
+        ...p,
+        { idLugar: 0, accion: 0, estado: 1, eta: new Date() },
+      ]),
     []
   );
 
   const updatePunto = useCallback(
     (idx: number, key: keyof Punto, val: number | Date | string) =>
-      setPuntos(prev => {
+      setPuntos((prev) => {
         const next = prev.map((pt, i) =>
           i === idx ? ({ ...pt, [key]: val } as Punto) : pt
         );
@@ -250,7 +276,7 @@ const NuevoServicio: React.FC = () => {
             if (etaJ instanceof Date && etaJ.getTime() < newEtaMs) {
               next[j] = {
                 ...next[j],
-                eta: new Date(0)    // puedes usar otra fecha por defecto
+                eta: new Date(0), // puedes usar otra fecha por defecto
               } as Punto;
             }
           }
@@ -261,10 +287,10 @@ const NuevoServicio: React.FC = () => {
     []
   );
 
-  const removePunto = useCallback(
-    (idx: number) => setPuntos((p) => p.filter((_, i) => i !== idx)),
-    []
-  );
+  const removePunto = useCallback((idx: number) => {
+    setPuntos((p) => p.filter((_, i) => i !== idx));
+    setGrupoPuntos((g) => g.filter((_, i) => i !== idx));
+  }, []);
 
   // Manejo de archivo para "documentoPorContenedor"
   const handleFileChange = useCallback(
@@ -397,27 +423,64 @@ const NuevoServicio: React.FC = () => {
     nav(`/${perfilActual}/gestion-servicios`);
   }, [form, puntos, idService, nav]);
 
+  
   function generarValoresDesdePuntos(puntos: Punto[]): ValorFactura[] {
-    // asegura que nunca sea undefined
-    const hoy: Date = new Date();
+    const hoy = new Date();
 
-    return puntos
-      .filter((p) => !!valoresPorDefecto[p.accion])
+    // 1) Genera todos los valores a partir de puntos
+    const detalles = puntos
       .map((p, i) => {
-        const def = valoresPorDefecto[p.accion]!;
+        const def = valoresPorDefecto[p.accion];
+        const accionItem = mockCatalogos.acciones.find(
+          (a) => a.codigo === p.accion
+        );
 
+        if (!accionItem) return null;
+
+        // Si existe definición y cumple condición, usa sus valores
+        if (def && (!def.condicion || def.condicion(p))) {
+          return {
+            id: `auto-${i}`,
+            concepto: def.concepto,
+            montoVenta: def.montoVenta,
+            montoCosto: def.montoCosto,
+            impuesto: 0,
+            fechaEmision: hoy,
+            tipo: "costo" as const,
+            codigo: p.accion.toString(),
+            descuentoPorcentaje: [] as Descuento[],
+          } as ValorFactura;
+        }
+
+        // Si falla la condición (o no hay def), usa nombre de acción y ceros
         return {
           id: `auto-${i}`,
-          concepto: def.concepto,
-          montoVenta: def.montoVenta,
-          montoCosto: def.montoCosto,
-          impuesto: 0, // ValorPorDefecto no trae impuesto
-          fechaEmision: hoy, // Date
-          tipo: "costo" as "costo", // o "venta", según convenga
+          concepto: accionItem.nombre,
+          montoVenta: 0,
+          montoCosto: 0,
+          impuesto: 0,
+          fechaEmision: hoy,
+          tipo: "costo" as const,
           codigo: p.accion.toString(),
           descuentoPorcentaje: [] as Descuento[],
         } as ValorFactura;
-      });
+      })
+      .filter((v): v is ValorFactura => v !== null);
+
+    // 2) Crea el valor base del servicio, con montos en 0
+    const baseServicio: ValorFactura = {
+      id: "base-servicio",
+      concepto: "Valor base del servicio",
+      montoVenta: 0,
+      montoCosto: 0,
+      fechaEmision: hoy,
+      tipo: "costo" as const,
+      codigo: "base",
+      descuentoPorcentaje: [] as Descuento[],
+    };
+
+    // 3) Devuelve primero el base y luego los valores de puntos
+    return [baseServicio, ...detalles];
   }
 
   // quita ceros iniciales: "007" → "7", deja "0" si es exactamente "0"
@@ -550,6 +613,20 @@ const NuevoServicio: React.FC = () => {
                 <option value={2}>Indirecto</option>
               </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium">
+                Tipo de contenedor *
+              </label>
+              <select
+                className="input"
+                value={form.tipoContenedor}
+                onChange={upd("tipoContenedor")}
+                required
+              >
+                <option value={0}>—</option>
+                {opt(mockCatalogos.Tipo_contenedor)}
+              </select>
+            </div>
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
@@ -614,20 +691,6 @@ const NuevoServicio: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium">
-                Tipo de contenedor *
-              </label>
-              <select
-                className="input"
-                value={form.tipoContenedor}
-                onChange={upd("tipoContenedor")}
-                required
-              >
-                <option value={0}>—</option>
-                {opt(mockCatalogos.Tipo_contenedor)}
-              </select>
-            </div>
-            <div>
               <label className="block text-sm font-medium">Kilos *</label>
               <input
                 type="number"
@@ -639,7 +702,7 @@ const NuevoServicio: React.FC = () => {
             </div>
             <div>
               <label className="block text-sm font-medium">
-                Precio de Carga
+                Precio de Carga ($US)
               </label>
               <input
                 type="number"
@@ -691,25 +754,36 @@ const NuevoServicio: React.FC = () => {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium">N° de Folio *</label>
+              <label className="block text-sm font-medium">ETA *</label>
               <input
-                type="number"
+                type="date"
                 className="input"
-                value={form.folio}
-                onChange={upd("folio")}
+                value={formatDateOnly(form.eta)}
+                onChange={upd("eta")}
                 required
               />
             </div>
             <div>
               <label className="block text-sm font-medium">
-                Fecha de Folio *
+                N° de Folio {form.tipoOperacion === 1 && "*"}
+              </label>
+              <input
+                type="number"
+                className="input"
+                value={form.folio}
+                onChange={upd("folio")}
+                required={form.tipoOperacion === 1}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">
+                Fecha de Folio
               </label>
               <input
                 type="date"
                 className="input"
                 value={formatDateOnly(form.fechaFolio)}
                 onChange={upd("fechaFolio")}
-                required
               />
             </div>
             {form.tipoContenedor != 11 && (
@@ -813,7 +887,12 @@ const NuevoServicio: React.FC = () => {
         {puntos.map((p, idx) => {
           const prev = estadosPrevios[idx];
           let acciones: Item[] = [];
-          let lugaresPuntos: Lugar[] = [];
+          const idGrupoSeleccionado = grupoPuntos[idx] || 0;
+          const lugaresPuntos = mockCatalogos.Lugares.filter(
+            (a) =>
+              (a.cliente === form.cliente || a.cliente === undefined) &&
+              a.idGrupo === idGrupoSeleccionado
+          );
           // rawMinEta siempre string en formato "YYYY-MM-DDTHH:mm"
           const rawMinEta: string | undefined =
             idx === 0
@@ -826,11 +905,6 @@ const NuevoServicio: React.FC = () => {
               ? rawMinEta
               : `${rawMinEta}T00:00`
             : undefined;
-
-          // Filtramos lugares igual en todos los casos
-          lugaresPuntos = mockCatalogos.Lugares.filter(
-            (a) => a.cliente === form.cliente || a.cliente === undefined
-          );
 
           // Si es LCL / Maquinaria (código 11), ajustamos acciones según prev
           if (form.tipoContenedor === 11) {
@@ -906,8 +980,37 @@ const NuevoServicio: React.FC = () => {
 
               {/* Campos del punto */}
               <div className="grid grid-cols-4 gap-4 flex-grow">
-                {/* Lugar */}
-                <div>
+                {/* selector de grupo */}
+                <div className="w-full pr-2">
+                  <label className="block text-sm font-medium mb-1">
+                    Grupo *
+                  </label>
+                  <select
+                    className="input w-full"
+                    value={idGrupoSeleccionado}
+                    onChange={(e) => {
+                      const nuevo = Number(e.target.value);
+                      setGrupoPuntos((g) => {
+                        const copy = [...g];
+                        copy[idx] = nuevo;
+                        return copy;
+                      });
+                      // resetear lugar al cambiar grupo
+                      updatePunto(idx, "idLugar", 0);
+                    }}
+                    required
+                  >
+                    <option value={0}>— Selecciona grupo —</option>
+                    {mockCatalogos.GrupoLugares.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* lugar filtrado por grupo */}
+                <div className="w-full">
                   <label className="block text-sm font-medium mb-1">
                     Lugar del Punto {idx + 1} *
                   </label>
@@ -916,15 +1019,9 @@ const NuevoServicio: React.FC = () => {
                     value={
                       lugaresPuntos.find((l) => l.id === p.idLugar) || null
                     }
-                    onChange={(sel) => {
-                      if (sel) {
-                        updatePunto(idx, "idLugar", sel.id);
-                      } else {
-                        // si deseleccionas (sel===null), recupera último valor o deja vacío:
-                        const last = p.idLugar;
-                        updatePunto(idx, "idLugar", last);
-                      }
-                    }}
+                    onChange={(sel) =>
+                      sel && updatePunto(idx, "idLugar", sel.id)
+                    }
                     getOptionLabel={(l) => l.nombre}
                     placeholder="Buscar lugar..."
                   />
@@ -948,10 +1045,10 @@ const NuevoServicio: React.FC = () => {
                   </select>
                 </div>
 
-                {/* ETA */}
+                {/* Fecha agendada */}
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    ETA *
+                    Fecha agendada *
                   </label>
                   <input
                     type="datetime-local"

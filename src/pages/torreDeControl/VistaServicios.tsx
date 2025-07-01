@@ -12,6 +12,8 @@ import {
   Payload,
   mockCatalogos,
   EstadoServicio,
+  Cliente,
+  Lugar
 } from "../../utils/ServiceDrafts";
 import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
 
@@ -24,6 +26,7 @@ interface ServiceRow {
   tipo: string;
   estado: string;
   raw: Payload;
+  sortable?: boolean;
 }
 
 const columns: Column<ServiceRow>[] = [
@@ -69,7 +72,9 @@ const VistaServicios: React.FC = () => {
     // lookup genéricos
     const lookup = (arr: { codigo: number; nombre: string }[], code: number) =>
       arr.find((x) => x.codigo === code)?.nombre || code.toString();
-    const lookupLugar = (arr: { id: number; nombre: string }[], id: number) =>
+    const lookupLugar = (arr: Lugar[], id: number) =>
+      arr.find((x) => x.id === id)?.nombre || id.toString();
+    const lookupCliente = (arr: Cliente[], id: number) =>
       arr.find((x) => x.id === id)?.nombre || id.toString();
 
     const drafts = loadDrafts();
@@ -78,7 +83,7 @@ const VistaServicios: React.FC = () => {
     const mapped: ServiceRow[] = sent.map((p) => {
       const f = p.form;
       const tipoOp = f.tipoOperacion;
-      const clienteName = lookup(mockCatalogos.empresas, f.cliente);
+      const clienteName = lookupCliente(mockCatalogos.empresas, f.cliente);
       const origenName = lookupLugar(mockCatalogos.Lugares, f.origen);
       const destinoName = lookupLugar(mockCatalogos.Lugares, f.destino);
       const tipoName = lookup(mockCatalogos.Operación, tipoOp);

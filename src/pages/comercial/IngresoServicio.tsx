@@ -1,37 +1,33 @@
-// src/pages/IngresoServicio.tsx
-import React, { useEffect, useState, useMemo } from "react";
+// src/pages/comercial/IngresoServicio.tsx
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ListWithSearch, {
   Column,
-  DropdownOption,
   SearchFilter,
   CheckboxFilterGroup,
+  DropdownOptionsType,
+  DropdownOption
 } from "../../components/ListWithSearch";
+import { Modal } from "../../components/Modal";
 import {
-  mockCatalogos,
   loadDrafts,
   loadSent,
   deleteDraft,
   Payload,
   EstadoServicio,
   Lugar,
-  mockPaises
+  mockCatalogos,
+  mockPaises,
 } from "../../utils/ServiceDrafts";
-import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
+import {
+  importExcelFile,
+  exportToExcelFile,
+} from "../../utils/ServiceExcelMapper";
 import { ServiceRow, payloadToRow } from "../../utils/ServiceUtils";
+import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
 import { formatCLP } from "../../utils/format";
 
-// Extendemos Column para permitir un render personalizado
-interface CustomColumn<T> extends Column<T> {
-  render?: (value: any, row: T) => React.ReactNode;
-}
-// Extendemos DropdownOption para poder deshabilitar opciones
-interface CustomDropdownOption extends DropdownOption {
-  disabled?: boolean;
-}
-
-// Sólo mostramos estados pendientes o sin asignar
-
+// Definición de filtros de búsqueda
 const searchFilters: SearchFilter<ServiceRow>[] = [
   { label: "ID", key: "id", type: "text", placeholder: "Buscar ID" },
   {
@@ -48,6 +44,7 @@ const searchFilters: SearchFilter<ServiceRow>[] = [
   },
 ];
 
+// Filtros de casillas
 const checkboxFilterGroups: CheckboxFilterGroup<ServiceRow>[] = [
   {
     label: "Filtrar por estado",
@@ -56,90 +53,98 @@ const checkboxFilterGroups: CheckboxFilterGroup<ServiceRow>[] = [
   },
 ];
 
+interface CustomColumn<T> extends Column<T> {
+  render?: (value: any, row: T) => React.ReactNode;
+}
+
 const IngresoServicio: React.FC = () => {
   const navigate = useNavigate();
   const [rows, setRows] = useState<ServiceRow[]>([]);
 
+  // Estados y refs de importación
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [candidateRows, setCandidateRows] = useState<ServiceRow[]>([]);
+
+  // Refs y estados de plantilla de exportación
+  const tplInputRef = useRef<HTMLInputElement>(null);
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
+
+  // Importar Excel: abrir file picker
+  const handleImportClick = () => fileInputRef.current?.click();
+  // Al seleccionar archivo, generar payloads y abrir modal de confirmación
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const payloads = await importExcelFile(file);
+    const newRows = payloads.map(payloadToRow);
+    setCandidateRows(newRows);
+    setImportModalOpen(true);
+    e.target.value = "";
+  };
+  // Confirmar importación
+  const confirmImport = () => {
+    setRows((prev) => [...prev, ...candidateRows]);
+    setCandidateRows([]);
+    setImportModalOpen(false);
+  };
+
+  // Cambio de plantilla
+  const handleTemplateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setTemplateFile(file);
+    if (tplInputRef.current) tplInputRef.current.value = "";
+  };
+
+  // Carga inicial de datos
   useEffect(() => {
     const lookupCodigo = (
       arr: { codigo: number; nombre: string }[],
       code: number
     ) => arr.find((x) => x.codigo === code)?.nombre || code.toString();
-
     const lookupLugar = (arr: Lugar[], id: number) =>
       arr.find((x) => x.id === id)?.nombre || id.toString();
 
     const payloads: Payload[] = [...loadDrafts(), ...loadSent()];
-
     const mapped = payloads.map((p) => {
-      // Aplanar todo el Payload a primitivos + raw
-      const baseRow = payloadToRow(p);
+      const base = payloadToRow(p);
       const f = p.form;
-
-      // Reemplazar cliente (número) por nombre de empresa
-      const empresa = mockCatalogos.empresas.find(
-        (e) => e.id === f.cliente
-      );
-      baseRow.cliente = empresa ? empresa.nombre : f.cliente.toString();
-
-      // Reemplazar tipoOperacion (número) por nombre de operación
-      const operacion = mockCatalogos.Operación.find(
-        (op) => op.codigo === f.tipoOperacion
-      );
-      baseRow.tipoOperacion = operacion
-        ? operacion.nombre
-        : f.tipoOperacion.toString();
-
-      // Reemplazar pais (número) por nombre del país
-      const paisItem = mockPaises.find((p) => p.codigo === f.pais);
-      baseRow.pais = paisItem ? paisItem.nombre : f.pais.toString();
-
-      // Reemplazar tipoContenedor (número) por nombre de tipo de contenedor
-      const cont = mockCatalogos.Tipo_contenedor.find(
-        (t) => t.codigo === f.tipoContenedor
-      );
-      baseRow.tipoContenedor = cont ? cont.nombre : f.tipoContenedor.toString();
-
-      // Luego sobreescribimos origen/destino por sus nombres
-      const tipoOp = f.tipoOperacion;
-      baseRow.origen = lookupLugar(mockCatalogos.Lugares, f.origen);
-      baseRow.destino = lookupLugar(mockCatalogos.Lugares, f.destino);
-
-      // Convertimos id a string (payloadToRow deja id como number)
-      baseRow.id = p.id.toString();
-      // Agregamos fecha a partir de fechaSol
-      baseRow.fecha = f.fechaSol;
-      // Agregamos tipo legible (nombre de operación)
-      baseRow.tipo = lookupCodigo(mockCatalogos.Operación, tipoOp);
-
-      return baseRow;
+      base.cliente =
+        mockCatalogos.empresas.find((e) => e.id === f.cliente)?.nombre ||
+        f.cliente.toString();
+      base.tipoOperacion =
+        mockCatalogos.Operación.find((o) => o.codigo === f.tipoOperacion)
+          ?.nombre || f.tipoOperacion.toString();
+      base.pais =
+        mockPaises.find((pi) => pi.codigo === f.pais)?.nombre ||
+        f.pais.toString();
+      base.tipoContenedor =
+        mockCatalogos.Tipo_contenedor.find((t) => t.codigo === f.tipoContenedor)
+          ?.nombre || f.tipoContenedor.toString();
+      base.origen = lookupLugar(mockCatalogos.Lugares, f.origen);
+      base.destino = lookupLugar(mockCatalogos.Lugares, f.destino);
+      base.id = p.id.toString();
+      base.fecha = f.fechaSol;
+      base.tipo = lookupCodigo(mockCatalogos.Operación, f.tipoOperacion);
+      return base;
     });
-
-    // Filtramos sólo los estados indicados
     setRows(mapped);
   }, []);
 
-  // Generamos columnas dinámicamente según las claves de la primera fila.
-  // Usamos el operador "!" para indicar a TypeScript que rows[0] no es undefined
-  const columns: CustomColumn<ServiceRow>[] = useMemo(() => {
-    if (rows.length === 0) return [];
-
+  // Columnas con render personalizado
+  const columns = useMemo<CustomColumn<ServiceRow>[]>(() => {
+    if (!rows.length) return [];
     const sample = rows[0]!;
-    const allKeys = Object.keys(sample).filter((k) => k !== "raw");
-
-    return allKeys.map((key) => {
+    const keys = Object.keys(sample).filter((k) => k !== "raw");
+    return keys.map((key) => {
       if (key === "precioCarga") {
         return {
           label: "Precio Carga",
           key: "precioCarga",
           sortable: true,
-          render: (value: any) => {
-            const num = typeof value === "number" ? value : Number(value);
-            return formatCLP(num);
-          },
-        } as CustomColumn<ServiceRow>;
+          render: (v) => formatCLP(Number(v)),
+        };
       }
-
       if (key === "estado") {
         return {
           label: "Estado",
@@ -147,94 +152,119 @@ const IngresoServicio: React.FC = () => {
           sortable: true,
           render: (value: EstadoServicio) => (
             <span
-              className={`px-2 py-1 rounded-full text-xs font-medium ${
-                estadoStyles[value] || ""
-              } ${badgeTextColor[value] || ""}`}
+              className={`px-2 py-1 rounded-full text-xs font-medium ${estadoStyles[value]} ${badgeTextColor[value]}`}
             >
               {value}
             </span>
           ),
-        } as CustomColumn<ServiceRow>;
+        };
       }
-
-      const label = key.charAt(0).toUpperCase() + key.slice(1);
       return {
-        label,
-        key,
+        label: key.charAt(0).toUpperCase() + key.slice(1),
+        key: key as keyof ServiceRow,
         sortable: true,
-      } as CustomColumn<ServiceRow>;
+      };
     });
   }, [rows]);
 
-  const handleDelete = (row: ServiceRow) => {
-    if (!window.confirm(`¿Eliminar servicio ${row.id}?`)) return;
-    const idNum = Number(row.id);
-
-    const drafts = loadDrafts();
-    if (drafts.some((d) => d.id === idNum)) {
-      deleteDraft(idNum);
-    } else {
-      const sent = loadSent().filter((s) => s.id !== idNum);
-      localStorage.setItem("serviciosEnviados", JSON.stringify(sent));
-    }
-
-    setRows((prev) => prev.filter((r) => r.id !== row.id));
-  };
-
-  const dropdownOptions = (row: ServiceRow): CustomDropdownOption[] => {
+  // Opciones del dropdown por fila
+  const dropdownOptions: DropdownOptionsType<ServiceRow> = (row) => {
     const est = row.estado as EstadoServicio;
+    const common: DropdownOption<ServiceRow>[] = [
+      {
+        label: "Ver/Editar Servicio",
+        onClick: () => navigate(`/comercial/modificar-servicio/${row.id}`),
+      },
+      {
+        label: "Gestionar Valores",
+        onClick: () => navigate(`/comercial/gestionar-valores/${row.id}`),
+      },
+      {
+        label: "Ver Detalle",
+        onClick: () => navigate(`/detalle-servicio/${row.id}`),
+      },
+    ];
     if (["Pendiente", "Sin Asignar", "En Proceso"].includes(est)) {
       return [
-        {
-          label: "Ver/Editar Servicio",
-          onClick: () => navigate(`/comercial/modificar-servicio/${row.id}`),
-        },
-        {
-          label: "Gestionar Valores",
-          onClick: () => navigate(`/comercial/gestionar-valores/${row.id}`),
-          disabled: false,
-        },
-        {
-          label: "Eliminar",
-          onClick: () => handleDelete(row),
-          disabled: false,
-        },
-        {
-          label: "Ver Detalle",
-          onClick: () => navigate(`/detalle-servicio/${row.id}`),
-        },
+        common[0]!,
+        common[1]!,
+        { label: "Eliminar", onClick: () => handleDelete(row) },
+        common[2]!,
       ];
     }
-    if (["Por validar"].includes(est)) {
+    if (est === "Por validar") {
       return [
-        {
-          label: "Ver/Editar Servicio",
-          onClick: () => navigate(`/comercial/modificar-servicio/${row.id}`),
-        },
-        {
-          label: "Gestionar Valores",
-          onClick: () => navigate(`/comercial/gestionar-valores/${row.id}`),
-          disabled: false,
-        },
-        {
-          label: "Marcar como falso flete",
-          onClick: () => handleDelete(row),
-          disabled: false,
-        },
+        common[0]!,
+        common[1]!,
         {
           label: "Ver y completar Servicio",
           onClick: () => navigate(`/detalle-servicio/${row.id}`),
         },
       ];
-     } else {
-      return [
-        {
-          label: "Ver Detalle",
-          onClick: () => navigate(`/detalle-servicio/${row.id}`),
-        },
-      ];
     }
+    return common;
   };
+
+  // Función para eliminar
+  const handleDelete = (row: ServiceRow) => {
+    if (!window.confirm(`¿Eliminar servicio ${row.id}?`)) return;
+    const idNum = Number(row.id);
+    if (loadDrafts().some((d) => d.id === idNum)) deleteDraft(idNum);
+    else
+      localStorage.setItem(
+        "serviciosEnviados",
+        JSON.stringify(loadSent().filter((s) => s.id !== idNum))
+      );
+    setRows((prev) => prev.filter((r) => r.id !== row.id));
+  };
+
+  // Exportar Excel
+  const handleExport = async () => {
+    if (!templateFile) {
+      tplInputRef.current?.click();
+      return;
+    }
+    await exportToExcelFile(rows, templateFile, "servicios_export.xlsx");
+  };
+
+  // Botones globales (Importar/Exportar)
+  const globalButtons: React.ReactNode = (
+    <>
+      <button
+        onClick={handleImportClick}
+        className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 mr-2"
+      >
+        Importar Excel
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
+      <button
+        onClick={() => tplInputRef.current?.click()}
+        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mr-2"
+      >
+        Seleccionar plantilla
+      </button>
+      <input
+        ref={tplInputRef}
+        type="file"
+        accept=".xlsx"
+        onChange={handleTemplateChange}
+        className="hidden"
+      />
+      <button
+        onClick={handleExport}
+        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+      >
+        Exportar Excel
+      </button>
+    </>
+  );
 
   return (
     <div className="p-6 w-full">
@@ -248,14 +278,52 @@ const IngresoServicio: React.FC = () => {
         </Link>
       </div>
 
+      {/* Modal de confirmación de importación */}
+      <Modal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onConfirm={confirmImport}
+        confirmText="Confirmar Importación"
+        cancelText="Cancelar"
+      >
+        <p className="mb-4">Se ingresarán {candidateRows.length} servicios:</p>
+        <div className="overflow-auto max-h-64">
+          <table className="min-w-full table-auto border-collapse">
+            <thead>
+              <tr>
+                {columns.map((col) => (
+                  <th
+                    key={col.key as string}
+                    className="border px-2 py-1 text-left"
+                  >
+                    {col.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {candidateRows.map((r, i) => (
+                <tr key={i} className="hover:bg-gray-100">
+                  {columns.map((col) => (
+                    <td key={col.key as string} className="border px-2 py-1">
+                      {/* @ts-ignore */}
+                      {r[col.key]}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Modal>
+
+      {/* Listado con filtros y botones */}
       <ListWithSearch<ServiceRow>
         data={rows}
         columns={columns}
         searchFilters={searchFilters}
         checkboxFilterGroups={checkboxFilterGroups}
-        defaultCheckboxSelections={{
-          estado: ["Sin Asignar", "Pendiente"],
-        }}
+        defaultCheckboxSelections={{ estado: ["Sin Asignar", "Pendiente"] }}
         dropdownOptions={dropdownOptions}
         customSortOrder={{
           estado: [
@@ -273,8 +341,7 @@ const IngresoServicio: React.FC = () => {
           textMapping: badgeTextColor,
           mode: "row",
         }}
-        onDownloadExcel={() => alert("Descarga de Excel (stub)")}
-        onSearch={() => alert("Buscar (stub)")}
+        globalButtons={globalButtons}
         preferencesKey="Preferences"
       />
     </div>

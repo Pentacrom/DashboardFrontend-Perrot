@@ -9,6 +9,7 @@ import {
   ValorFactura,
   valoresPorDefecto,
 } from "../utils/ServiceDrafts";
+import { formatDateTimeLocal } from "../utils/format";
 
 interface Discount {
   id: string;
@@ -89,7 +90,7 @@ const AgregarValoresServicio: React.FC = () => {
       codigo: "",
       montoVenta: 0,
       montoCosto: 0,
-      fechaEmision: new Date().toISOString().slice(0, 10),
+      fechaEmision: new Date(),
       tipo: "venta",
       descuentoPorcentaje: [],
     };
@@ -277,35 +278,38 @@ const AgregarValoresServicio: React.FC = () => {
               {/* Concepto */}
               <div>
                 <label className="block text-sm font-medium">Concepto</label>
-                <select
+                <input
+                  list={`conceptos-${v.id}`}
                   className="input mt-1"
-                  value={v.codigo || ""}
+                  value={v.concepto}
                   onChange={(e) => {
-                    const sel = e.target.value;
-                    if (!sel) {
-                      actualizarValor(v.id, "codigo", "");
-                      actualizarValor(v.id, "concepto", "");
-                      actualizarValor(v.id, "montoVenta", 0);
-                      actualizarValor(v.id, "montoCosto", 0);
-                      setDescPorValor((d) => ({ ...d, [v.id]: [] }));
-                    } else {
-                      const def = valoresPorDefecto[sel];
-                      if (!def) return;
-                      actualizarValor(v.id, "codigo", sel);
-                      actualizarValor(v.id, "concepto", def.concepto);
+                    const val = e.target.value;
+                    // 1) actualizamos el texto del concepto
+                    actualizarValor(v.id, "concepto", val);
+
+                    // 2) si coincide con uno de los predefinidos, cargamos sus montos
+                    const found = Object.entries(valoresPorDefecto).find(
+                      ([, def]) => def.concepto === val
+                    );
+                    if (found) {
+                      const [key, def] = found as [
+                        string,
+                        (typeof valoresPorDefecto)[string]
+                      ];
+                      actualizarValor(v.id, "codigo", key);
                       actualizarValor(v.id, "montoVenta", def.montoVenta);
                       actualizarValor(v.id, "montoCosto", def.montoCosto);
-                      // conservamos descuentos previos
+                    } else {
+                      // si no, dejamos el código vacío para saber que es custom
+                      actualizarValor(v.id, "codigo", "");
                     }
                   }}
-                >
-                  <option value="">-- elige concepto --</option>
+                />
+                <datalist id={`conceptos-${v.id}`}>
                   {Object.entries(valoresPorDefecto).map(([key, def]) => (
-                    <option key={key} value={key}>
-                      {def.concepto}
-                    </option>
+                    <option key={key} value={def.concepto} />
                   ))}
-                </select>
+                </datalist>
               </div>
 
               {/* Venta */}
@@ -342,19 +346,6 @@ const AgregarValoresServicio: React.FC = () => {
                       "montoCosto",
                       parseFloat(e.target.value) || 0
                     )
-                  }
-                />
-              </div>
-
-              {/* Fecha Emisión */}
-              <div>
-                <label className="block text-sm font-medium">Fecha</label>
-                <input
-                  type="date"
-                  className="input mt-1"
-                  value={v.fechaEmision}
-                  onChange={(e) =>
-                    actualizarValor(v.id, "fechaEmision", e.target.value)
                   }
                 />
               </div>

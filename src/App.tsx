@@ -24,6 +24,7 @@ import SeguimientoServicio from "./pages/torreDeControl/SeguimientoServicio";
 import AsignarChoferMovil from "./pages/operaciones/AsignarChoferMovil";
 import Profile from "./pages/Profile"
 import AdministrarCuentas from "./pages/AdministrarCuentas"
+import AdministrarDatos from "./pages/MockCatalogManagerPanel";
 
 // Inicio de sesión
 import InicioSesion from "./pages/InicioSesion";
@@ -133,6 +134,11 @@ function App() {
                       <Route
                         path="/admin/cuentas"
                         element={<AdministrarCuentas />}
+                      />
+
+                      <Route
+                        path="/admin/datos"
+                        element={<AdministrarDatos />}
                       />
                       <Route path="/profile" element={<Profile />} />
                     </Routes>

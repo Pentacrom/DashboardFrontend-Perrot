@@ -6,6 +6,12 @@ export interface Item {
   nombre: string;
 }
 
+export interface GrupoLugar {
+  id: number;
+  nombre: string;
+  descripcion: string;
+}
+
 export interface Lugar {
   id: number;
   nombre: string;
@@ -22,6 +28,7 @@ export interface Cliente {
 export interface Catalogos {
   Operación: Item[];
   Zona: Item[];
+  GrupoLugares: GrupoLugar[];
   Lugares: Lugar[];
   Tipo_contenedor: Item[];
   acciones: Item[];
@@ -76,6 +83,8 @@ export interface FormState {
   tipoServicio: number;
   folio: number;
   fechaFolio: Date;
+  eta: Date;
+  ejecutivo?: string;
 }
 
 export type EstadoServicio =
@@ -132,16 +141,48 @@ export const mockCatalogos: Catalogos = {
     { codigo: 2, nombre: "CENTRO" },
     { codigo: 3, nombre: "NORTE" },
   ],
-  Lugares: [
+  GrupoLugares: [
+    { id: 7, nombre: "Proveedores", descripcion: "Proveedores" },
+    { id: 8, nombre: "Centros", descripcion: "Centros" },
+  ],
+  Lugares : [
     { id: 1, nombre: "SAI", tipo: "Zona Portuaria" },
     { id: 2, nombre: "VAP", tipo: "Zona Portuaria" },
     { id: 3, nombre: "CNL", tipo: "Zona Portuaria" },
     { id: 4, nombre: "LQN", tipo: "Zona Portuaria" },
     { id: 5, nombre: "SVE", tipo: "Zona Portuaria" },
     { id: 6, nombre: "SCL", tipo: "Zona Portuaria" },
+  
+    // Muelle Norte/Sur (SAI)
+    { id: 101, nombre: "Muelle Norte SAI", tipo: "Zona Portuaria" },
+    { id: 102, nombre: "Muelle Sur SAI", tipo: "Zona Portuaria" },
+  
+    // Muelle Este/Oeste (VAP)
+    { id: 103, nombre: "Muelle Este VAP", tipo: "Zona Portuaria" },
+    { id: 104, nombre: "Muelle Oeste VAP", tipo: "Zona Portuaria" },
+  
+    // Muelle Central/Exterior (CNL)
+    { id: 105, nombre: "Muelle Central CNL", tipo: "Zona Portuaria" },
+    { id: 106, nombre: "Muelle Exterior CNL", tipo: "Zona Portuaria" },
+  
+    // Muelle Alto/Bajo (LQN)
+    { id: 107, nombre: "Muelle Alto LQN", tipo: "Zona Portuaria" },
+    { id: 108, nombre: "Muelle Bajo LQN", tipo: "Zona Portuaria" },
+  
+    // Muelle Este/Oeste (SVE)
+    { id: 109, nombre: "Muelle Este SVE", tipo: "Zona Portuaria" },
+    { id: 110, nombre: "Muelle Oeste SVE", tipo: "Zona Portuaria" },
+  
+    // Muelle Norte/Sur (SCL)
+    { id: 111, nombre: "Muelle Norte SCL", tipo: "Zona Portuaria" },
+    { id: 112, nombre: "Muelle Sur SCL", tipo: "Zona Portuaria" },
+  
+    // Proveedores
     { id: 10, nombre: "Proveedor 1", tipo: "Proveedor" },
     { id: 11, nombre: "Proveedor 2", tipo: "Proveedor" },
     { id: 12, nombre: "Proveedor 3", tipo: "Proveedor" },
+  
+    // Centros
     { id: 13, nombre: "Centro A", tipo: "Centro", cliente: 1 },
     { id: 14, nombre: "Centro B", tipo: "Centro", cliente: 1 },
     { id: 15, nombre: "Centro C", tipo: "Centro", cliente: 2 },
@@ -219,16 +260,6 @@ export const mockPaises: Item[] = [
   { codigo: 3, nombre: "Perú" },
 ];
 
-// Formateo de fechas a HH:mm dd/MM/yyyy
-export function formatFechaISO(iso: string): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(
-    d.getMonth() + 1
-  )}/${d.getFullYear()}`;
-}
-
 // Implementación de funciones de almacenamiento y migración
 const STORAGE = {
   borradores: "serviciosBorradores",
@@ -244,88 +275,50 @@ export interface ValorPorDefecto {
   montoVenta: number;
   montoCosto: number;
   aplicaA: "punto" | "servicio";
+  condicion?: (p: Punto) => boolean;
 }
 
 export const valoresPorDefecto: Record<number | string, ValorPorDefecto> = {
   1: {
-    concepto: "Retiro de container vacío",
-    montoVenta: 60000,
-    montoCosto: 10000,
-    aplicaA: "punto",
-  },
-  2: {
-    concepto: "Retiro de container cargado",
-    montoVenta: 80000,
-    montoCosto: 12000,
-    aplicaA: "punto",
-  },
-  3: {
-    concepto: "Entrega de container vacío",
-    montoVenta: 50000,
-    montoCosto: 9000,
-    aplicaA: "punto",
-  },
-  4: {
-    concepto: "Entrega de container cargado",
-    montoVenta: 75000,
-    montoCosto: 13000,
-    aplicaA: "punto",
-  },
-  5: {
-    concepto: "Almacenaje de contenido",
-    montoVenta: 55000,
-    montoCosto: 8000,
-    aplicaA: "punto",
-  },
-  6: {
-    concepto: "Llenado de container",
-    montoVenta: 65000,
-    montoCosto: 11000,
-    aplicaA: "punto",
-  },
-  7: {
-    concepto: "Vaciado de container",
-    montoVenta: 63000,
-    montoCosto: 10500,
-    aplicaA: "punto",
-  },
-  8: {
     concepto: "Servicio de porteo",
     montoVenta: 40000,
     montoCosto: 7000,
     aplicaA: "punto",
+    condicion: (p) => p.accion === 8,
   },
-  9: {
+  2: {
     concepto: "Servicio de almacenaje",
     montoVenta: 35000,
     montoCosto: 6000,
     aplicaA: "punto",
+    condicion: (p) => p.accion === 9,
   },
-  doc: {
+  3: {
     concepto: "Gestión documental",
     montoVenta: 15000,
     montoCosto: 3000,
     aplicaA: "servicio",
   },
-  mon: {
+  4: {
     concepto: "Monitoreo 24/7",
     montoVenta: 18000,
     montoCosto: 4000,
     aplicaA: "servicio",
   },
-  track: {
+  5: {
     concepto: "Tracking GPS",
     montoVenta: 10000,
     montoCosto: 2500,
     aplicaA: "servicio",
   },
-  seg: {
-    concepto: "Seguro de carga",
+  6: {
+    concepto: "Resguardo de carga",
     montoVenta: 12000,
     montoCosto: 3500,
     aplicaA: "servicio",
+    condicion: (p) => p.accion === 10,
   },
-  com: {
+  7: {
     concepto: "Comisión administrativa",
     montoVenta: 8000,
     montoCosto: 2000,

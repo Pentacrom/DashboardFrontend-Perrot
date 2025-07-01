@@ -12,6 +12,21 @@ export function formatCLP(value: number): string {
   }).format(Math.round(value));
 }
 
+// Formateo de fechas a HH:mm dd/MM/yyyy
+export function formatFechaISO(iso: string | Date): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => n.toString().padStart(2, "0");
+
+  const hh = pad(d.getHours());
+  const mm = pad(d.getMinutes());
+  const dd = pad(d.getDate());
+  const MM = pad(d.getMonth() + 1);
+  const yyyy = d.getFullYear();
+
+  return `${dd}/${MM}/${yyyy} ${hh}:${mm} `;
+}
+
 export function formatDateTimeLocal(input: Date | string | number | undefined): string {
   const d = input instanceof Date
     ? input

@@ -4,7 +4,7 @@ import { Payload, EstadoServicio } from "./ServiceDrafts";
 // 1. Ajustamos la firma de índice para que acepte también Payload.
 //    De esta forma `raw: Payload` ya no choca con el [key: string]: ...
 export interface ServiceRow {
-  [key: string]: string | number | boolean | Payload;
+  [key: string]: string | number | boolean | Payload | Date;
   raw: Payload;
 }
 

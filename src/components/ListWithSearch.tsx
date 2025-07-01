@@ -10,37 +10,16 @@ import {
 } from "react";
 import ReactDOM from "react-dom";
 
-export function formatDateTimeLocal(input: Date | string | number | undefined): string {
-  const d = input instanceof Date
-    ? input
-    : new Date(input ?? Date.now());
 
+// Formateo de fechas a HH:mm dd/MM/yyyy
+export function formatFechaISO(iso: string | Date): string {
+  if (!iso) return "";
+  const d = new Date(iso);
   const pad = (n: number) => n.toString().padStart(2, "0");
-
-  const YYYY = d.getFullYear();
-  const MM = pad(d.getMonth() + 1);
-  const DD = pad(d.getDate());
-  const hh = pad(d.getHours());
-  const mm = pad(d.getMinutes());
-
-  return `${YYYY}-${MM}-${DD}T${hh}:${mm}`;
+  return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(
+    d.getMonth() + 1
+  )}/${d.getFullYear()}`;
 }
-
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  arrayMove,
-  SortableContext,
-  useSortable,
-  horizontalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 
 export interface Column<T> {
   label: string;
@@ -71,6 +50,13 @@ export type DropdownOptionsType<T> =
   | DropdownOption<T>[]
   | ((item: T) => DropdownOption<T>[]);
 
+export interface ListButton {
+  label: string;
+  onClick: () => void;
+  className?: string; // Para color, tamaño, etc.
+  disabled?: boolean;
+}
+
 export interface ListWithSearchProps<T> {
   data: T[];
   columns?: Column<T>[];
@@ -81,7 +67,6 @@ export interface ListWithSearchProps<T> {
   onDownloadExcel?: () => void;
   onSearch?: () => void;
   searchButtonDisabled?: boolean;
-  showExcelButton?: boolean;
   colorConfig?: {
     field: keyof T;
     bgMapping: Record<string, string>;
@@ -92,11 +77,12 @@ export interface ListWithSearchProps<T> {
   filterTitle?: string;
   tableTitle?: string;
   globalButtons?: React.ReactNode;
-  customButtons?: (item: T) => React.ReactNode[];
+  customButtons?: (item: T) => React.ReactNode[]; // Botones de celda, NO botones de la vista general
   customSortOrder?: Partial<Record<keyof T, T[keyof T][]>>;
   defaultSortKey?: keyof T;
   defaultSortOrder?: "asc" | "desc";
   preferencesKey?: string;
+  buttons?: ListButton[]; // Botones de vista general
 }
 
 export interface ListPreferences<T> {
@@ -126,7 +112,6 @@ function ListWithSearchInner<T extends Record<string, any>>(
     onDownloadExcel,
     onSearch,
     searchButtonDisabled = false,
-    showExcelButton = false,
     colorConfig,
     dropdownOptions = [],
     filterTitle,
@@ -138,6 +123,7 @@ function ListWithSearchInner<T extends Record<string, any>>(
     defaultSortOrder,
     defaultCheckboxSelections,
     preferencesKey,
+    buttons
   } = props;
 
   const dateKeys = useMemo(
@@ -542,8 +528,9 @@ function ListWithSearchInner<T extends Record<string, any>>(
                       {group.options.map((option, idx) => (
                         <label
                           key={option}
-                          className={`flex items-center text-sm text-gray-700 ${idx > 0 ? "pt-1" : ""
-                            }`}
+                          className={`flex items-center text-sm text-gray-700 ${
+                            idx > 0 ? "pt-1" : ""
+                          }`}
                         >
                           <input
                             type="checkbox"
@@ -586,13 +573,22 @@ function ListWithSearchInner<T extends Record<string, any>>(
             >
               Buscar
             </button>
-            {showExcelButton && onDownloadExcel && (
-              <button
-                onClick={onDownloadExcel}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-              >
-                Descargar Informe en Excel
-              </button>
+            {buttons && buttons.length > 0 && (
+              <div className="flex justify-end items-center space-x-2 mb-4">
+                {buttons.map((btn, idx) => (
+                  <button
+                    key={idx}
+                    onClick={btn.onClick}
+                    className={
+                      btn.className ||
+                      "px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                    }
+                    disabled={btn.disabled}
+                  >
+                    {btn.label}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -698,8 +694,9 @@ function ListWithSearchInner<T extends Record<string, any>>(
                       <th
                         key={col.key as string}
                         onClick={() => col.sortable && handleSort(col.key)}
-                        className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase ${col.sortable ? "hover:text-gray-700" : ""
-                          }`}
+                        className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase ${
+                          col.sortable ? "hover:text-gray-700" : ""
+                        }`}
                       >
                         {col.label}
                         {col.sortable && renderSortIndicator(col.key)}
@@ -708,13 +705,13 @@ function ListWithSearchInner<T extends Record<string, any>>(
                     .concat(
                       extraColumnVisible
                         ? [
-                          <th
-                            key="actions"
-                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                          >
-                            Acciones
-                          </th>,
-                        ]
+                            <th
+                              key="actions"
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                            >
+                              Acciones
+                            </th>,
+                          ]
                         : []
                     )}
                 </tr>
@@ -747,13 +744,20 @@ function ListWithSearchInner<T extends Record<string, any>>(
 
                           const displayValue =
                             isDateObj || isIsoString
-                              ? formatDateTimeLocal(raw as any).replace("T", " ")
+                              ? formatFechaISO(raw as any).replace("T", " ")
                               : String(raw);
 
                           // Ahora aplicamos colorConfig o simplemente mostramos el valor
-                          if (colorConfig && colorConfig.mode === "cell" && col.key === colorConfig.field) {
+                          if (
+                            colorConfig &&
+                            colorConfig.mode === "cell" &&
+                            col.key === colorConfig.field
+                          ) {
                             return (
-                              <td key={col.key as string} className="px-6 py-4 whitespace-nowrap">
+                              <td
+                                key={col.key as string}
+                                className="px-6 py-4 whitespace-nowrap"
+                              >
                                 <span
                                   className={`
                         ${colorConfig.bgMapping[displayValue] || ""}
@@ -768,7 +772,10 @@ function ListWithSearchInner<T extends Record<string, any>>(
                           }
 
                           return (
-                            <td key={col.key as string} className="px-6 py-4 whitespace-nowrap">
+                            <td
+                              key={col.key as string}
+                              className="px-6 py-4 whitespace-nowrap"
+                            >
                               {displayValue}
                             </td>
                           );
@@ -776,77 +783,77 @@ function ListWithSearchInner<T extends Record<string, any>>(
                         .concat(
                           extraColumnVisible
                             ? [
-                              <td
-                                key="actions"
-                                className="px-6 py-4 whitespace-nowrap relative"
-                              >
-                                {headerDropdownVisible &&
-                                  rowOptions.length > 0 && (
-                                    <button
-                                      ref={(el) => {
-                                        dropdownButtonRefs.current[idx] = el;
-                                      }}
-                                      onClick={() =>
-                                        setOpenDropdownRow((prev) =>
-                                          prev === idx ? null : idx
-                                        )
-                                      }
-                                      className="p-2 rounded hover:bg-gray-200"
-                                    >
-                                      ⋮
-                                    </button>
-                                  )}
-                                {customButtonsProvided &&
-                                  customButtons(item).map((btn, index) => (
-                                    <span
-                                      key={index}
-                                      className="ml-2 inline-block"
-                                    >
-                                      {btn}
-                                    </span>
-                                  ))}
-                                {headerDropdownVisible &&
-                                  openDropdownRow === idx &&
-                                  dropdownButtonRefs.current[idx] &&
-                                  ReactDOM.createPortal(
-                                    <div
-                                      ref={dropdownRef}
-                                      className="bg-white border rounded shadow-lg z-50 flex flex-col"
-                                      style={{
-                                        position: "fixed",
-                                        top: Math.min(
-                                          dropdownButtonRefs.current[
-                                            idx
-                                          ]!.getBoundingClientRect().bottom +
-                                          4,
-                                          window.innerHeight - 200
-                                        ),
-                                        left: Math.min(
-                                          dropdownButtonRefs.current[
-                                            idx
-                                          ]!.getBoundingClientRect().left,
-                                          window.innerWidth - 192
-                                        ),
-                                        width: "12rem",
-                                      }}
-                                    >
-                                      {rowOptions.map((option, dIdx) => (
-                                        <button
-                                          key={dIdx}
-                                          onClick={() => {
-                                            option.onClick(item!);
-                                            setOpenDropdownRow(null);
-                                          }}
-                                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                        >
-                                          {option.label}
-                                        </button>
-                                      ))}
-                                    </div>,
-                                    document.body
-                                  )}
-                              </td>,
-                            ]
+                                <td
+                                  key="actions"
+                                  className="px-6 py-4 whitespace-nowrap relative"
+                                >
+                                  {headerDropdownVisible &&
+                                    rowOptions.length > 0 && (
+                                      <button
+                                        ref={(el) => {
+                                          dropdownButtonRefs.current[idx] = el;
+                                        }}
+                                        onClick={() =>
+                                          setOpenDropdownRow((prev) =>
+                                            prev === idx ? null : idx
+                                          )
+                                        }
+                                        className="p-2 rounded hover:bg-gray-200"
+                                      >
+                                        ⋮
+                                      </button>
+                                    )}
+                                  {customButtonsProvided &&
+                                    customButtons(item).map((btn, index) => (
+                                      <span
+                                        key={index}
+                                        className="ml-2 inline-block"
+                                      >
+                                        {btn}
+                                      </span>
+                                    ))}
+                                  {headerDropdownVisible &&
+                                    openDropdownRow === idx &&
+                                    dropdownButtonRefs.current[idx] &&
+                                    ReactDOM.createPortal(
+                                      <div
+                                        ref={dropdownRef}
+                                        className="bg-white border rounded shadow-lg z-50 flex flex-col"
+                                        style={{
+                                          position: "fixed",
+                                          top: Math.min(
+                                            dropdownButtonRefs.current[
+                                              idx
+                                            ]!.getBoundingClientRect().bottom +
+                                              4,
+                                            window.innerHeight - 200
+                                          ),
+                                          left: Math.min(
+                                            dropdownButtonRefs.current[
+                                              idx
+                                            ]!.getBoundingClientRect().left,
+                                            window.innerWidth - 192
+                                          ),
+                                          width: "12rem",
+                                        }}
+                                      >
+                                        {rowOptions.map((option, dIdx) => (
+                                          <button
+                                            key={dIdx}
+                                            onClick={() => {
+                                              option.onClick(item!);
+                                              setOpenDropdownRow(null);
+                                            }}
+                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                          >
+                                            {option.label}
+                                          </button>
+                                        ))}
+                                      </div>,
+                                      document.body
+                                    )}
+                                </td>,
+                              ]
                             : []
                         )}
                     </tr>
@@ -897,10 +904,11 @@ function ListWithSearchInner<T extends Record<string, any>>(
               return (
                 <button
                   key={page}
-                  className={`px-3 py-1 border rounded ${page === currentPage
-                    ? "bg-blue-600 text-white"
-                    : "hover:bg-gray-200"
-                    }`}
+                  className={`px-3 py-1 border rounded ${
+                    page === currentPage
+                      ? "bg-blue-600 text-white"
+                      : "hover:bg-gray-200"
+                  }`}
                   onClick={() => setCurrentPage(page)}
                 >
                   {page}
