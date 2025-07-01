@@ -71,6 +71,7 @@ const NuevoServicio: React.FC = () => {
   const { userName } = useContext(AuthContext);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [subgrupoPuntos, setSubgrupoPuntos] = useState<number[]>([]);
 
   // Función común para procesar FileList
   const processFiles = useCallback((files: FileList) => {
@@ -83,18 +84,14 @@ const NuevoServicio: React.FC = () => {
 
   // Sincronizador de grupo de lugares
   useEffect(() => {
-    setGrupoPuntos(
-      puntos.map((p, i) => {
-        // Si ya había group guardado, lo mantenemos
-        return (
-          grupoPuntos[i] ??
-          // si el punto ya tiene un lugar, inferimos su grupo:
-          mockCatalogos.Lugares.find((l) => l.id === p.idLugar)?.idGrupo ??
-          0
-        );
+    setSubgrupoPuntos(
+      puntos.map((p) => {
+        const lugar = mockCatalogos.Lugares.find((l) => l.id === p.idLugar);
+        return lugar?.parentId ?? 0;
       })
     );
   }, [puntos]);
+
 
   useEffect(() => {
     //clearAllServiciosCache();
@@ -933,6 +930,17 @@ const NuevoServicio: React.FC = () => {
               );
             }
           }
+
+          // grupo actual (id de GrupoLugares)
+          const idGrupoSeleccionado = grupoPuntos[idx] || 0;
+          // raíces: los lugares de primer nivel de ese grupo
+          const rootLugares = mockCatalogos.Lugares.filter(
+            (l) => l.idGrupo === idGrupoSeleccionado && !l.parentId
+          );
+          // sublugares: los que tengan parentId igual al subgrupo seleccionado
+          const subLugares = mockCatalogos.Lugares.filter(
+            (l) => l.parentId === subgrupoPuntos[idx]
+          );
 
           return (
             <div

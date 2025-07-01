@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-    
+
 // Interfaces
 export interface Item {
   codigo: number;
@@ -17,6 +17,7 @@ export interface Lugar {
   nombre: string;
   tipo: TipoLugar;
   cliente?: number;
+  parentId?: number;
 }
 
 export interface Cliente {
@@ -145,43 +146,61 @@ export const mockCatalogos: Catalogos = {
     { id: 7, nombre: "Proveedores", descripcion: "Proveedores" },
     { id: 8, nombre: "Centros", descripcion: "Centros" },
   ],
-  Lugares : [
+  Lugares: [
     { id: 1, nombre: "SAI", tipo: "Zona Portuaria" },
     { id: 2, nombre: "VAP", tipo: "Zona Portuaria" },
     { id: 3, nombre: "CNL", tipo: "Zona Portuaria" },
     { id: 4, nombre: "LQN", tipo: "Zona Portuaria" },
     { id: 5, nombre: "SVE", tipo: "Zona Portuaria" },
     { id: 6, nombre: "SCL", tipo: "Zona Portuaria" },
-  
-    // Muelle Norte/Sur (SAI)
-    { id: 101, nombre: "Muelle Norte SAI", tipo: "Zona Portuaria" },
-    { id: 102, nombre: "Muelle Sur SAI", tipo: "Zona Portuaria" },
-  
-    // Muelle Este/Oeste (VAP)
-    { id: 103, nombre: "Muelle Este VAP", tipo: "Zona Portuaria" },
-    { id: 104, nombre: "Muelle Oeste VAP", tipo: "Zona Portuaria" },
-  
-    // Muelle Central/Exterior (CNL)
-    { id: 105, nombre: "Muelle Central CNL", tipo: "Zona Portuaria" },
-    { id: 106, nombre: "Muelle Exterior CNL", tipo: "Zona Portuaria" },
-  
-    // Muelle Alto/Bajo (LQN)
-    { id: 107, nombre: "Muelle Alto LQN", tipo: "Zona Portuaria" },
-    { id: 108, nombre: "Muelle Bajo LQN", tipo: "Zona Portuaria" },
-  
-    // Muelle Este/Oeste (SVE)
-    { id: 109, nombre: "Muelle Este SVE", tipo: "Zona Portuaria" },
-    { id: 110, nombre: "Muelle Oeste SVE", tipo: "Zona Portuaria" },
-  
-    // Muelle Norte/Sur (SCL)
-    { id: 111, nombre: "Muelle Norte SCL", tipo: "Zona Portuaria" },
-    { id: 112, nombre: "Muelle Sur SCL", tipo: "Zona Portuaria" },
-  
+    {
+      id: 101,
+      nombre: "Muelle Norte SAI",
+      tipo: "Zona Portuaria",
+      parentId: 1,
+    },
+    { id: 102, nombre: "Muelle Sur SAI", tipo: "Zona Portuaria", parentId: 1 },
+    { id: 103, nombre: "Muelle Este VAP", tipo: "Zona Portuaria", parentId: 2 },
+    {
+      id: 104,
+      nombre: "Muelle Oeste VAP",
+      tipo: "Zona Portuaria",
+      parentId: 2,
+    },
+    {
+      id: 105,
+      nombre: "Muelle Central CNL",
+      tipo: "Zona Portuaria",
+      parentId: 3,
+    },
+    {
+      id: 106,
+      nombre: "Muelle Exterior CNL",
+      tipo: "Zona Portuaria",
+      parentId: 3,
+    },
+    { id: 107, nombre: "Muelle Alto LQN", tipo: "Zona Portuaria", parentId: 4 },
+    { id: 108, nombre: "Muelle Bajo LQN", tipo: "Zona Portuaria", parentId: 4 },
+    { id: 109, nombre: "Muelle Este SVE", tipo: "Zona Portuaria", parentId: 5 },
+    {
+      id: 110,
+      nombre: "Muelle Oeste SVE",
+      tipo: "Zona Portuaria",
+      parentId: 5,
+    },
+    {
+      id: 111,
+      nombre: "Muelle Norte SCL",
+      tipo: "Zona Portuaria",
+      parentId: 6,
+    },
+    { id: 112, nombre: "Muelle Sur SCL", tipo: "Zona Portuaria", parentId: 6 },
+
     // Proveedores
     { id: 10, nombre: "Proveedor 1", tipo: "Proveedor" },
     { id: 11, nombre: "Proveedor 2", tipo: "Proveedor" },
     { id: 12, nombre: "Proveedor 3", tipo: "Proveedor" },
-  
+
     // Centros
     { id: 13, nombre: "Centro A", tipo: "Centro", cliente: 1 },
     { id: 14, nombre: "Centro B", tipo: "Centro", cliente: 1 },
@@ -329,13 +348,11 @@ export const valoresPorDefecto: Record<number | string, ValorPorDefecto> = {
 export const imoCategorias = [
   {
     code: 1,
-    label:
-      "1 – Explosivos",
+    label: "1 – Explosivos",
   },
   {
     code: 2,
-    label:
-      "2 – Gases",
+    label: "2 – Gases",
   },
   {
     code: 3,
@@ -343,33 +360,27 @@ export const imoCategorias = [
   },
   {
     code: 4,
-    label:
-      "4 – Sólidos inflamables o que emiten gases inflamables al mojarse",
+    label: "4 – Sólidos inflamables o que emiten gases inflamables al mojarse",
   },
   {
     code: 5,
-    label:
-      "5 – Sustancias comburentes y peróxidos orgánicos",
+    label: "5 – Sustancias comburentes y peróxidos orgánicos",
   },
   {
     code: 6,
-    label:
-      "6 – Sustancias tóxicas e infecciosas",
+    label: "6 – Sustancias tóxicas e infecciosas",
   },
   {
     code: 7,
-    label:
-      "7 – Material radiactivo",
+    label: "7 – Material radiactivo",
   },
   {
     code: 8,
-    label:
-      "8 – Sustancias corrosivas",
+    label: "8 – Sustancias corrosivas",
   },
   {
     code: 9,
-    label:
-      "9 – Sustancias y objetos peligrosos diversos",
+    label: "9 – Sustancias y objetos peligrosos diversos",
   },
 ];
 
@@ -411,9 +422,7 @@ export function clearLegacyDraft(): void {
 
 function reviver(key: string, value: any) {
   if (
-    (key === "fechaSol" ||
-     key === "fechaIng" ||
-     key === "fechaFolio") &&
+    (key === "fechaSol" || key === "fechaIng" || key === "fechaFolio") &&
     typeof value === "string"
   ) {
     return new Date(value);
@@ -429,7 +438,7 @@ export function loadSent(): Payload[] {
 
 export function saveOrUpdateSent(payload: Payload): void {
   const sent = loadSent();
-  const idx = sent.findIndex(p => p.id === payload.id);
+  const idx = sent.findIndex((p) => p.id === payload.id);
   if (idx >= 0) sent[idx] = payload;
   else sent.push(payload);
   localStorage.setItem(STORAGE.enviados, JSON.stringify(sent));
@@ -465,14 +474,11 @@ export const migrateAllFechas = (): void => {
     s.form.fechaSol = solDate;
     s.form.fechaIng = ingDate;
     const oldFolio =
-    s.form.fechaFolio instanceof Date
-      ? s.form.fechaFolio
-      : new Date(s.form.fechaFolio);
-  const folioDate = isNaN(oldFolio.getTime())
-    ? now
-    : oldFolio;
-  s.form.fechaFolio = folioDate;
-  
+      s.form.fechaFolio instanceof Date
+        ? s.form.fechaFolio
+        : new Date(s.form.fechaFolio);
+    const folioDate = isNaN(oldFolio.getTime()) ? now : oldFolio;
+    s.form.fechaFolio = folioDate;
 
     saveOrUpdateSent(s);
   });
@@ -485,7 +491,9 @@ const safeIso = (raw: string) =>
 
 // Helper: genera fecha aleatoria entre dos fechas
 function randomDateBetween(start: Date, end: Date): Date {
-  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+  return new Date(
+    start.getTime() + Math.random() * (end.getTime() - start.getTime())
+  );
 }
 
 /** Hook personalizado para drafts */
