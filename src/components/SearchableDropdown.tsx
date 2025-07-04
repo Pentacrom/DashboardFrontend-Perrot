@@ -47,7 +47,7 @@ export function SearchableDropdown<T extends { id: number }>(
         }}
       />
       {open && (
-        <ul className="absolute z-10 mt-1 w-full bg-white border rounded max-h-48 overflow-y-auto">
+        <ul className="absolute z-50 mt-1 w-full bg-white border rounded max-h-48 overflow-y-auto shadow-lg">
           {filtered.map((opt) => (
             <li
               key={opt.id}

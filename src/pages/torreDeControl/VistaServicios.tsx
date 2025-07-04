@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ListWithSearch, {
-  Column,
   SearchFilter,
   DropdownOption,
   DropdownOptionsType,
@@ -9,48 +8,17 @@ import ListWithSearch, {
 import {
   loadDrafts,
   loadSent,
-  Payload,
   mockCatalogos,
   EstadoServicio,
   Cliente,
   Lugar
 } from "../../utils/ServiceDrafts";
+import { 
+  ServiceRow, 
+  getServiceColumnsWithRender, 
+  defaultColumnConfigs 
+} from "../../utils/ServiceColumns";
 import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
-
-interface ServiceRow {
-  id: string;
-  cliente: string;
-  origen: string;
-  destino: string;
-  fecha: string;
-  tipo: string;
-  estado: string;
-  raw: Payload;
-  sortable?: boolean;
-}
-
-const columns: Column<ServiceRow>[] = [
-  { label: "ID", key: "id", sortable: true },
-  { label: "Cliente", key: "cliente", sortable: true },
-  { label: "Origen", key: "origen", sortable: true },
-  { label: "Destino", key: "destino", sortable: true },
-  { label: "Fecha", key: "fecha", sortable: true },
-  { label: "Tipo", key: "tipo", sortable: true },
-  {
-    label: "Estado",
-    key: "estado",
-    sortable: true,
-    render: (value: string) => (
-      <span
-        className={`px-2 py-1 rounded-full text-xs font-medium ${
-          estadoStyles[value as EstadoServicio] || ""
-        } ${badgeTextColor[value as EstadoServicio] || ""}`}
-      >
-        {value}
-      </span>
-    ),
-  },
-];
 
 const searchFilters: SearchFilter<ServiceRow>[] = [
   { label: "ID", key: "id", type: "text", placeholder: "Buscar ID" },
@@ -82,20 +50,44 @@ const VistaServicios: React.FC = () => {
 
     const mapped: ServiceRow[] = sent.map((p) => {
       const f = p.form;
-      const tipoOp = f.tipoOperacion;
       const clienteName = lookupCliente(mockCatalogos.empresas, f.cliente);
       const origenName = lookupLugar(mockCatalogos.Lugares, f.origen);
       const destinoName = lookupLugar(mockCatalogos.Lugares, f.destino);
-      const tipoName = lookup(mockCatalogos.Operación, tipoOp);
+      const tipoName = lookup(mockCatalogos.Operación, f.tipoOperacion);
+      const paisName = mockCatalogos.Zona.find(z => z.codigo === f.pais)?.nombre || "";
+      const tipoContenedorName = mockCatalogos.Tipo_contenedor.find(tc => tc.codigo === f.tipoContenedor)?.nombre || "";
 
       return {
         id: p.id.toString(),
         cliente: clienteName,
+        tipoOperacion: tipoName,
         origen: origenName,
         destino: destinoName,
-        fecha: f.fechaSol,
+        fecha: f.fechaSol && f.fechaSol instanceof Date ? f.fechaSol.toISOString() : "",
         tipo: tipoName,
         estado: p.estado,
+        pais: paisName,
+        tipoContenedor: tipoContenedorName,
+        kilos: f.kilos,
+        precioCarga: f.precioCarga,
+        temperatura: f.temperatura,
+        guiaDeDespacho: f.guiaDeDespacho,
+        tarjeton: f.tarjeton,
+        nroContenedor: f.nroContenedor,
+        sello: f.sello,
+        nave: f.nave,
+        observacion: f.observacion,
+        interchange: f.interchange,
+        odv: f.odv,
+        imoCargo: f.imoCargo,
+        imoCategoria: f.imoCategoria,
+        tipoServicio: f.tipoServicio,
+        folio: f.folio,
+        fechaFolio: f.fechaFolio && f.fechaFolio instanceof Date ? f.fechaFolio.toISOString() : "",
+        eta: f.eta && f.eta instanceof Date ? f.eta.toISOString() : "",
+        ejecutivo: f.ejecutivo || "",
+        chofer: p.chofer,
+        movil: p.movil,
         raw: p,
       };
     });
@@ -136,7 +128,8 @@ const VistaServicios: React.FC = () => {
 
       <ListWithSearch<ServiceRow>
         data={rows}
-        columns={columns}
+        columns={getServiceColumnsWithRender()}
+        defaultVisibleColumns={defaultColumnConfigs.torreDeControl}
         searchFilters={searchFilters}
         checkboxFilterGroups={estadoCheckboxFilter}
         defaultCheckboxSelections={{
@@ -149,7 +142,6 @@ const VistaServicios: React.FC = () => {
           textMapping: badgeTextColor,
           mode: "row",
         }}
-        onDownloadExcel={() => alert("Descarga de Excel (stub)")}
         onSearch={() => alert("Buscar (stub)")}
         customSortOrder={{
           estado: [
@@ -163,7 +155,7 @@ const VistaServicios: React.FC = () => {
         }}
         defaultSortKey="estado"
         defaultSortOrder="asc"
-        preferencesKey="torre"
+        preferencesKey="torreDeControl-servicios"
       />
     </div>
   );

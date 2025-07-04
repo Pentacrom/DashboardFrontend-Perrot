@@ -18,7 +18,6 @@ import {
   Descuento,
   imoCategorias,
   Cliente,
-  GrupoLugar,
 } from "../utils/ServiceDrafts";
 import { AuthContext } from "../context/AuthContext";
 import { MoreVertical } from "lucide-react";
@@ -66,12 +65,10 @@ const NuevoServicio: React.FC = () => {
     fechaFolio: new Date(),
     eta: new Date(),
   });
-  const [grupoPuntos, setGrupoPuntos] = useState<number[]>([]);
   const [puntos, setPuntos] = useState<Punto[]>([]);
   const { userName } = useContext(AuthContext);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [subgrupoPuntos, setSubgrupoPuntos] = useState<number[]>([]);
 
   // Función común para procesar FileList
   const processFiles = useCallback((files: FileList) => {
@@ -82,15 +79,6 @@ const NuevoServicio: React.FC = () => {
     }));
   }, []);
 
-  // Sincronizador de grupo de lugares
-  useEffect(() => {
-    setSubgrupoPuntos(
-      puntos.map((p) => {
-        const lugar = mockCatalogos.Lugares.find((l) => l.id === p.idLugar);
-        return lugar?.parentId ?? 0;
-      })
-    );
-  }, [puntos]);
 
 
   useEffect(() => {
@@ -238,21 +226,51 @@ const NuevoServicio: React.FC = () => {
 
   // Agregar punto al final
   const addPunto = useCallback(() => {
-    setPuntos((p) => [
-      ...p,
-      { idLugar: 0, accion: 0, estado: 1, eta: new Date() },
-    ]);
-    setGrupoPuntos((g) => [...g, 0]);
+    setPuntos((p) => {
+      // Calcular la primera acción disponible basada en el estado del camión
+      let defaultAccion = 0;
+      if (p.length === 0) {
+        // Primer punto: retirar container vacío o cargado
+        defaultAccion = 1; // retirar container vacío
+      } else {
+        const lastAcc = p[p.length - 1]?.accion ?? 0;
+        if ([1, 7].includes(lastAcc)) {
+          defaultAccion = 6; // llenar container
+        } else if ([2, 6, 8, 9, 11].includes(lastAcc)) {
+          defaultAccion = 7; // vaciar container
+        } else {
+          defaultAccion = 1; // default
+        }
+      }
+      
+      return [
+        ...p,
+        { idLugar: 0, accion: defaultAccion, estado: 1, eta: new Date() },
+      ];
+    });
   }, []);
 
 
   // Insertar punto antes de la posición idx
   const insertPunto = useCallback(
     (idx: number) =>
-      setPuntos((p) => [
-        ...p,
-        { idLugar: 0, accion: 0, estado: 1, eta: new Date() },
-      ]),
+      setPuntos((p) => {
+        // Calcular la primera acción disponible basada en el estado previo
+        let defaultAccion = 1;
+        if (idx > 0) {
+          const prevAcc = p[idx - 1]?.accion ?? 0;
+          if ([1, 7].includes(prevAcc)) {
+            defaultAccion = 6; // llenar container
+          } else if ([2, 6, 8, 9, 11].includes(prevAcc)) {
+            defaultAccion = 7; // vaciar container
+          }
+        }
+        
+        return [
+          ...p,
+          { idLugar: 0, accion: defaultAccion, estado: 1, eta: new Date() },
+        ];
+      }),
     []
   );
 
@@ -286,7 +304,6 @@ const NuevoServicio: React.FC = () => {
 
   const removePunto = useCallback((idx: number) => {
     setPuntos((p) => p.filter((_, i) => i !== idx));
-    setGrupoPuntos((g) => g.filter((_, i) => i !== idx));
   }, []);
 
   // Manejo de archivo para "documentoPorContenedor"
@@ -884,24 +901,17 @@ const NuevoServicio: React.FC = () => {
         {puntos.map((p, idx) => {
           const prev = estadosPrevios[idx];
           let acciones: Item[] = [];
-          const idGrupoSeleccionado = grupoPuntos[idx] || 0;
           const lugaresPuntos = mockCatalogos.Lugares.filter(
             (a) =>
-              (a.cliente === form.cliente || a.cliente === undefined) &&
-              a.idGrupo === idGrupoSeleccionado
+              // Excluir sublugares (que tienen parentId)
+              !a.parentId &&
+              (
+                (a.cliente === form.cliente || a.cliente === undefined) ||
+                (a.tipo === "Zona Portuaria") ||
+                (a.tipo === "Proveedor")
+              )
           );
-          // rawMinEta siempre string en formato "YYYY-MM-DDTHH:mm"
-          const rawMinEta: string | undefined =
-            idx === 0
-              ? form.fechaSol.toISOString().slice(0, 16)
-              : // si en el punto anterior hay eta, lo pasamos a ISO y recortamos
-                puntos[idx - 1]!.eta?.toISOString().slice(0, 16);
 
-          const minEta = rawMinEta
-            ? rawMinEta.includes("T")
-              ? rawMinEta
-              : `${rawMinEta}T00:00`
-            : undefined;
 
           // Si es LCL / Maquinaria (código 11), ajustamos acciones según prev
           if (form.tipoContenedor === 11) {
@@ -931,16 +941,23 @@ const NuevoServicio: React.FC = () => {
             }
           }
 
-          // grupo actual (id de GrupoLugares)
-          const idGrupoSeleccionado = grupoPuntos[idx] || 0;
-          // raíces: los lugares de primer nivel de ese grupo
-          const rootLugares = mockCatalogos.Lugares.filter(
-            (l) => l.idGrupo === idGrupoSeleccionado && !l.parentId
-          );
-          // sublugares: los que tengan parentId igual al subgrupo seleccionado
-          const subLugares = mockCatalogos.Lugares.filter(
-            (l) => l.parentId === subgrupoPuntos[idx]
-          );
+          // Obtener lugar seleccionado (principal o sublugar)
+          const lugarActual = mockCatalogos.Lugares.find(l => l.id === p.idLugar);
+          
+          // Determinar el lugar principal (para mostrar sublugares)
+          let lugarPrincipal = lugarActual;
+          if (lugarActual && lugarActual.parentId) {
+            // Si es un sublugar, buscar el lugar principal
+            lugarPrincipal = mockCatalogos.Lugares.find(l => l.id === lugarActual.parentId);
+          }
+          
+          // Obtener sublugares del lugar principal
+          const subLugares = lugarPrincipal && lugarPrincipal.tipo === "Zona Portuaria" 
+            ? mockCatalogos.Lugares.filter(l => l.parentId === lugarPrincipal.id)
+            : [];
+          
+          // Determinar qué sublugar está seleccionado
+          const sublugarSeleccionado = lugarActual && lugarActual.parentId ? lugarActual.id : 0;
 
           return (
             <div
@@ -988,36 +1005,7 @@ const NuevoServicio: React.FC = () => {
 
               {/* Campos del punto */}
               <div className="grid grid-cols-4 gap-4 flex-grow">
-                {/* selector de grupo */}
-                <div className="w-full pr-2">
-                  <label className="block text-sm font-medium mb-1">
-                    Grupo *
-                  </label>
-                  <select
-                    className="input w-full"
-                    value={idGrupoSeleccionado}
-                    onChange={(e) => {
-                      const nuevo = Number(e.target.value);
-                      setGrupoPuntos((g) => {
-                        const copy = [...g];
-                        copy[idx] = nuevo;
-                        return copy;
-                      });
-                      // resetear lugar al cambiar grupo
-                      updatePunto(idx, "idLugar", 0);
-                    }}
-                    required
-                  >
-                    <option value={0}>— Selecciona grupo —</option>
-                    {mockCatalogos.GrupoLugares.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* lugar filtrado por grupo */}
+                {/* lugar principal */}
                 <div className="w-full">
                   <label className="block text-sm font-medium mb-1">
                     Lugar del Punto {idx + 1} *
@@ -1025,15 +1013,48 @@ const NuevoServicio: React.FC = () => {
                   <SearchableDropdown
                     options={lugaresPuntos}
                     value={
-                      lugaresPuntos.find((l) => l.id === p.idLugar) || null
+                      lugarPrincipal ? lugaresPuntos.find((l) => l.id === lugarPrincipal.id) || null : null
                     }
-                    onChange={(sel) =>
-                      sel && updatePunto(idx, "idLugar", sel.id)
-                    }
+                    onChange={(sel) => {
+                      if (sel) {
+                        // Al cambiar el lugar principal, actualizar al lugar principal (no sublugar)
+                        updatePunto(idx, "idLugar", sel.id);
+                      }
+                    }}
                     getOptionLabel={(l) => l.nombre}
                     placeholder="Buscar lugar..."
                   />
                 </div>
+
+                {/* sublugar (solo para Zona Portuaria) */}
+                {lugarPrincipal && lugarPrincipal.tipo === "Zona Portuaria" && subLugares.length > 0 && (
+                  <div className="w-full">
+                    <label className="block text-sm font-medium mb-1">
+                      Sublugar (Opcional)
+                    </label>
+                    <select
+                      className="input w-full"
+                      value={sublugarSeleccionado}
+                      onChange={(e) => {
+                        const sublugarId = Number(e.target.value);
+                        // Actualizar el idLugar del punto al sublugar seleccionado
+                        if (sublugarId > 0) {
+                          updatePunto(idx, "idLugar", sublugarId);
+                        } else {
+                          // Si no hay sublugar seleccionado, volver al lugar principal
+                          updatePunto(idx, "idLugar", lugarPrincipal.id);
+                        }
+                      }}
+                    >
+                      <option value={0}>— Sin sublugar específico —</option>
+                      {subLugares.map((sub) => (
+                        <option key={sub.id} value={sub.id}>
+                          {sub.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {/* Acción */}
                 <div>

@@ -1,8 +1,7 @@
 // src/pages/operaciones/VistaServiciosPendientes.tsx
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ListWithSearch, {
-  Column,
   SearchFilter,
   DropdownOption,
   DropdownOptionsType,
@@ -14,29 +13,15 @@ import {
   Payload,
   Descuento,
   mockCatalogos,
-  EstadoServicio,
 } from "../../utils/ServiceDrafts";
+import { 
+  ServiceRow, 
+  getServiceColumnsWithRender, 
+  defaultColumnConfigs 
+} from "../../utils/ServiceColumns";
 import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
 import { AsignarChoferMovilModal } from "../operaciones/AsignarChoferMovilModal";
 import { Modal } from "../../components/Modal";
-
-interface ServiceRow {
-  id: string;
-  cliente: string;
-  origen: string;
-  destino: string;
-  fecha: string;
-  tipo: string;
-  estado: EstadoServicio;
-  precioCarga?: number;
-  raw: Payload;
-}
-
-// formateador CLP
-const formatCLP = (v: number) =>
-  new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(
-    v
-  );
 
 const searchFilters: SearchFilter<ServiceRow>[] = [
   { label: "ID", key: "id", type: "text", placeholder: "Buscar ID" },
@@ -65,43 +50,6 @@ const VistaServiciosPendientes: React.FC = () => {
   };
   const closeConfirm = () => setConfirmId(null);
 
-  const columns: Column<ServiceRow>[] = useMemo(() => {
-    if (rows.length === 0) return [];
-    const sample = rows[0]!; // aseguramos que no es undefined
-
-    const keys = Object.keys(sample).filter(
-      (k): k is keyof ServiceRow => k !== "raw"
-    );
-
-    return keys.map((key) => {
-      if (key === "precioCarga") {
-        return {
-          label: "Precio Carga",
-          key,
-          sortable: true,
-          render: (val: number) => formatCLP(val),
-        };
-      }
-      if (key === "estado") {
-        return {
-          label: "Estado",
-          key,
-          sortable: true,
-          render: (val: EstadoServicio) => (
-            <span
-              className={`px-2 py-1 rounded-full text-xs font-medium ${
-                estadoStyles[val] || ""
-              } ${badgeTextColor[val] || ""}`}
-            >
-              {val}
-            </span>
-          ),
-        };
-      }
-      const label = key.charAt(0).toUpperCase() + key.slice(1);
-      return { label, key, sortable: true };
-    }) as Column<ServiceRow>[];
-  }, [rows]);
 
   const confirmFalsoFlete = () => {
     if (!confirmId) return;
@@ -138,17 +86,45 @@ const VistaServiciosPendientes: React.FC = () => {
       code.toString();
 
     const all = [...loadDrafts(), ...loadSent()];
-    const mapped: ServiceRow[] = all.map((p) => ({
-      id: p.id.toString(),
-      cliente: lookupEmpresa(p.form.cliente),
-      origen: lookupLugar(p.form.origen),
-      destino: lookupLugar(p.form.destino),
-      fecha: p.form.fechaSol,
-      tipo: lookupOp(p.form.tipoOperacion),
-      precioCarga: p.form.precioCarga,
-      estado: p.estado,
-      raw: p,
-    }));
+    const mapped: ServiceRow[] = all.map((p) => {
+      const f = p.form;
+      const paisName = mockCatalogos.Zona.find(z => z.codigo === f.pais)?.nombre || "";
+      const tipoContenedorName = mockCatalogos.Tipo_contenedor.find(tc => tc.codigo === f.tipoContenedor)?.nombre || "";
+
+      return {
+        id: p.id.toString(),
+        cliente: lookupEmpresa(f.cliente),
+        tipoOperacion: lookupOp(f.tipoOperacion),
+        origen: lookupLugar(f.origen),
+        destino: lookupLugar(f.destino),
+        fecha: f.fechaSol && f.fechaSol instanceof Date ? f.fechaSol.toISOString() : "",
+        tipo: lookupOp(f.tipoOperacion),
+        estado: p.estado,
+        pais: paisName,
+        tipoContenedor: tipoContenedorName,
+        kilos: f.kilos,
+        precioCarga: f.precioCarga,
+        temperatura: f.temperatura,
+        guiaDeDespacho: f.guiaDeDespacho,
+        tarjeton: f.tarjeton,
+        nroContenedor: f.nroContenedor,
+        sello: f.sello,
+        nave: f.nave,
+        observacion: f.observacion,
+        interchange: f.interchange,
+        odv: f.odv,
+        imoCargo: f.imoCargo,
+        imoCategoria: f.imoCategoria,
+        tipoServicio: f.tipoServicio,
+        folio: f.folio,
+        fechaFolio: f.fechaFolio && f.fechaFolio instanceof Date ? f.fechaFolio.toISOString() : "",
+        eta: f.eta && f.eta instanceof Date ? f.eta.toISOString() : "",
+        ejecutivo: f.ejecutivo || "",
+        chofer: p.chofer,
+        movil: p.movil,
+        raw: p,
+      };
+    });
     setRows(mapped);
   }, []);
 
@@ -198,7 +174,8 @@ const VistaServiciosPendientes: React.FC = () => {
 
       <ListWithSearch<ServiceRow>
         data={rows}
-        columns={columns}
+        columns={getServiceColumnsWithRender()}
+        defaultVisibleColumns={defaultColumnConfigs.operaciones}
         searchFilters={searchFilters}
         dropdownOptions={dropdownOptions as DropdownOptionsType<ServiceRow>}
         colorConfig={{
@@ -221,7 +198,7 @@ const VistaServiciosPendientes: React.FC = () => {
         }}
         defaultSortKey="estado"
         defaultSortOrder="asc"
-        preferencesKey="preferencias"
+        preferencesKey="operaciones-servicios"
       />
 
       <AsignarChoferMovilModal

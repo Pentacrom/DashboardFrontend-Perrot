@@ -9,6 +9,25 @@ import {
   useImperativeHandle,
 } from "react";
 import ReactDOM from "react-dom";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  horizontalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import {
+  CSS,
+} from "@dnd-kit/utilities";
 
 
 // Formateo de fechas a HH:mm dd/MM/yyyy
@@ -92,11 +111,70 @@ export interface ListPreferences<T> {
   sortOrder: "asc" | "desc";
   searchValues: Record<string, string>;
   checkboxValues: Record<string, string[]>;
+  columnOrder: Array<keyof T>;
 }
 
 export interface ListWithSearchHandles<T> {
   exportPreferences: () => ListPreferences<T>;
   updatePreferences: (prefs: Partial<ListPreferences<T>>) => void;
+}
+
+// Componente para columna arrastrable
+interface SortableColumnHeaderProps<T> {
+  column: Column<T>;
+  onSort: (key: keyof T) => void;
+  renderSortIndicator: (key: keyof T) => React.ReactNode;
+}
+
+function SortableColumnHeader<T>({
+  column,
+  onSort,
+  renderSortIndicator,
+}: SortableColumnHeaderProps<T>) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: column.key as string,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <th
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase ${
+        column.sortable ? "hover:text-gray-700" : ""
+      } ${isDragging ? "bg-gray-200" : ""}`}
+    >
+      <div className="flex items-center justify-between">
+        <span
+          {...listeners}
+          className="mr-2 cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
+          title="Arrastra para reordenar"
+        >
+          ⋮⋮
+        </span>
+        <div
+          className={`flex-1 flex items-center ${column.sortable ? 'cursor-pointer' : ''}`}
+          onClick={() => column.sortable && onSort(column.key)}
+        >
+          {column.label}
+          {renderSortIndicator(column.key)}
+        </div>
+      </div>
+    </th>
+  );
 }
 
 
@@ -109,7 +187,6 @@ function ListWithSearchInner<T extends Record<string, any>>(
     columns,
     searchFilters = [],
     checkboxFilterGroups = [],
-    onDownloadExcel,
     onSearch,
     searchButtonDisabled = false,
     colorConfig,
@@ -126,10 +203,6 @@ function ListWithSearchInner<T extends Record<string, any>>(
     buttons
   } = props;
 
-  const dateKeys = useMemo(
-    () => new Set(searchFilters.filter(f => f.type === "date").map(f => String(f.key))),
-    [searchFilters]
-  );
   // Construir lista completa de columnas
   const allColumns = useMemo<Column<T>[]>(() => {
     if (columns && columns.length > 0) {
@@ -164,6 +237,60 @@ function ListWithSearchInner<T extends Record<string, any>>(
     setVisibleKeys((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
     );
+  };
+
+  // Estado para el orden de columnas
+  const [columnOrder, setColumnOrder] = useState<Array<keyof T>>(() => {
+    if (preferencesKey) {
+      const stored = localStorage.getItem(preferencesKey);
+      if (stored) {
+        try {
+          const prefs = JSON.parse(stored) as ListPreferences<T>;
+          if (prefs.columnOrder) {
+            console.log("📥 Cargando orden de columnas desde localStorage:", prefs.columnOrder);
+            return prefs.columnOrder;
+          }
+        } catch { }
+      }
+    }
+    const defaultOrder = allColumns.map((c) => c.key);
+    console.log("📋 Usando orden por defecto:", defaultOrder);
+    return defaultOrder;
+  });
+
+  // Sincronizar columnOrder cuando cambian las columnas (evitar bucle infinito)
+  useEffect(() => {
+    const currentKeys = allColumns.map(c => c.key);
+    const newKeys = currentKeys.filter(key => !columnOrder.includes(key));
+    const validKeys = columnOrder.filter(key => currentKeys.includes(key));
+    
+    if (newKeys.length > 0 || validKeys.length !== columnOrder.length) {
+      setColumnOrder([...validKeys, ...newKeys]);
+    }
+  }, [allColumns]); // Solo dependemos de allColumns para evitar bucle
+
+  // Sensores para drag and drop
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Función para manejar el final del drag
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (active.id !== over?.id) {
+      setColumnOrder((items) => {
+        const oldIndex = items.findIndex((item) => item === active.id);
+        const newIndex = items.findIndex((item) => item === over?.id);
+
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        console.log("🔄 Nuevo orden de columnas:", newOrder);
+        return newOrder;
+      });
+    }
   };
 
   // Paginación
@@ -400,6 +527,7 @@ function ListWithSearchInner<T extends Record<string, any>>(
       sortOrder,
       searchValues,
       checkboxValues,
+      columnOrder,
     }),
     updatePreferences: (newPrefs: Partial<ListPreferences<T>>) => {
       newPrefs.visibleKeys && setVisibleKeys(newPrefs.visibleKeys);
@@ -408,6 +536,7 @@ function ListWithSearchInner<T extends Record<string, any>>(
       newPrefs.sortOrder && setSortOrder(newPrefs.sortOrder);
       newPrefs.searchValues && setSearchValues(newPrefs.searchValues);
       newPrefs.checkboxValues && setCheckboxValues(newPrefs.checkboxValues);
+      newPrefs.columnOrder && setColumnOrder(newPrefs.columnOrder);
     },
   }));
 
@@ -423,6 +552,7 @@ function ListWithSearchInner<T extends Record<string, any>>(
       sortOrder,
       searchValues,
       checkboxValues,
+      columnOrder,
     };
     console.log("🔖 Guardando prefs:", preferencesKey, prefs);
     localStorage.setItem(preferencesKey, JSON.stringify(prefs));
@@ -433,22 +563,10 @@ function ListWithSearchInner<T extends Record<string, any>>(
     sortOrder,
     searchValues,
     checkboxValues,
+    columnOrder,
     preferencesKey,
   ]);
 
-  // Guardar orden en localStorage
-  useEffect(() => {
-    if (!preferencesKey) return;
-    const prefs: Partial<ListPreferences<T>> = {
-      visibleKeys,
-    };
-    const raw = localStorage.getItem(preferencesKey);
-    const existing = raw ? JSON.parse(raw) : {};
-    localStorage.setItem(
-      preferencesKey,
-      JSON.stringify({ ...existing, ...prefs })
-    );
-  }, [visibleKeys, preferencesKey]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -685,37 +803,40 @@ function ListWithSearchInner<T extends Record<string, any>>(
         {/* Sólo la tabla queda en un contenedor con overflow-x-auto */}
         <div className="overflow-x-auto w-full">
           <div className="inline-block w-full">
-            <table className="divide-y divide-gray-200 max-w-full min-w-full">
-              <thead className="bg-gray-100">
-                <tr>
-                  {allColumns
-                    .filter((col) => visibleKeys.includes(col.key))
-                    .map((col) => (
-                      <th
-                        key={col.key as string}
-                        onClick={() => col.sortable && handleSort(col.key)}
-                        className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase ${
-                          col.sortable ? "hover:text-gray-700" : ""
-                        }`}
-                      >
-                        {col.label}
-                        {col.sortable && renderSortIndicator(col.key)}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <table className="divide-y divide-gray-200 max-w-full min-w-full">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <SortableContext
+                      items={columnOrder.filter(key => visibleKeys.includes(key)).map(key => String(key))}
+                      strategy={horizontalListSortingStrategy}
+                    >
+                      {columnOrder
+                        .filter((key) => visibleKeys.includes(key))
+                        .map((key) => {
+                          const col = allColumns.find(c => c.key === key);
+                          if (!col) return null;
+                          return (
+                            <SortableColumnHeader
+                              key={col.key as string}
+                              column={col}
+                              onSort={handleSort}
+                              renderSortIndicator={renderSortIndicator}
+                            />
+                          );
+                        })}
+                    </SortableContext>
+                    {extraColumnVisible && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky right-0 bg-gray-100 border-l border-gray-200">
+                        Acciones
                       </th>
-                    ))
-                    .concat(
-                      extraColumnVisible
-                        ? [
-                            <th
-                              key="actions"
-                              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                            >
-                              Acciones
-                            </th>,
-                          ]
-                        : []
                     )}
-                </tr>
-              </thead>
+                  </tr>
+                </thead>
               <tbody className="divide-y divide-gray-200">
                 {paginatedData.map((item, idx) => {
                   let rowClass = "";
@@ -731,9 +852,11 @@ function ListWithSearchInner<T extends Record<string, any>>(
                       : dropdownOptions;
                   return (
                     <tr key={idx} className={rowClass}>
-                      {allColumns
-                        .filter((col) => visibleKeys.includes(col.key))
-                        .map((col) => {
+                      {columnOrder
+                        .filter((key) => visibleKeys.includes(key))
+                        .map((key) => {
+                          const col = allColumns.find(c => c.key === key);
+                          if (!col) return null;
                           const raw = item[col.key];
                           // Si esta columna es de tipo fecha, formateamos
                           // detectamos Date objetos o strings ISO
@@ -785,7 +908,11 @@ function ListWithSearchInner<T extends Record<string, any>>(
                             ? [
                                 <td
                                   key="actions"
-                                  className="px-6 py-4 whitespace-nowrap relative"
+                                  className={`px-6 py-4 whitespace-nowrap relative sticky right-0 border-l border-gray-200 ${
+                                    colorConfig && colorConfig.mode === "row"
+                                      ? colorConfig.bgMapping[String(item[colorConfig.field])] || "bg-white"
+                                      : "bg-white"
+                                  }`}
                                 >
                                   {headerDropdownVisible &&
                                     rowOptions.length > 0 && (
@@ -873,7 +1000,8 @@ function ListWithSearchInner<T extends Record<string, any>>(
                   </tr>
                 )}
               </tbody>
-            </table>
+              </table>
+            </DndContext>
           </div>
         </div>
 

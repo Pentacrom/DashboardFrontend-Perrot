@@ -1,8 +1,7 @@
 // src/pages/comercial/IngresoServicio.tsx
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ListWithSearch, {
-  Column,
   SearchFilter,
   CheckboxFilterGroup,
   DropdownOptionsType,
@@ -23,9 +22,13 @@ import {
   importExcelFile,
   exportToExcelFile,
 } from "../../utils/ServiceExcelMapper";
-import { ServiceRow, payloadToRow } from "../../utils/ServiceUtils";
+import { 
+  ServiceRow, 
+  getServiceColumnsWithRender, 
+  defaultColumnConfigs 
+} from "../../utils/ServiceColumns";
+import { payloadToRow } from "../../utils/ServiceUtils";
 import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
-import { formatCLP } from "../../utils/format";
 
 // Definición de filtros de búsqueda
 const searchFilters: SearchFilter<ServiceRow>[] = [
@@ -53,9 +56,6 @@ const checkboxFilterGroups: CheckboxFilterGroup<ServiceRow>[] = [
   },
 ];
 
-interface CustomColumn<T> extends Column<T> {
-  render?: (value: any, row: T) => React.ReactNode;
-}
 
 const IngresoServicio: React.FC = () => {
   const navigate = useNavigate();
@@ -77,7 +77,7 @@ const IngresoServicio: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     const payloads = await importExcelFile(file);
-    const newRows = payloads.map(payloadToRow);
+    const newRows = payloads.map(payloadToRow) as unknown as ServiceRow[];
     setCandidateRows(newRows);
     setImportModalOpen(true);
     e.target.value = "";
@@ -106,66 +106,53 @@ const IngresoServicio: React.FC = () => {
       arr.find((x) => x.id === id)?.nombre || id.toString();
 
     const payloads: Payload[] = [...loadDrafts(), ...loadSent()];
-    const mapped = payloads.map((p) => {
-      const base = payloadToRow(p);
+    const mapped: ServiceRow[] = payloads.map((p) => {
       const f = p.form;
-      base.cliente =
-        mockCatalogos.empresas.find((e) => e.id === f.cliente)?.nombre ||
-        f.cliente.toString();
-      base.tipoOperacion =
-        mockCatalogos.Operación.find((o) => o.codigo === f.tipoOperacion)
-          ?.nombre || f.tipoOperacion.toString();
-      base.pais =
-        mockPaises.find((pi) => pi.codigo === f.pais)?.nombre ||
-        f.pais.toString();
-      base.tipoContenedor =
-        mockCatalogos.Tipo_contenedor.find((t) => t.codigo === f.tipoContenedor)
-          ?.nombre || f.tipoContenedor.toString();
-      base.origen = lookupLugar(mockCatalogos.Lugares, f.origen);
-      base.destino = lookupLugar(mockCatalogos.Lugares, f.destino);
-      base.id = p.id.toString();
-      base.fecha = f.fechaSol;
-      base.tipo = lookupCodigo(mockCatalogos.Operación, f.tipoOperacion);
-      return base;
+      const clienteName = mockCatalogos.empresas.find((e) => e.id === f.cliente)?.nombre || f.cliente.toString();
+      const tipoOperacionName = mockCatalogos.Operación.find((o) => o.codigo === f.tipoOperacion)?.nombre || f.tipoOperacion.toString();
+      const paisName = mockPaises.find((pi) => pi.codigo === f.pais)?.nombre || f.pais.toString();
+      const tipoContenedorName = mockCatalogos.Tipo_contenedor.find((t) => t.codigo === f.tipoContenedor)?.nombre || f.tipoContenedor.toString();
+      const origenName = lookupLugar(mockCatalogos.Lugares, f.origen);
+      const destinoName = lookupLugar(mockCatalogos.Lugares, f.destino);
+      const tipoName = lookupCodigo(mockCatalogos.Operación, f.tipoOperacion);
+
+      return {
+        id: p.id.toString(),
+        cliente: clienteName,
+        tipoOperacion: tipoOperacionName,
+        origen: origenName,
+        destino: destinoName,
+        fecha: f.fechaSol && f.fechaSol instanceof Date ? f.fechaSol.toISOString() : "",
+        tipo: tipoName,
+        estado: p.estado,
+        pais: paisName,
+        tipoContenedor: tipoContenedorName,
+        kilos: f.kilos,
+        precioCarga: f.precioCarga,
+        temperatura: f.temperatura,
+        guiaDeDespacho: f.guiaDeDespacho,
+        tarjeton: f.tarjeton,
+        nroContenedor: f.nroContenedor,
+        sello: f.sello,
+        nave: f.nave,
+        observacion: f.observacion,
+        interchange: f.interchange,
+        odv: f.odv,
+        imoCargo: f.imoCargo,
+        imoCategoria: f.imoCategoria,
+        tipoServicio: f.tipoServicio,
+        folio: f.folio,
+        fechaFolio: f.fechaFolio && f.fechaFolio instanceof Date ? f.fechaFolio.toISOString() : "",
+        eta: f.eta && f.eta instanceof Date ? f.eta.toISOString() : "",
+        ejecutivo: f.ejecutivo || "",
+        chofer: p.chofer,
+        movil: p.movil,
+        raw: p,
+      };
     });
     setRows(mapped);
   }, []);
 
-  // Columnas con render personalizado
-  const columns = useMemo<CustomColumn<ServiceRow>[]>(() => {
-    if (!rows.length) return [];
-    const sample = rows[0]!;
-    const keys = Object.keys(sample).filter((k) => k !== "raw");
-    return keys.map((key) => {
-      if (key === "precioCarga") {
-        return {
-          label: "Precio Carga",
-          key: "precioCarga",
-          sortable: true,
-          render: (v) => formatCLP(Number(v)),
-        };
-      }
-      if (key === "estado") {
-        return {
-          label: "Estado",
-          key: "estado",
-          sortable: true,
-          render: (value: EstadoServicio) => (
-            <span
-              className={`px-2 py-1 rounded-full text-xs font-medium ${estadoStyles[value]} ${badgeTextColor[value]}`}
-            >
-              {value}
-            </span>
-          ),
-        };
-      }
-      return {
-        label: key.charAt(0).toUpperCase() + key.slice(1),
-        key: key as keyof ServiceRow,
-        sortable: true,
-      };
-    });
-  }, [rows]);
 
   // Opciones del dropdown por fila
   const dropdownOptions: DropdownOptionsType<ServiceRow> = (row) => {
@@ -291,7 +278,7 @@ const IngresoServicio: React.FC = () => {
           <table className="min-w-full table-auto border-collapse">
             <thead>
               <tr>
-                {columns.map((col) => (
+                {getServiceColumnsWithRender().slice(0, 5).map((col) => (
                   <th
                     key={col.key as string}
                     className="border px-2 py-1 text-left"
@@ -304,10 +291,9 @@ const IngresoServicio: React.FC = () => {
             <tbody>
               {candidateRows.map((r, i) => (
                 <tr key={i} className="hover:bg-gray-100">
-                  {columns.map((col) => (
+                  {getServiceColumnsWithRender().slice(0, 5).map((col) => (
                     <td key={col.key as string} className="border px-2 py-1">
-                      {/* @ts-ignore */}
-                      {r[col.key]}
+                      {String(r[col.key] || "")}
                     </td>
                   ))}
                 </tr>
@@ -320,7 +306,8 @@ const IngresoServicio: React.FC = () => {
       {/* Listado con filtros y botones */}
       <ListWithSearch<ServiceRow>
         data={rows}
-        columns={columns}
+        columns={getServiceColumnsWithRender()}
+        defaultVisibleColumns={defaultColumnConfigs.comercial}
         searchFilters={searchFilters}
         checkboxFilterGroups={checkboxFilterGroups}
         defaultCheckboxSelections={{ estado: ["Sin Asignar", "Pendiente"] }}
@@ -342,7 +329,7 @@ const IngresoServicio: React.FC = () => {
           mode: "row",
         }}
         globalButtons={globalButtons}
-        preferencesKey="Preferences"
+        preferencesKey="comercial-servicios"
       />
     </div>
   );
