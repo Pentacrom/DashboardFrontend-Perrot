@@ -12,6 +12,7 @@ import {
 } from "../utils/ServiceExcelMapper";
 import { ServiceRow, getServiceColumnsWithRender } from "../utils/ServiceColumns";
 import { payloadToRow } from "../utils/ServiceUtils";
+import { mockCatalogos, mockPaises } from "../utils/ServiceDrafts";
 
 interface ImportExportButtonsProps {
   data: ServiceRow[];
@@ -33,6 +34,37 @@ const ImportExportButtons: React.FC<ImportExportButtonsProps> = ({
   // Estados para rollback
   const [rollbackModalOpen, setRollbackModalOpen] = useState(false);
   const [importBatches, setImportBatches] = useState<ImportBatch[]>([]);
+
+  // Función para obtener resumen detallado de los servicios
+  const getServiceSummary = (payloads: any[]) => {
+    if (payloads.length === 0) return [];
+    
+    // Agrupar por cliente y tipo de operación
+    const summary = payloads.reduce((acc: any, payload: any) => {
+      const form = payload.form || {};
+      const cliente = mockCatalogos.empresas.find(e => e.id === form.cliente)?.nombre || `ID: ${form.cliente}`;
+      const tipoOp = mockCatalogos.Operación.find(op => op.codigo === form.tipoOperacion)?.nombre || `ID: ${form.tipoOperacion}`;
+      const ejecutivo = form.ejecutivo || payload.createdBy || 'Sin especificar';
+      
+      const key = `${cliente} - ${tipoOp} - ${ejecutivo}`;
+      
+      if (!acc[key]) {
+        acc[key] = {
+          cliente,
+          tipoOperacion: tipoOp,
+          ejecutivo,
+          count: 0,
+          ids: []
+        };
+      }
+      
+      acc[key].count++;
+      acc[key].ids.push(payload.id);
+      return acc;
+    }, {});
+    
+    return Object.values(summary);
+  };
 
   // Función para mostrar vista previa de importación
   const handleImportClick = () => fileInputRef.current?.click();
@@ -150,6 +182,24 @@ const ImportExportButtons: React.FC<ImportExportButtonsProps> = ({
           <p><strong>Total de filas en archivo:</strong> {batchInfo?.rowCount}</p>
           <p><strong>Servicios válidos para importar:</strong> {candidateRows.length}</p>
           
+          {/* Resumen detallado de servicios a importar */}
+          {validationResult && validationResult.validPayloads.length > 0 && (
+            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
+              <p className="font-semibold text-green-800 mb-2">📋 Resumen de servicios a importar:</p>
+              {getServiceSummary(validationResult.validPayloads).map((summary: any, index: number) => (
+                <div key={index} className="text-sm text-green-700 mb-1">
+                  <strong>{summary.count}</strong> servicio{summary.count > 1 ? 's' : ''} - 
+                  <strong> Cliente:</strong> {summary.cliente} | 
+                  <strong> Operación:</strong> {summary.tipoOperacion} | 
+                  <strong> Ejecutivo:</strong> {summary.ejecutivo}
+                  <div className="text-xs text-green-600 ml-2">
+                    IDs: {summary.ids.join(', ')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
           {validationResult && validationResult.skippedCount > 0 && (
             <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
               <p className="font-semibold text-yellow-800">⚠️ Registros omitidos: {validationResult.skippedCount}</p>
@@ -157,7 +207,7 @@ const ImportExportButtons: React.FC<ImportExportButtonsProps> = ({
               {validationResult.duplicateIds.length > 0 && (
                 <div className="mt-2">
                   <p className="text-sm text-yellow-700">
-                    <strong>IDs duplicados con sistema existente:</strong> {validationResult.duplicateIds.join(', ')}
+                    <strong>Servicios que ya existen en el sistema (IDs):</strong> {validationResult.duplicateIds.join(', ')}
                   </p>
                 </div>
               )}
@@ -165,7 +215,7 @@ const ImportExportButtons: React.FC<ImportExportButtonsProps> = ({
               {validationResult.duplicatesInFile.length > 0 && (
                 <div className="mt-2">
                   <p className="text-sm text-yellow-700">
-                    <strong>IDs duplicados dentro del archivo:</strong> {validationResult.duplicatesInFile.join(', ')}
+                    <strong>Servicios duplicados dentro del archivo (IDs):</strong> {validationResult.duplicatesInFile.join(', ')}
                   </p>
                 </div>
               )}

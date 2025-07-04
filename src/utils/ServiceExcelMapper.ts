@@ -114,6 +114,10 @@ import {
     const destinoValue = findCellValue(row, "destino");
     const destinoLugarObj = findItemByName(mockCatalogos.Lugares, destinoValue);
     const destinoLugar = destinoLugarObj?.id || 0;
+
+    const navieraValue = findCellValue(row, "naviera");
+    const navieraObj = findItemByName(mockCatalogos.navieras, navieraValue);
+    const naviera = navieraObj?.codigo || 0;
   
     const opName = tipoOperacionObj?.nombre.toLowerCase();
   
@@ -141,7 +145,7 @@ import {
       tarjeton: findCellValue(row, "tarjeton"),
       nroContenedor: findCellValue(row, "nroContenedor"),
       sello: findCellValue(row, "sello"),
-      nave: 0,
+      nave: naviera,
       observacion: findCellValue(row, "observacion"),
       interchange: "",
       rcNoDevolucion: 0,
@@ -162,7 +166,8 @@ import {
         accion: 8,
         estado: 0,
         eta: form.eta,
-        observacion: form.observacion
+        observacion: form.observacion,
+        naviera: naviera
       },
       {
         idLugar: lugarDevolucionId,
@@ -176,7 +181,7 @@ import {
       form,
       puntos,
       estado: "Pendiente",
-      createdBy: "importacion-excel"
+      createdBy: findCellValue(row, "ejecutivo") || "importacion-excel"
     };
   }
   

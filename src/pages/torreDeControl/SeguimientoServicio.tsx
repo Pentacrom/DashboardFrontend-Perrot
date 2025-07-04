@@ -303,6 +303,28 @@ const SeguimientoServicio: React.FC = () => {
                     </p>
                   )}
                 </div>
+                {/* Naviera para puntos de retiro (acción 8) */}
+                {p.accion === 8 && (
+                  <div className="md:col-span-5">
+                    <label className="block text-sm font-medium mb-1">
+                      Naviera
+                    </label>
+                    <select
+                      className="input w-full"
+                      value={p.naviera || 0}
+                      onChange={(e) =>
+                        updatePunto(idx, "naviera", Number(e.target.value))
+                      }
+                    >
+                      <option value={0}>— Seleccionar naviera —</option>
+                      {mockCatalogos.navieras.map((nav) => (
+                        <option key={nav.codigo} value={nav.codigo}>
+                          {nav.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 {isLate && (
                   <div className="md:col-span-5">
                     <label className="block text-sm font-medium mb-1">

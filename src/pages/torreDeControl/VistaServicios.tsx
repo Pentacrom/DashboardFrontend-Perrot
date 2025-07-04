@@ -129,10 +129,12 @@ const VistaServicios: React.FC = () => {
     <div className="p-6">
       <div className="mb-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold">Servicios en Proceso</h1>
-        <ImportExportButtons
-          data={rows}
-          onDataUpdate={setRows}
-        />
+        <div className="flex gap-2">
+          <ImportExportButtons
+            data={rows}
+            onDataUpdate={setRows}
+          />
+        </div>
       </div>
 
       <ListWithSearch<ServiceRow>

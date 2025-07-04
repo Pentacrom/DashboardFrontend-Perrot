@@ -53,6 +53,7 @@ export interface Punto {
   salida?: Date; // datetime de salida
   observacion?: string;
   razonDeTardia?: string;
+  naviera?: number; // ID de la naviera para puntos de retiro
 }
 
 export interface FormState {
@@ -256,6 +257,23 @@ export const mockCatalogos: Catalogos = {
     { codigo: 1, nombre: "grupo Cliente 1" },
     { codigo: 2, nombre: "grupo Cliente 2" },
     { codigo: 3, nombre: "grupo Cliente 3" },
+  ],
+  navieras: [
+    { codigo: 1, nombre: "MAERSK" },
+    { codigo: 2, nombre: "MSC" },
+    { codigo: 3, nombre: "CMA CGM" },
+    { codigo: 4, nombre: "COSCO SHIPPING" },
+    { codigo: 5, nombre: "HAPAG-LLOYD" },
+    { codigo: 6, nombre: "ONE" },
+    { codigo: 7, nombre: "EVERGREEN" },
+    { codigo: 8, nombre: "YANG MING" },
+    { codigo: 9, nombre: "ZIM" },
+    { codigo: 10, nombre: "PIL PACIFIC" },
+    { codigo: 11, nombre: "HAMBURG SÜD" },
+    { codigo: 12, nombre: "HYUNDAI MERCHANT MARINE" },
+    { codigo: 13, nombre: "CSAV" },
+    { codigo: 14, nombre: "ARKAS LINE" },
+    { codigo: 15, nombre: "CCNI" },
   ],
 };
 

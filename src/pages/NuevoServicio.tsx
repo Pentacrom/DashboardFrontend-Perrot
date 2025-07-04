@@ -693,6 +693,17 @@ const NuevoServicio: React.FC = () => {
               </select>
             </div>
             <div>
+              <label className="block text-sm font-medium">Naviera</label>
+              <select
+                className="input"
+                value={form.nave}
+                onChange={upd("nave")}
+              >
+                <option value={0}>—</option>
+                {opt(mockCatalogos.navieras)}
+              </select>
+            </div>
+            <div>
               <label className="block text-sm font-medium">
                 Fecha de Solicitud *
               </label>
