@@ -1,5 +1,5 @@
 // src/pages/comercial/IngresoServicio.tsx
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ListWithSearch, {
   SearchFilter,
@@ -7,7 +7,6 @@ import ListWithSearch, {
   DropdownOptionsType,
   DropdownOption
 } from "../../components/ListWithSearch";
-import { Modal } from "../../components/Modal";
 import {
   loadDrafts,
   loadSent,
@@ -18,17 +17,13 @@ import {
   mockCatalogos,
   mockPaises,
 } from "../../utils/ServiceDrafts";
-import {
-  importExcelFile,
-  exportToExcelFile,
-} from "../../utils/ServiceExcelMapper";
 import { 
   ServiceRow, 
   getServiceColumnsWithRender, 
   defaultColumnConfigs 
 } from "../../utils/ServiceColumns";
-import { payloadToRow } from "../../utils/ServiceUtils";
 import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
+import ImportExportButtons from "../../components/ImportExportButtons";
 
 // Definición de filtros de búsqueda
 const searchFilters: SearchFilter<ServiceRow>[] = [
@@ -61,43 +56,8 @@ const IngresoServicio: React.FC = () => {
   const navigate = useNavigate();
   const [rows, setRows] = useState<ServiceRow[]>([]);
 
-  // Estados y refs de importación
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importModalOpen, setImportModalOpen] = useState(false);
-  const [candidateRows, setCandidateRows] = useState<ServiceRow[]>([]);
-
-  // Refs y estados de plantilla de exportación
-  const tplInputRef = useRef<HTMLInputElement>(null);
-  const [templateFile, setTemplateFile] = useState<File | null>(null);
-
-  // Importar Excel: abrir file picker
-  const handleImportClick = () => fileInputRef.current?.click();
-  // Al seleccionar archivo, generar payloads y abrir modal de confirmación
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const payloads = await importExcelFile(file);
-    const newRows = payloads.map(payloadToRow) as unknown as ServiceRow[];
-    setCandidateRows(newRows);
-    setImportModalOpen(true);
-    e.target.value = "";
-  };
-  // Confirmar importación
-  const confirmImport = () => {
-    setRows((prev) => [...prev, ...candidateRows]);
-    setCandidateRows([]);
-    setImportModalOpen(false);
-  };
-
-  // Cambio de plantilla
-  const handleTemplateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) setTemplateFile(file);
-    if (tplInputRef.current) tplInputRef.current.value = "";
-  };
-
-  // Carga inicial de datos
-  useEffect(() => {
+  // Función para cargar datos
+  const loadData = () => {
     const lookupCodigo = (
       arr: { codigo: number; nombre: string }[],
       code: number
@@ -151,6 +111,11 @@ const IngresoServicio: React.FC = () => {
       };
     });
     setRows(mapped);
+  };
+
+  // Carga inicial de datos
+  useEffect(() => {
+    loadData();
   }, []);
 
 
@@ -205,103 +170,25 @@ const IngresoServicio: React.FC = () => {
     setRows((prev) => prev.filter((r) => r.id !== row.id));
   };
 
-  // Exportar Excel
-  const handleExport = async () => {
-    if (!templateFile) {
-      tplInputRef.current?.click();
-      return;
-    }
-    await exportToExcelFile(rows, templateFile, "servicios_export.xlsx");
-  };
-
-  // Botones globales (Importar/Exportar)
-  const globalButtons: React.ReactNode = (
-    <>
-      <button
-        onClick={handleImportClick}
-        className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 mr-2"
-      >
-        Importar Excel
-      </button>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".xlsx,.xls,.csv"
-        onChange={handleFileChange}
-        className="hidden"
-      />
-
-      <button
-        onClick={() => tplInputRef.current?.click()}
-        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mr-2"
-      >
-        Seleccionar plantilla
-      </button>
-      <input
-        ref={tplInputRef}
-        type="file"
-        accept=".xlsx"
-        onChange={handleTemplateChange}
-        className="hidden"
-      />
-      <button
-        onClick={handleExport}
-        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-      >
-        Exportar Excel
-      </button>
-    </>
-  );
 
   return (
     <div className="p-6 w-full">
       <div className="mb-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold">Servicios</h1>
-        <Link
-          to="/comercial/nuevo-servicio"
-          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-        >
-          Nuevo Servicio
-        </Link>
+        <div className="flex gap-2">
+          <ImportExportButtons
+            data={rows}
+            onDataUpdate={setRows}
+          />
+          <Link
+            to="/comercial/nuevo-servicio"
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            Nuevo Servicio
+          </Link>
+        </div>
       </div>
 
-      {/* Modal de confirmación de importación */}
-      <Modal
-        isOpen={importModalOpen}
-        onClose={() => setImportModalOpen(false)}
-        onConfirm={confirmImport}
-        confirmText="Confirmar Importación"
-        cancelText="Cancelar"
-      >
-        <p className="mb-4">Se ingresarán {candidateRows.length} servicios:</p>
-        <div className="overflow-auto max-h-64">
-          <table className="min-w-full table-auto border-collapse">
-            <thead>
-              <tr>
-                {getServiceColumnsWithRender().slice(0, 5).map((col) => (
-                  <th
-                    key={col.key as string}
-                    className="border px-2 py-1 text-left"
-                  >
-                    {col.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {candidateRows.map((r, i) => (
-                <tr key={i} className="hover:bg-gray-100">
-                  {getServiceColumnsWithRender().slice(0, 5).map((col) => (
-                    <td key={col.key as string} className="border px-2 py-1">
-                      {String(r[col.key] || "")}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Modal>
 
       {/* Listado con filtros y botones */}
       <ListWithSearch<ServiceRow>
@@ -328,7 +215,6 @@ const IngresoServicio: React.FC = () => {
           textMapping: badgeTextColor,
           mode: "row",
         }}
-        globalButtons={globalButtons}
         preferencesKey="comercial-servicios"
       />
     </div>

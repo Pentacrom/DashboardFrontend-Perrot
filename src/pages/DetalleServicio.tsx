@@ -12,6 +12,7 @@ import {
   Lugar,
   Cliente,
   imoCategorias,
+  mockPaises,
 } from "../utils/ServiceDrafts";
 import { formatCLP, formatFechaISO } from "../utils/format";
 
@@ -162,7 +163,7 @@ const DetalleServicio: React.FC = () => {
           <dd>{lookupLugar(mockCatalogos.Lugares, form.destino)}</dd>
 
           <dt className="font-medium">País:</dt>
-          <dd>{form.pais}</dd>
+          <dd>{lookup(mockPaises, form.pais)}</dd>
 
           <dt className="font-medium">Fecha Solicitud:</dt>
           <dd>{formatFechaISO(form.fechaSol)}</dd>
@@ -369,9 +370,6 @@ const DetalleServicio: React.FC = () => {
                   <p>
                     <strong>Llegada:</strong>{" "}
                     {p.llegada ? formatFechaISO(new Date(p.llegada)) : "—"}
-                  </p>
-                  <p>
-                    <strong>Estado:</strong> {p.estado}
                   </p>
                   {p.observacion && (
                     <p>

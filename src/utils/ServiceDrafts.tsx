@@ -124,6 +124,7 @@ export interface Payload {
   movil?: string;
   descuentoServicioPorcentaje?: Descuento[];
   createdBy: string;
+  importBatchId?: string; // Para rastrear lotes de importación
 }
 
 // Datos mock completos

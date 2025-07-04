@@ -10,7 +10,7 @@ import {
   mockCentros,
 } from "../../utils/ServiceDrafts";
 import { Modal } from "../../components/Modal";
-import { formatDateTimeLocal } from "../../utils/format";
+import { formatDateTimeLocal, formatFechaISO } from "../../utils/format";
 
 const SeguimientoServicio: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -275,8 +275,8 @@ const SeguimientoServicio: React.FC = () => {
                   )}
                   {isLate && (
                     <p className="text-sm text-red-600 mt-1">
-                      Llegada tardía respecto a la ETA (
-                      {formatDateTimeLocal(etaDate!)})
+                      Llegada tardía respecto al agendada (
+                      {formatFechaISO(etaDate!)})
                     </p>
                   )}
                 </div>

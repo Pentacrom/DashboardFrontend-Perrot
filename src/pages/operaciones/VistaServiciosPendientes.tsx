@@ -22,6 +22,7 @@ import {
 import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
 import { AsignarChoferMovilModal } from "../operaciones/AsignarChoferMovilModal";
 import { Modal } from "../../components/Modal";
+import ImportExportButtons from "../../components/ImportExportButtons";
 
 const searchFilters: SearchFilter<ServiceRow>[] = [
   { label: "ID", key: "id", type: "text", placeholder: "Buscar ID" },
@@ -76,7 +77,7 @@ const VistaServiciosPendientes: React.FC = () => {
     closeConfirm();
   };
 
-  useEffect(() => {
+  const loadData = () => {
     const lookupEmpresa = (id: number) =>
       mockCatalogos.empresas.find((e) => e.id === id)?.nombre || id.toString();
     const lookupLugar = (id: number) =>
@@ -126,6 +127,10 @@ const VistaServiciosPendientes: React.FC = () => {
       };
     });
     setRows(mapped);
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
   const dropdownOptions = (row: ServiceRow): DropdownOption<ServiceRow>[] => {
@@ -164,12 +169,18 @@ const VistaServiciosPendientes: React.FC = () => {
     <div className="p-6">
       <div className="mb-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold">Servicios Pendientes</h1>
-        <button
-          onClick={() => navigate("/operaciones/nuevo-servicio")}
-          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-        >
-          Nuevo Servicio
-        </button>
+        <div className="flex gap-2">
+          <ImportExportButtons
+            data={rows}
+            onDataUpdate={setRows}
+          />
+          <button
+            onClick={() => navigate("/operaciones/nuevo-servicio")}
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            Nuevo Servicio
+          </button>
+        </div>
       </div>
 
       <ListWithSearch<ServiceRow>

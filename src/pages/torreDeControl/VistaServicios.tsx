@@ -19,6 +19,7 @@ import {
   defaultColumnConfigs 
 } from "../../utils/ServiceColumns";
 import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
+import ImportExportButtons from "../../components/ImportExportButtons";
 
 const searchFilters: SearchFilter<ServiceRow>[] = [
   { label: "ID", key: "id", type: "text", placeholder: "Buscar ID" },
@@ -36,7 +37,7 @@ const VistaServicios: React.FC = () => {
   const navigate = useNavigate();
   const [rows, setRows] = useState<ServiceRow[]>([]);
 
-  useEffect(() => {
+  const loadData = () => {
     // lookup genéricos
     const lookup = (arr: { codigo: number; nombre: string }[], code: number) =>
       arr.find((x) => x.codigo === code)?.nombre || code.toString();
@@ -93,6 +94,10 @@ const VistaServicios: React.FC = () => {
     });
 
     setRows(mapped);
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
   const dropdownOptions = (row: ServiceRow): DropdownOption<ServiceRow>[] => {
@@ -124,6 +129,10 @@ const VistaServicios: React.FC = () => {
     <div className="p-6">
       <div className="mb-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold">Servicios en Proceso</h1>
+        <ImportExportButtons
+          data={rows}
+          onDataUpdate={setRows}
+        />
       </div>
 
       <ListWithSearch<ServiceRow>
