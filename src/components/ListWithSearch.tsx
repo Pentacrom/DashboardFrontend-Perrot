@@ -30,15 +30,8 @@ import {
 } from "@dnd-kit/utilities";
 
 
-// Formateo de fechas a HH:mm dd/MM/yyyy
-export function formatFechaISO(iso: string | Date): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(
-    d.getMonth() + 1
-  )}/${d.getFullYear()}`;
-}
+// Import formatDateTime from format utils
+import { formatDateTime } from "../utils/format";
 
 export interface Column<T> {
   label: string;
@@ -867,7 +860,7 @@ function ListWithSearchInner<T extends Record<string, any>>(
 
                           const displayValue =
                             isDateObj || isIsoString
-                              ? formatFechaISO(raw as any).replace("T", " ")
+                              ? formatDateTime(raw as any)
                               : String(raw);
 
                           // Ahora aplicamos colorConfig o simplemente mostramos el valor

@@ -42,9 +42,22 @@ const ImportExportButtons: React.FC<ImportExportButtonsProps> = ({
     // Agrupar por cliente y tipo de operación
     const summary = payloads.reduce((acc: any, payload: any) => {
       const form = payload.form || {};
-      const cliente = mockCatalogos.empresas.find(e => e.id === form.cliente)?.nombre || `ID: ${form.cliente}`;
-      const tipoOp = mockCatalogos.Operación.find(op => op.codigo === form.tipoOperacion)?.nombre || `ID: ${form.tipoOperacion}`;
+      
+      // Buscar nombres reales en lugar de códigos
+      const clienteObj = mockCatalogos.empresas.find(e => e.id === form.cliente);
+      const cliente = clienteObj?.nombre || `Cliente ID: ${form.cliente}`;
+      
+      const tipoOpObj = mockCatalogos.Operación.find(op => op.codigo === form.tipoOperacion);
+      const tipoOp = tipoOpObj?.nombre || `Operación ID: ${form.tipoOperacion}`;
+      
       const ejecutivo = form.ejecutivo || payload.createdBy || 'Sin especificar';
+      
+      // Información adicional
+      const paisObj = mockPaises.find(p => p.codigo === form.pais);
+      const pais = paisObj?.nombre || `País ID: ${form.pais}`;
+      
+      const tipoContObj = mockCatalogos.Tipo_contenedor.find(tc => tc.codigo === form.tipoContenedor);
+      const tipoContenedor = tipoContObj?.nombre || `Contenedor ID: ${form.tipoContenedor}`;
       
       const key = `${cliente} - ${tipoOp} - ${ejecutivo}`;
       
@@ -53,6 +66,8 @@ const ImportExportButtons: React.FC<ImportExportButtonsProps> = ({
           cliente,
           tipoOperacion: tipoOp,
           ejecutivo,
+          pais,
+          tipoContenedor,
           count: 0,
           ids: []
         };
@@ -187,13 +202,19 @@ const ImportExportButtons: React.FC<ImportExportButtonsProps> = ({
             <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
               <p className="font-semibold text-green-800 mb-2">📋 Resumen de servicios a importar:</p>
               {getServiceSummary(validationResult.validPayloads).map((summary: any, index: number) => (
-                <div key={index} className="text-sm text-green-700 mb-1">
-                  <strong>{summary.count}</strong> servicio{summary.count > 1 ? 's' : ''} - 
-                  <strong> Cliente:</strong> {summary.cliente} | 
-                  <strong> Operación:</strong> {summary.tipoOperacion} | 
-                  <strong> Ejecutivo:</strong> {summary.ejecutivo}
-                  <div className="text-xs text-green-600 ml-2">
-                    IDs: {summary.ids.join(', ')}
+                <div key={index} className="text-sm text-green-700 mb-2 p-2 bg-white rounded border border-green-200">
+                  <div className="font-semibold">
+                    <strong>{summary.count}</strong> servicio{summary.count > 1 ? 's' : ''}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1 mt-1">
+                    <div><strong>Cliente:</strong> {summary.cliente}</div>
+                    <div><strong>Operación:</strong> {summary.tipoOperacion}</div>
+                    <div><strong>Ejecutivo:</strong> {summary.ejecutivo}</div>
+                    <div><strong>País:</strong> {summary.pais}</div>
+                    <div className="md:col-span-2"><strong>Tipo Container:</strong> {summary.tipoContenedor}</div>
+                  </div>
+                  <div className="text-xs text-green-600 mt-1">
+                    <strong>IDs:</strong> {summary.ids.join(', ')}
                   </div>
                 </div>
               ))}

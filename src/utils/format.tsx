@@ -12,7 +12,7 @@ export function formatCLP(value: number): string {
   }).format(Math.round(value));
 }
 
-// Formateo de fechas a HH:mm dd/MM/yyyy
+// Formateo de fechas a DD-MM-YYYY HH:mm
 export function formatFechaISO(iso: string | Date): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -24,7 +24,39 @@ export function formatFechaISO(iso: string | Date): string {
   const MM = pad(d.getMonth() + 1);
   const yyyy = d.getFullYear();
 
-  return `${dd}/${MM}/${yyyy} ${hh}:${mm} `;
+  return `${dd}-${MM}-${yyyy} ${hh}:${mm}`;
+}
+
+// Función general para formatear fechas a DD-MM-YYYY HH:mm
+export function formatDateTime(date: string | Date | undefined | null): string {
+  if (!date) return "";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "";
+  
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  
+  const dd = pad(d.getDate());
+  const MM = pad(d.getMonth() + 1);
+  const yyyy = d.getFullYear();
+  const hh = pad(d.getHours());
+  const mm = pad(d.getMinutes());
+  
+  return `${dd}-${MM}-${yyyy} ${hh}:${mm}`;
+}
+
+// Función para formatear solo fecha a DD-MM-YYYY
+export function formatDate(date: string | Date | undefined | null): string {
+  if (!date) return "";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "";
+  
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  
+  const dd = pad(d.getDate());
+  const MM = pad(d.getMonth() + 1);
+  const yyyy = d.getFullYear();
+  
+  return `${dd}-${MM}-${yyyy}`;
 }
 
 export function formatDateTimeLocal(input: Date | string | number | undefined): string {

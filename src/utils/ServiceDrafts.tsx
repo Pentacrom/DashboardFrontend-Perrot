@@ -97,6 +97,18 @@ export type EstadoServicio =
   | "Sin Asignar"
   | "Falso Flete"
   | "Por validar";
+
+export type EstadoSeguimiento =
+  | "Sin iniciar"
+  | "En ruta a origen"
+  | "En origen"
+  | "Carga retirada"
+  | "En ruta a destino"
+  | "Carga entregada"
+  | "Pendiente devolución"
+  | "Container devuelto"
+  | "Finalizado";
+
 export type TipoLugar = "Zona Portuaria" | "Centro" | "Proveedor";
 
 export interface ValorFactura {
@@ -115,11 +127,26 @@ export interface Descuento {
   razon: string;
 }
 
+export interface Movil {
+  id: number;
+  patente: string;
+  tipo: "tracto" | "camion" | "furgon";
+  rampla?: string; // Solo para tipo tracto
+}
+
+export interface Chofer {
+  id: number;
+  nombre: string;
+  telefono?: string;
+}
+
 export interface Payload {
   id: number;
   form: FormState;
   puntos: Punto[];
   estado: EstadoServicio;
+  estadoSeguimiento: EstadoSeguimiento;
+  pendienteDevolucion: boolean;
   valores?: ValorFactura[];
   chofer?: string;
   movil?: string;
@@ -277,6 +304,19 @@ export const mockCatalogos: Catalogos = {
   ],
 };
 
+// Configuración de colores para estados de seguimiento
+export const estadoSeguimientoStyles: Record<EstadoSeguimiento, { bg: string; text: string; border: string }> = {
+  "Sin iniciar": { bg: "bg-gray-100", text: "text-gray-800", border: "border-gray-300" },
+  "En ruta a origen": { bg: "bg-blue-100", text: "text-blue-800", border: "border-blue-300" },
+  "En origen": { bg: "bg-indigo-100", text: "text-indigo-800", border: "border-indigo-300" },
+  "Carga retirada": { bg: "bg-purple-100", text: "text-purple-800", border: "border-purple-300" },
+  "En ruta a destino": { bg: "bg-cyan-100", text: "text-cyan-800", border: "border-cyan-300" },
+  "Carga entregada": { bg: "bg-green-100", text: "text-green-800", border: "border-green-300" },
+  "Pendiente devolución": { bg: "bg-orange-100", text: "text-orange-800", border: "border-orange-300" },
+  "Container devuelto": { bg: "bg-emerald-100", text: "text-emerald-800", border: "border-emerald-300" },
+  "Finalizado": { bg: "bg-slate-100", text: "text-slate-800", border: "border-slate-300" },
+};
+
 export const mockCentros: Centro[] = [
   { codigo: 1, nombre: "Centro A", cliente: 1 },
   { codigo: 2, nombre: "Centro B", cliente: 1 },
@@ -296,6 +336,38 @@ export const mockPaises: Item[] = [
   { codigo: 1, nombre: "Chile" },
   { codigo: 2, nombre: "Argentina" },
   { codigo: 3, nombre: "Perú" },
+];
+
+export const mockMoviles: Movil[] = [
+  { id: 1, patente: "ABCD12", tipo: "tracto", rampla: "RAMP01" },
+  { id: 2, patente: "EFGH34", tipo: "tracto", rampla: "RAMP02" },
+  { id: 3, patente: "IJKL56", tipo: "tracto", rampla: "RAMP03" },
+  { id: 4, patente: "MNOP78", tipo: "camion" },
+  { id: 5, patente: "QRST90", tipo: "camion" },
+  { id: 6, patente: "UVWX12", tipo: "furgon" },
+  { id: 7, patente: "YZAB34", tipo: "furgon" },
+  { id: 8, patente: "CDEF56", tipo: "tracto", rampla: "RAMP04" },
+  { id: 9, patente: "GHIJ78", tipo: "tracto", rampla: "RAMP05" },
+  { id: 10, patente: "KLMN90", tipo: "camion" },
+];
+
+export const mockChoferes: Chofer[] = [
+  { id: 1, nombre: "Juan Pérez", telefono: "+56912345678" },
+  { id: 2, nombre: "María González", telefono: "+56987654321" },
+  { id: 3, nombre: "Carlos Rodríguez", telefono: "+56923456789" },
+  { id: 4, nombre: "Ana Martínez", telefono: "+56945678901" },
+  { id: 5, nombre: "Pedro López", telefono: "+56967890123" },
+  { id: 6, nombre: "Laura Silva", telefono: "+56934567890" },
+  { id: 7, nombre: "Diego Morales", telefono: "+56956789012" },
+  { id: 8, nombre: "Carmen Ruiz", telefono: "+56978901234" },
+  { id: 9, nombre: "Roberto Herrera", telefono: "+56912345679" },
+  { id: 10, nombre: "Patricia Castro", telefono: "+56987654322" },
+];
+
+export const mockRamplas: string[] = [
+  "RAMP01", "RAMP02", "RAMP03", "RAMP04", "RAMP05",
+  "RAMP06", "RAMP07", "RAMP08", "RAMP09", "RAMP10",
+  "SEMI01", "SEMI02", "SEMI03", "SEMI04", "SEMI05"
 ];
 
 // Implementación de funciones de almacenamiento y migración

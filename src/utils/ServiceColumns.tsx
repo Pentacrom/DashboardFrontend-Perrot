@@ -1,8 +1,9 @@
 import React from "react";
 import { Column } from "../components/ListWithSearch";
-import { EstadoServicio } from "./ServiceDrafts";
+import { EstadoServicio, EstadoSeguimiento } from "./ServiceDrafts";
 import { estadoStyles, badgeTextColor } from "../config/estadoConfig";
-import { formatCLP } from "./format";
+import { formatCLP, formatDateTime } from "./format";
+import EstadoSeguimientoOval from "../components/EstadoSeguimientoOval";
 
 export interface ServiceRow {
   id: string;
@@ -13,6 +14,8 @@ export interface ServiceRow {
   fecha: string;
   tipo: string;
   estado: EstadoServicio;
+  estadoSeguimiento: EstadoSeguimiento;
+  pendienteDevolucion: boolean;
   pais: string;
   tipoContenedor: string;
   kilos: number;
@@ -76,20 +79,39 @@ export const allServiceColumns: Column<ServiceRow>[] = [
   { label: "Fecha Folio", key: "fechaFolio", sortable: true },
   { label: "ETA", key: "eta", sortable: true },
   { label: "Ejecutivo", key: "ejecutivo", sortable: true },
+  { label: "Estado Seguimiento", key: "estadoSeguimiento", sortable: true },
   { label: "Chofer", key: "chofer", sortable: true },
   { label: "Móvil", key: "movil", sortable: true },
 ];
 
 // Configuraciones de columnas por defecto para cada página
 export const defaultColumnConfigs = {
-  comercial: ["id", "cliente", "tipoOperacion", "origen", "destino", "fecha", "tipo", "estado", "pais", "tipoContenedor", "precioCarga"] as Array<keyof ServiceRow>,
-  torreDeControl: ["id", "cliente", "origen", "destino", "fecha", "tipo", "estado"] as Array<keyof ServiceRow>,
-  operaciones: ["id", "cliente", "origen", "destino", "fecha", "tipo", "precioCarga", "estado"] as Array<keyof ServiceRow>,
+  comercial: ["id", "cliente", "tipoOperacion", "origen", "destino", "fecha", "tipo", "estado", "estadoSeguimiento", "pais", "tipoContenedor", "precioCarga"] as Array<keyof ServiceRow>,
+  torreDeControl: ["id", "cliente", "origen", "destino", "fecha", "tipo", "estado", "estadoSeguimiento"] as Array<keyof ServiceRow>,
+  operaciones: ["id", "cliente", "origen", "destino", "fecha", "tipo", "precioCarga", "estado", "estadoSeguimiento"] as Array<keyof ServiceRow>,
 };
 
 // Función para obtener columnas con render personalizado
 export const getServiceColumnsWithRender = (): Column<ServiceRow>[] => {
   return allServiceColumns.map(col => {
+    if (col.key === "id") {
+      return {
+        ...col,
+        render: (value: string, row: ServiceRow) => (
+          <div className="flex items-center gap-2">
+            <span>{value}</span>
+            {row.pendienteDevolucion && (
+              <span 
+                className="text-red-600 font-bold text-lg" 
+                title="Pendiente devolución de container"
+              >
+                ⚠️
+              </span>
+            )}
+          </div>
+        ),
+      };
+    }
     if (col.key === "estado") {
       return {
         ...col,
@@ -100,6 +122,20 @@ export const getServiceColumnsWithRender = (): Column<ServiceRow>[] => {
             {value}
           </span>
         ),
+      };
+    }
+    if (col.key === "estadoSeguimiento") {
+      return {
+        ...col,
+        render: (value: EstadoSeguimiento) => (
+          <EstadoSeguimientoOval estado={value} />
+        ),
+      };
+    }
+    if (col.key === "fecha" || col.key === "fechaFolio" || col.key === "eta") {
+      return {
+        ...col,
+        render: (value: string) => value ? formatDateTime(value) : "-",
       };
     }
     if (col.key === "precioCarga") {

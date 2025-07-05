@@ -8,8 +8,10 @@ import {
     getNextId,
     loadSent,
     loadDrafts,
-    saveOrUpdateSent
+    saveOrUpdateSent,
+    EstadoSeguimiento
   } from "./ServiceDrafts";
+  import { formatDateTime } from "./format";
   import * as XLSX from "xlsx";
   import ExcelJS from "exceljs";
   
@@ -181,6 +183,8 @@ import {
       form,
       puntos,
       estado: "Pendiente",
+      estadoSeguimiento: "Sin iniciar",
+      pendienteDevolucion: false,
       createdBy: findCellValue(row, "ejecutivo") || "importacion-excel"
     };
   }
@@ -409,7 +413,7 @@ import {
           const pais = mockPaises.find(p => p.codigo === form.pais);
           return pais?.nombre || '';
         case 'ETA_STACKING':
-          return form.eta ? new Date(form.eta).toLocaleDateString() : '';
+          return form.eta ? formatDateTime(form.eta) : '';
         case 'Naviera':
           return ''; // Este campo no está mapeado actualmente
         case 'Nave':
@@ -427,7 +431,7 @@ import {
           const origen = mockCatalogos.Lugares.find(lugar => lugar.id === form.origen);
           return origen?.nombre || '';
         case 'Fecha de Retiro 1':
-          return form.fechaSol ? new Date(form.fechaSol).toLocaleDateString() : '';
+          return form.fechaSol ? formatDateTime(form.fechaSol) : '';
         case 'Lugar de Retiro 2':
           return ''; // Este campo no está mapeado actualmente
         case 'Fecha de Retiro 2':
@@ -442,7 +446,7 @@ import {
         case 'Guia':
           return form.guiaDeDespacho || '';
         case 'Fecha de Presentación':
-          return form.fechaIng ? new Date(form.fechaIng).toLocaleDateString() : '';
+          return form.fechaIng ? formatDateTime(form.fechaIng) : '';
         default:
           return '';
       }

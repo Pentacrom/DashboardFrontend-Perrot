@@ -6,31 +6,20 @@ import {
   loadSent,
   saveOrUpdateSent,
   Payload,
+  mockMoviles,
+  mockChoferes,
+  mockRamplas,
 } from "../../utils/ServiceDrafts";
 
-const COMPANY_DATA: Record<string, { drivers: string[]; moviles: string[] }> = {
-  empresa1: {
-    drivers: ["Juan Pérez", "Ana López"],
-    moviles: ["ABC-123", "ABC-456"],
-  },
-  empresa2: {
-    drivers: ["Carlos Díaz", "María García"],
-    moviles: ["XYZ-789", "XYZ-012"],
-  },
-  empresa3: {
-    drivers: ["Luis Ramírez", "Sofía Torres"],
-    moviles: ["MNO-321", "MNO-654"],
-  },
-};
 
 const AsignarChoferMovil: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
   const [service, setService] = useState<Payload | null>(null);
-  const [empresa, setEmpresa] = useState("");
-  const [chofer, setChofer] = useState("");
-  const [movil, setMovil] = useState("");
+  const [chofer, setChofer] = useState(0);
+  const [movil, setMovil] = useState(0);
+  const [rampla, setRampla] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,21 +43,32 @@ const AsignarChoferMovil: React.FC = () => {
     (e: React.FormEvent) => {
       e.preventDefault();
       if (!service) return;
-      if (!empresa || !chofer || !movil) {
-        alert("Debe seleccionar empresa, chofer y móvil.");
+      if (!chofer || !movil) {
+        alert("Debe seleccionar chofer y móvil.");
         return;
       }
+      
+      const selectedMovil = mockMoviles.find(m => m.id === movil);
+      if (selectedMovil?.tipo === "Tracto" && !rampla) {
+        alert("Debe seleccionar una rampla para vehículos tipo Tracto.");
+        return;
+      }
+      
+      const choferNombre = mockChoferes.find(c => c.id === chofer)?.nombre || "";
+      const movilPatente = mockMoviles.find(m => m.id === movil)?.patente || "";
+      
       const updated: Payload = {
         ...service,
-        chofer,
-        movil,
+        chofer: choferNombre,
+        movil: movilPatente,
         estado: "En Proceso",
+        estadoSeguimiento: "Asignado",
       };
       saveOrUpdateSent(updated);
       alert(`Chofer y móvil asignados. Servicio ${service.id} en Proceso.`);
       navigate("/comercial/ingresoServicios");
     },
-    [service, empresa, chofer, movil, navigate]
+    [service, chofer, movil, rampla, navigate]
   );
 
   if (loading) {
@@ -95,8 +95,8 @@ const AsignarChoferMovil: React.FC = () => {
     );
   }
 
-  const drivers = empresa ? COMPANY_DATA[empresa]?.drivers : [];
-  const movilesList = empresa ? COMPANY_DATA[empresa]?.moviles : [];
+  const selectedMovil = mockMoviles.find(m => m.id === movil);
+  const isTracto = selectedMovil?.tipo === "Tracto";
 
   return (
     <div className="p-6 max-w-md mx-auto">
@@ -109,39 +109,17 @@ const AsignarChoferMovil: React.FC = () => {
         className="space-y-6 bg-white p-6 rounded shadow"
       >
         <div>
-          <label className="block text-sm font-medium mb-1">Empresa *</label>
-          <select
-            value={empresa}
-            onChange={(e) => {
-              setEmpresa(e.target.value);
-              setChofer("");
-              setMovil("");
-            }}
-            required
-            className="input w-full"
-          >
-            <option value="">— Seleccione empresa —</option>
-            {Object.keys(COMPANY_DATA).map((key) => (
-              <option key={key} value={key}>
-                {key}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
           <label className="block text-sm font-medium mb-1">Chofer *</label>
           <select
             value={chofer}
-            onChange={(e) => setChofer(e.target.value)}
+            onChange={(e) => setChofer(Number(e.target.value))}
             required
-            disabled={!empresa}
             className="input w-full"
           >
-            <option value="">— Seleccione chofer —</option>
-            {drivers?.map((d) => (
-              <option key={d} value={d}>
-                {d}
+            <option value={0}>— Seleccione chofer —</option>
+            {mockChoferes.map((chofer) => (
+              <option key={chofer.id} value={chofer.id}>
+                {chofer.nombre} - RUT: {chofer.rut}
               </option>
             ))}
           </select>
@@ -151,19 +129,44 @@ const AsignarChoferMovil: React.FC = () => {
           <label className="block text-sm font-medium mb-1">Móvil *</label>
           <select
             value={movil}
-            onChange={(e) => setMovil(e.target.value)}
+            onChange={(e) => {
+              setMovil(Number(e.target.value));
+              setRampla(0); // Reset rampla when changing vehicle
+            }}
             required
-            disabled={!empresa}
             className="input w-full"
           >
-            <option value="">— Seleccione móvil —</option>
-            {movilesList?.map((m) => (
-              <option key={m} value={m}>
-                {m}
+            <option value={0}>— Seleccione móvil —</option>
+            {mockMoviles.map((movil) => (
+              <option key={movil.id} value={movil.id}>
+                {movil.patente} - {movil.tipo} ({movil.capacidad}t)
               </option>
             ))}
           </select>
         </div>
+
+        {/* Mostrar selector de rampla solo para vehículos Tracto */}
+        {isTracto && (
+          <div>
+            <label className="block text-sm font-medium mb-1">Rampla *</label>
+            <select
+              value={rampla}
+              onChange={(e) => setRampla(Number(e.target.value))}
+              required
+              className="input w-full"
+            >
+              <option value={0}>— Seleccione rampla —</option>
+              {mockRamplas.map((rampla) => (
+                <option key={rampla.id} value={rampla.id}>
+                  {rampla.patente} - {rampla.capacidad}t
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Requerido para vehículos tipo Tracto
+            </p>
+          </div>
+        )}
 
         <div className="flex justify-end gap-4">
           <button

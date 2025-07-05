@@ -8,6 +8,9 @@ import {
   Punto,
   mockCatalogos,
   mockCentros,
+  mockMoviles,
+  mockRamplas,
+  EstadoSeguimiento
 } from "../../utils/ServiceDrafts";
 import { Modal } from "../../components/Modal";
 import { formatDateTimeLocal, formatFechaISO } from "../../utils/format";
@@ -21,6 +24,7 @@ const SeguimientoServicio: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [selectedRampla, setSelectedRampla] = useState<number>(0);
 
   // Extrae el primer segmento de la ruta
   const segments = location.pathname.split("/").filter(Boolean);
@@ -68,6 +72,25 @@ const SeguimientoServicio: React.FC = () => {
     );
   }, []);
 
+  // Función para calcular si el container está pendiente de devolución
+  const calcularPendienteDevolucion = useCallback((puntos: Punto[]) => {
+    // Buscar puntos que implican dejar el container (acciones 3 y 4)
+    const puntosDevolucion = puntos.filter(p => p.accion === 3 || p.accion === 4);
+    
+    // Si no hay puntos de devolución, no puede estar pendiente
+    if (puntosDevolucion.length === 0) return false;
+    
+    // Verificar si todos los puntos NO de devolución están completados
+    const puntosNoDevolución = puntos.filter(p => p.accion !== 3 && p.accion !== 4);
+    const todosNoDevolacionCompletados = puntosNoDevolución.every(p => p.llegada && p.salida);
+    
+    // Verificar si algún punto de devolución NO está completado
+    const algunDevolucionIncompleta = puntosDevolucion.some(p => !p.llegada || !p.salida);
+    
+    // Está pendiente si todos los puntos no-devolución están completos pero falta alguna devolución
+    return todosNoDevolacionCompletados && algunDevolucionIncompleta;
+  }, []);
+
   const validarFechas = () =>
     puntos.every((p, idx) => {
       const minArrivalRaw =
@@ -82,11 +105,16 @@ const SeguimientoServicio: React.FC = () => {
 
   const handleGuardar = useCallback(() => {
     if (!service) return;
-    const updated: Payload = { ...service, puntos };
+    const pendienteDevolucion = calcularPendienteDevolucion(puntos);
+    const updated: Payload = { 
+      ...service, 
+      puntos,
+      pendienteDevolucion
+    };
     saveOrUpdateSent(updated);
     alert("Seguimiento guardado correctamente.");
     navigate(-1);
-  }, [service, puntos, navigate]);
+  }, [service, puntos, navigate, calcularPendienteDevolucion]);
 
   const handleCompletar = () => {
     if (!validarFechas()) {
@@ -98,14 +126,28 @@ const SeguimientoServicio: React.FC = () => {
 
   const confirmarCompletar = () => {
     if (!service) return;
+    
+    // Calcular el estado de devolución de container basado en puntos completados
+    const pendienteDevolucion = calcularPendienteDevolucion(puntos);
+    
+    // Verificar si el container está pendiente de devolución
+    if (pendienteDevolucion) {
+      const confirmar = window.confirm(
+        "⚠️ ATENCIÓN: El container aún no ha sido devuelto. El servicio pasará a revisión pero con estado de container pendiente. ¿Continuar?"
+      );
+      if (!confirmar) return;
+    }
+    
     const actualizado: Payload = {
       ...service,
       puntos,
-      estado: "Por validar",
+      pendienteDevolucion,
+      estado: pendienteDevolucion ? "En revisión" : "Por validar",
+      estadoSeguimiento: pendienteDevolucion ? "En revisión con pendientes" : "Completado"
     };
     saveOrUpdateSent(actualizado);
     setShowModal(false);
-    alert("Servicio marcado como Por validar.");
+    alert(pendienteDevolucion ? "Servicio pasado a revisión con container pendiente." : "Servicio marcado como Por validar.");
     navigate(`/${perfilActual}/gestion-servicios`);
   };
 
@@ -203,7 +245,7 @@ const SeguimientoServicio: React.FC = () => {
             const isLate =
               !!p.llegada &&
               !!etaDate &&
-              new Date(p.llegada) > new Date(etaDate);
+              (new Date(p.llegada).getTime() - new Date(etaDate).getTime()) > (15 * 60 * 1000); // 15+ minutos tarde
             const invalidArrival =
               !!p.llegada &&
               minArrival &&
@@ -347,6 +389,53 @@ const SeguimientoServicio: React.FC = () => {
         </div>
       </div>
 
+      {/* Información del servicio asignado */}
+      <div className="bg-white p-6 rounded shadow">
+        <h2 className="text-lg font-semibold mb-4">Recursos Asignados</h2>
+        <div className="grid md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Chofer Asignado</label>
+            <input
+              type="text"
+              className="input w-full bg-gray-100"
+              value={service?.chofer || "Sin asignar"}
+              disabled
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Móvil Asignado</label>
+            <input
+              type="text"
+              className="input w-full bg-gray-100"
+              value={service?.movil || "Sin asignar"}
+              disabled
+            />
+          </div>
+        </div>
+        
+        {/* Mostrar selector de rampla solo si el móvil asignado es tipo "Tracto" */}
+        {service?.movil && mockMoviles.find(m => m.patente === service.movil)?.tipo === "Tracto" && (
+          <div className="max-w-md">
+            <label className="block text-sm font-medium mb-1">Rampla para Tracto</label>
+            <select
+              className="input w-full"
+              value={selectedRampla}
+              onChange={(e) => setSelectedRampla(Number(e.target.value))}
+            >
+              <option value={0}>— Seleccionar rampla —</option>
+              {mockRamplas.map((rampla) => (
+                <option key={rampla.id} value={rampla.id}>
+                  {rampla.patente} - {rampla.capacidad}t
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Selecciona la rampla que usará este vehículo tracto
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Botones */}
       <div className="flex justify-end gap-4">
         <button
@@ -363,9 +452,14 @@ const SeguimientoServicio: React.FC = () => {
         </button>
         <button
           onClick={handleCompletar}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          className={`px-4 py-2 rounded ${
+            calcularPendienteDevolucion(puntos)
+              ? "bg-yellow-600 text-white hover:bg-yellow-700" 
+              : "bg-blue-600 text-white hover:bg-blue-700"
+          }`}
+          disabled={!puntos.every(p => p.llegada && p.salida)}
         >
-          Completar Servicio
+          {calcularPendienteDevolucion(puntos) ? "Pasar a Revisar (⚠️ Container Pendiente)" : "Pasar a Revisar"}
         </button>
       </div>
 
@@ -373,12 +467,22 @@ const SeguimientoServicio: React.FC = () => {
       <Modal isOpen={showModal} onClose={() => setShowModal(false)}>
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">
-            ¿Confirmar completar servicio?
+            ¿Confirmar pasar servicio a revisión?
           </h2>
-          <p>
-            Esta acción marcará el servicio como <strong>Por validar</strong> y
-            será enviada a comercial.
-          </p>
+          {calcularPendienteDevolucion(puntos) ? (
+            <div className="bg-yellow-50 border border-yellow-200 p-3 rounded">
+              <p className="text-yellow-800 font-medium mb-2">⚠️ Container Pendiente de Devolución</p>
+              <p className="text-yellow-700">
+                El servicio pasará a <strong>En revisión</strong> pero el container aún no ha sido devuelto. 
+                Esto debe resolverse antes de poder completar totalmente el servicio.
+              </p>
+            </div>
+          ) : (
+            <p>
+              Esta acción marcará el servicio como <strong>Por validar</strong> y
+              será enviado a comercial para revisión final.
+            </p>
+          )}
           <div className="flex justify-end gap-4">
             <button
               onClick={() => setShowModal(false)}

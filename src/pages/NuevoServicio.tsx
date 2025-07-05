@@ -134,6 +134,7 @@ const NuevoServicio: React.FC = () => {
           salida: p.salida ? new Date(p.salida) : undefined,
         }))
       );
+      // pendienteDevolucion se maneja automáticamente en el seguimiento
     }
   }, [paramId, drafts]);
 
@@ -431,6 +432,8 @@ const NuevoServicio: React.FC = () => {
       form,
       puntos,
       estado: estadoToUse,
+      estadoSeguimiento: "Sin iniciar",
+      pendienteDevolucion: false, // Siempre inicia en false
       createdBy,
     });
     alert(`Guardado servicio N° ${newId}.`);
