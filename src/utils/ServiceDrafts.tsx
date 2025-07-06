@@ -36,6 +36,7 @@ export interface Catalogos {
   empresas: Cliente[];
   proveedores_extras: Item[];
   grupoCliente: Item[];
+  navieras: Item[];
 }
 
 export interface Centro {
@@ -96,10 +97,12 @@ export type EstadoServicio =
   | "Completado"
   | "Sin Asignar"
   | "Falso Flete"
-  | "Por validar";
+  | "Por validar"
+  | "En revisión";
 
 export type EstadoSeguimiento =
   | "Sin iniciar"
+  | "Asignado"
   | "En ruta a origen"
   | "En origen"
   | "Carga retirada"
@@ -107,6 +110,8 @@ export type EstadoSeguimiento =
   | "Carga entregada"
   | "Pendiente devolución"
   | "Container devuelto"
+  | "Completado"
+  | "En revisión con pendientes"
   | "Finalizado";
 
 export type TipoLugar = "Zona Portuaria" | "Centro" | "Proveedor";
@@ -130,14 +135,23 @@ export interface Descuento {
 export interface Movil {
   id: number;
   patente: string;
-  tipo: "tracto" | "camion" | "furgon";
-  rampla?: string; // Solo para tipo tracto
+  tipo: "Tracto" | "Camion" | "Furgon";
+  capacidad: number; // En toneladas
+  empresa: string; // Empresa a la que pertenece
 }
 
 export interface Chofer {
   id: number;
   nombre: string;
+  rut: string;
   telefono?: string;
+  empresa: string; // Empresa a la que pertenece
+}
+
+export interface Rampla {
+  id: number;
+  patente: string;
+  capacidad: number; // En toneladas
 }
 
 export interface Payload {
@@ -307,6 +321,7 @@ export const mockCatalogos: Catalogos = {
 // Configuración de colores para estados de seguimiento
 export const estadoSeguimientoStyles: Record<EstadoSeguimiento, { bg: string; text: string; border: string }> = {
   "Sin iniciar": { bg: "bg-gray-100", text: "text-gray-800", border: "border-gray-300" },
+  "Asignado": { bg: "bg-yellow-100", text: "text-yellow-800", border: "border-yellow-300" },
   "En ruta a origen": { bg: "bg-blue-100", text: "text-blue-800", border: "border-blue-300" },
   "En origen": { bg: "bg-indigo-100", text: "text-indigo-800", border: "border-indigo-300" },
   "Carga retirada": { bg: "bg-purple-100", text: "text-purple-800", border: "border-purple-300" },
@@ -314,6 +329,8 @@ export const estadoSeguimientoStyles: Record<EstadoSeguimiento, { bg: string; te
   "Carga entregada": { bg: "bg-green-100", text: "text-green-800", border: "border-green-300" },
   "Pendiente devolución": { bg: "bg-orange-100", text: "text-orange-800", border: "border-orange-300" },
   "Container devuelto": { bg: "bg-emerald-100", text: "text-emerald-800", border: "border-emerald-300" },
+  "Completado": { bg: "bg-green-200", text: "text-green-900", border: "border-green-400" },
+  "En revisión con pendientes": { bg: "bg-red-100", text: "text-red-800", border: "border-red-300" },
   "Finalizado": { bg: "bg-slate-100", text: "text-slate-800", border: "border-slate-300" },
 };
 
@@ -339,36 +356,59 @@ export const mockPaises: Item[] = [
 ];
 
 export const mockMoviles: Movil[] = [
-  { id: 1, patente: "ABCD12", tipo: "tracto", rampla: "RAMP01" },
-  { id: 2, patente: "EFGH34", tipo: "tracto", rampla: "RAMP02" },
-  { id: 3, patente: "IJKL56", tipo: "tracto", rampla: "RAMP03" },
-  { id: 4, patente: "MNOP78", tipo: "camion" },
-  { id: 5, patente: "QRST90", tipo: "camion" },
-  { id: 6, patente: "UVWX12", tipo: "furgon" },
-  { id: 7, patente: "YZAB34", tipo: "furgon" },
-  { id: 8, patente: "CDEF56", tipo: "tracto", rampla: "RAMP04" },
-  { id: 9, patente: "GHIJ78", tipo: "tracto", rampla: "RAMP05" },
-  { id: 10, patente: "KLMN90", tipo: "camion" },
+  // Empresa TransLogística SA
+  { id: 1, patente: "ABCD12", tipo: "Tracto", capacidad: 40, empresa: "TransLogística SA" },
+  { id: 2, patente: "EFGH34", tipo: "Tracto", capacidad: 40, empresa: "TransLogística SA" },
+  { id: 3, patente: "IJKL56", tipo: "Camion", capacidad: 20, empresa: "TransLogística SA" },
+  { id: 4, patente: "MNOP78", tipo: "Furgon", capacidad: 5, empresa: "TransLogística SA" },
+  
+  // Empresa Transportes Unidos Ltda
+  { id: 5, patente: "QRST90", tipo: "Tracto", capacidad: 45, empresa: "Transportes Unidos Ltda" },
+  { id: 6, patente: "UVWX12", tipo: "Camion", capacidad: 25, empresa: "Transportes Unidos Ltda" },
+  { id: 7, patente: "YZAB34", tipo: "Furgon", capacidad: 8, empresa: "Transportes Unidos Ltda" },
+  
+  // Empresa LogiCarga Express
+  { id: 8, patente: "CDEF56", tipo: "Tracto", capacidad: 35, empresa: "LogiCarga Express" },
+  { id: 9, patente: "GHIJ78", tipo: "Camion", capacidad: 18, empresa: "LogiCarga Express" },
+  { id: 10, patente: "KLMN90", tipo: "Tracto", capacidad: 42, empresa: "LogiCarga Express" },
 ];
 
 export const mockChoferes: Chofer[] = [
-  { id: 1, nombre: "Juan Pérez", telefono: "+56912345678" },
-  { id: 2, nombre: "María González", telefono: "+56987654321" },
-  { id: 3, nombre: "Carlos Rodríguez", telefono: "+56923456789" },
-  { id: 4, nombre: "Ana Martínez", telefono: "+56945678901" },
-  { id: 5, nombre: "Pedro López", telefono: "+56967890123" },
-  { id: 6, nombre: "Laura Silva", telefono: "+56934567890" },
-  { id: 7, nombre: "Diego Morales", telefono: "+56956789012" },
-  { id: 8, nombre: "Carmen Ruiz", telefono: "+56978901234" },
-  { id: 9, nombre: "Roberto Herrera", telefono: "+56912345679" },
-  { id: 10, nombre: "Patricia Castro", telefono: "+56987654322" },
+  // Empresa TransLogística SA
+  { id: 1, nombre: "Juan Pérez", rut: "12345678-9", telefono: "+56912345678", empresa: "TransLogística SA" },
+  { id: 2, nombre: "María González", rut: "98765432-1", telefono: "+56987654321", empresa: "TransLogística SA" },
+  { id: 3, nombre: "Carlos Rodríguez", rut: "11223344-5", telefono: "+56923456789", empresa: "TransLogística SA" },
+  
+  // Empresa Transportes Unidos Ltda  
+  { id: 4, nombre: "Ana Martínez", rut: "55667788-9", telefono: "+56945678901", empresa: "Transportes Unidos Ltda" },
+  { id: 5, nombre: "Pedro López", rut: "99887766-5", telefono: "+56967890123", empresa: "Transportes Unidos Ltda" },
+  { id: 6, nombre: "Luis Sánchez", rut: "44556677-8", telefono: "+56933445566", empresa: "Transportes Unidos Ltda" },
+  
+  // Empresa LogiCarga Express
+  { id: 7, nombre: "Carmen Silva", rut: "22334455-6", telefono: "+56955667788", empresa: "LogiCarga Express" },
+  { id: 8, nombre: "Roberto Torres", rut: "77889900-1", telefono: "+56977889900", empresa: "LogiCarga Express" },
 ];
 
-export const mockRamplas: string[] = [
-  "RAMP01", "RAMP02", "RAMP03", "RAMP04", "RAMP05",
-  "RAMP06", "RAMP07", "RAMP08", "RAMP09", "RAMP10",
-  "SEMI01", "SEMI02", "SEMI03", "SEMI04", "SEMI05"
+export const mockRamplas: Rampla[] = [
+  { id: 1, patente: "RAMP01", capacidad: 40 },
+  { id: 2, patente: "RAMP02", capacidad: 45 },
+  { id: 3, patente: "RAMP03", capacidad: 35 },
+  { id: 4, patente: "RAMP04", capacidad: 40 },
+  { id: 5, patente: "RAMP05", capacidad: 42 },
+  { id: 6, patente: "RAMP06", capacidad: 38 },
+  { id: 7, patente: "RAMP07", capacidad: 44 },
+  { id: 8, patente: "RAMP08", capacidad: 36 },
+  { id: 9, patente: "SEMI01", capacidad: 30 },
+  { id: 10, patente: "SEMI02", capacidad: 32 },
 ];
+
+// Función para obtener empresas de transporte únicas
+export function getEmpresasTransporte(): string[] {
+  const empresas = new Set<string>();
+  mockMoviles.forEach(movil => empresas.add(movil.empresa));
+  mockChoferes.forEach(chofer => empresas.add(chofer.empresa));
+  return Array.from(empresas).sort();
+}
 
 // Implementación de funciones de almacenamiento y migración
 const STORAGE = {
@@ -575,10 +615,6 @@ export const migrateAllFechas = (): void => {
   });
 };
 
-const safeIso = (raw: string) =>
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(raw)
-    ? raw
-    : new Date().toISOString().slice(0, 16);
 
 // Helper: genera fecha aleatoria entre dos fechas
 function randomDateBetween(start: Date, end: Date): Date {

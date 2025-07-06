@@ -58,6 +58,8 @@ const VistaServicios: React.FC = () => {
       const paisName = mockCatalogos.Zona.find(z => z.codigo === f.pais)?.nombre || "";
       const tipoContenedorName = mockCatalogos.Tipo_contenedor.find(tc => tc.codigo === f.tipoContenedor)?.nombre || "";
 
+      const pendienteDevolucion = p.pendienteDevolucion || false;
+      
       return {
         id: p.id.toString(),
         cliente: clienteName,
@@ -67,6 +69,10 @@ const VistaServicios: React.FC = () => {
         fecha: f.fechaSol && f.fechaSol instanceof Date ? f.fechaSol.toISOString() : "",
         tipo: tipoName,
         estado: p.estado,
+        estadoSeguimiento: p.estadoSeguimiento || "Sin iniciar",
+        pendienteDevolucion,
+        // Campo calculado para coloración de filas
+        rowStyle: pendienteDevolucion ? "CONTAINER_PENDIENTE" : p.estado,
         pais: paisName,
         tipoContenedor: tipoContenedorName,
         kilos: f.kilos,
@@ -93,7 +99,16 @@ const VistaServicios: React.FC = () => {
       };
     });
 
-    setRows(mapped);
+    // Ordenar para mostrar containers pendientes primero
+    const sorted = mapped.sort((a, b) => {
+      // Containers pendientes van arriba
+      if (a.pendienteDevolucion && !b.pendienteDevolucion) return -1;
+      if (!a.pendienteDevolucion && b.pendienteDevolucion) return 1;
+      // Luego por estado y fecha
+      return new Date(b.fecha).getTime() - new Date(a.fecha).getTime();
+    });
+
+    setRows(sorted);
   };
 
   useEffect(() => {
@@ -123,6 +138,12 @@ const VistaServicios: React.FC = () => {
       key: "estado" as keyof ServiceRow,
       options: Object.keys(estadoStyles) as EstadoServicio[],
     },
+    {
+      label: "Container pendiente",
+      key: "pendienteDevolucion" as keyof ServiceRow,
+      options: [true, false],
+      optionLabels: { "true": "Pendiente ⚠️", "false": "No pendiente ✅" },
+    },
   ];
 
   return (
@@ -148,9 +169,15 @@ const VistaServicios: React.FC = () => {
         }}
         dropdownOptions={dropdownOptions as DropdownOptionsType<ServiceRow>}
         colorConfig={{
-          field: "estado",
-          bgMapping: estadoStyles,
-          textMapping: badgeTextColor,
+          field: "rowStyle",
+          bgMapping: {
+            ...estadoStyles,
+            "CONTAINER_PENDIENTE": "bg-red-100 border-l-8 border-red-600 shadow-lg ring-2 ring-red-200",
+          },
+          textMapping: {
+            ...badgeTextColor,
+            "CONTAINER_PENDIENTE": "text-red-900 font-bold",
+          },
           mode: "row",
         }}
         onSearch={() => alert("Buscar (stub)")}
@@ -163,8 +190,9 @@ const VistaServicios: React.FC = () => {
             "Por facturar",
             "Completado",
           ],
+          pendienteDevolucion: [true, false],
         }}
-        defaultSortKey="estado"
+        defaultSortKey="pendienteDevolucion"
         defaultSortOrder="asc"
         preferencesKey="torreDeControl-servicios"
       />

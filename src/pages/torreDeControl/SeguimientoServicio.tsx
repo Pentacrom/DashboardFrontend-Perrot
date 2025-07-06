@@ -7,10 +7,8 @@ import {
   Payload,
   Punto,
   mockCatalogos,
-  mockCentros,
   mockMoviles,
   mockRamplas,
-  EstadoSeguimiento
 } from "../../utils/ServiceDrafts";
 import { Modal } from "../../components/Modal";
 import { formatDateTimeLocal, formatFechaISO } from "../../utils/format";
@@ -28,7 +26,7 @@ const SeguimientoServicio: React.FC = () => {
 
   // Extrae el primer segmento de la ruta
   const segments = location.pathname.split("/").filter(Boolean);
-  const perfilActual = segments[1] || "";
+  const perfilActual = segments[0] || "torreDeControl";
 
   // carga inicial
   useEffect(() => {
@@ -77,6 +75,8 @@ const SeguimientoServicio: React.FC = () => {
     // Buscar puntos que implican dejar el container (acciones 3 y 4)
     const puntosDevolucion = puntos.filter(p => p.accion === 3 || p.accion === 4);
     
+    console.log("DEBUG - Puntos de devolución:", puntosDevolucion);
+    
     // Si no hay puntos de devolución, no puede estar pendiente
     if (puntosDevolucion.length === 0) return false;
     
@@ -87,21 +87,33 @@ const SeguimientoServicio: React.FC = () => {
     // Verificar si algún punto de devolución NO está completado
     const algunDevolucionIncompleta = puntosDevolucion.some(p => !p.llegada || !p.salida);
     
+    console.log("DEBUG - Todos no devolución completados:", todosNoDevolacionCompletados);
+    console.log("DEBUG - Alguna devolución incompleta:", algunDevolucionIncompleta);
+    
     // Está pendiente si todos los puntos no-devolución están completos pero falta alguna devolución
-    return todosNoDevolacionCompletados && algunDevolucionIncompleta;
+    const resultado = todosNoDevolacionCompletados && algunDevolucionIncompleta;
+    console.log("DEBUG - Container pendiente:", resultado);
+    
+    return resultado;
   }, []);
 
-  const validarFechas = () =>
-    puntos.every((p, idx) => {
+  const validarFechas = () => {
+    console.log("DEBUG - Validando fechas de puntos:", puntos);
+    const resultado = puntos.every((p, idx) => {
       const minArrivalRaw =
         idx === 0 ? service?.form.fechaSol : puntos[idx - 1]?.salida || "";
-      return (
+      const valido = (
         !!p.llegada &&
         !!p.salida &&
         new Date(p.llegada) >= new Date(minArrivalRaw!) &&
         new Date(p.salida) >= new Date(p.llegada)
       );
+      console.log(`DEBUG - Punto ${idx} válido:`, valido, {llegada: p.llegada, salida: p.salida});
+      return valido;
     });
+    console.log("DEBUG - Resultado validación fechas:", resultado);
+    return resultado;
+  };
 
   const handleGuardar = useCallback(() => {
     if (!service) return;
@@ -117,24 +129,77 @@ const SeguimientoServicio: React.FC = () => {
   }, [service, puntos, navigate, calcularPendienteDevolucion]);
 
   const handleCompletar = () => {
-    if (!validarFechas()) {
-      alert("Todas las fechas deben respetar el orden y estar completas.");
+    console.log("DEBUG - Iniciando handleCompletar");
+    
+    // Validar que todos los puntos NO de devolución tengan llegada y salida
+    // Los puntos de devolución (acciones 3 y 4) pueden estar incompletos
+    const puntosNoDevolución = puntos.filter(p => p.accion !== 3 && p.accion !== 4);
+    const puntosIncompletos = puntosNoDevolución.filter(p => !p.llegada || !p.salida);
+    
+    if (puntosIncompletos.length > 0) {
+      const indices = puntosIncompletos.map(p => puntos.findIndex(punto => punto === p) + 1);
+      alert(`Faltan fechas de llegada y/o salida en los puntos: ${indices.join(', ')}. Los puntos de devolución de container pueden quedar pendientes.`);
       return;
     }
+    
+    // Validar que la carga fue entregada (debe haber al menos un punto con acción 4 "dejar container cargado" o 7 "vaciar container")
+    const cargaEntregada = puntos.some(p => (p.accion === 4 || p.accion === 7) && p.llegada && p.salida);
+    if (!cargaEntregada) {
+      alert("Debe completar al menos la entrega de la carga (dejar container cargado o vaciar container).");
+      return;
+    }
+    
+    // Validar orden de fechas solo para puntos completados
+    for (let idx = 0; idx < puntos.length; idx++) {
+      const p = puntos[idx];
+      const minArrivalRaw = idx === 0 ? service?.form.fechaSol : puntos[idx - 1]?.salida;
+      
+      // Solo validar si el punto está completado
+      if (!p.llegada || !p.salida) continue;
+      
+      if (minArrivalRaw && new Date(p.llegada) < new Date(minArrivalRaw)) {
+        alert(`La fecha de llegada del punto ${idx + 1} debe ser posterior a la salida del punto anterior.`);
+        return;
+      }
+      
+      if (new Date(p.salida) < new Date(p.llegada)) {
+        alert(`La fecha de salida del punto ${idx + 1} debe ser posterior a la fecha de llegada.`);
+        return;
+      }
+    }
+    
+    // Validar que si es tracto, debe tener rampla seleccionada
+    const movilAsignado = mockMoviles.find(m => m.patente === service?.movil);
+    console.log("DEBUG - Móvil asignado:", movilAsignado);
+    console.log("DEBUG - Rampla seleccionada:", selectedRampla);
+    
+    if (movilAsignado?.tipo === "Tracto" && selectedRampla === 0) {
+      console.log("DEBUG - Error: Tracto sin rampla");
+      alert("Debe seleccionar una rampla para el tracto antes de completar.");
+      return;
+    }
+    
+    console.log("DEBUG - Validaciones pasadas, mostrando modal");
     setShowModal(true);
   };
 
   const confirmarCompletar = () => {
-    if (!service) return;
+    console.log("DEBUG - Iniciando confirmarCompletar");
+    if (!service) {
+      console.log("DEBUG - No hay servicio, saliendo");
+      return;
+    }
     
     // Calcular el estado de devolución de container basado en puntos completados
     const pendienteDevolucion = calcularPendienteDevolucion(puntos);
+    console.log("DEBUG - Pendiente devolución calculado:", pendienteDevolucion);
     
     // Verificar si el container está pendiente de devolución
     if (pendienteDevolucion) {
       const confirmar = window.confirm(
         "⚠️ ATENCIÓN: El container aún no ha sido devuelto. El servicio pasará a revisión pero con estado de container pendiente. ¿Continuar?"
       );
+      console.log("DEBUG - Usuario confirmó:", confirmar);
       if (!confirmar) return;
     }
     
@@ -142,13 +207,25 @@ const SeguimientoServicio: React.FC = () => {
       ...service,
       puntos,
       pendienteDevolucion,
-      estado: pendienteDevolucion ? "En revisión" : "Por validar",
+      estado: "Por validar",
       estadoSeguimiento: pendienteDevolucion ? "En revisión con pendientes" : "Completado"
     };
-    saveOrUpdateSent(actualizado);
-    setShowModal(false);
-    alert(pendienteDevolucion ? "Servicio pasado a revisión con container pendiente." : "Servicio marcado como Por validar.");
-    navigate(`/${perfilActual}/gestion-servicios`);
+    
+    console.log("DEBUG - Payload actualizado:", actualizado);
+    
+    try {
+      saveOrUpdateSent(actualizado);
+      console.log("DEBUG - Servicio guardado exitosamente");
+      setShowModal(false);
+      alert("Servicio marcado como Por validar.");
+      
+      // Navegación corregida - ruta específica torre de control
+      console.log("DEBUG - Navegando a: /torre-de-control/gestion-servicios");
+      navigate("/torre-de-control/gestion-servicios");
+    } catch (error) {
+      console.error("Error al guardar el servicio:", error);
+      alert("Error al guardar el servicio. Intente nuevamente.");
+    }
   };
 
   if (loading) {
@@ -223,6 +300,55 @@ const SeguimientoServicio: React.FC = () => {
         </div>
       </div>
 
+      
+      {/* Información del servicio asignado */}
+      <div className="bg-white p-6 rounded shadow">
+        <h2 className="text-lg font-semibold mb-4">Recursos Asignados</h2>
+        <div className="grid md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Chofer Asignado</label>
+            <input
+              type="text"
+              className="input w-full bg-gray-100"
+              value={service?.chofer || "Sin asignar"}
+              disabled
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Móvil Asignado</label>
+            <input
+              type="text"
+              className="input w-full bg-gray-100"
+              value={service?.movil || "Sin asignar"}
+              disabled
+            />
+          </div>
+        </div>
+        
+        {/* Mostrar selector de rampla solo si el móvil asignado es tipo "Tracto" */}
+        {service?.movil && mockMoviles.find(m => m.patente === service.movil)?.tipo === "Tracto" && (
+          <div className="max-w-md">
+            <label className="block text-sm font-medium mb-1">Rampla para Tracto *</label>
+            <select
+              className="input w-full"
+              value={selectedRampla}
+              onChange={(e) => setSelectedRampla(Number(e.target.value))}
+              required
+            >
+              <option value={0}>— Seleccionar rampla —</option>
+              {mockRamplas.map((rampla) => (
+                <option key={rampla.id} value={rampla.id}>
+                  {rampla.patente} - {rampla.capacidad}t
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              * Selecciona la rampla que usará este vehículo tracto (obligatorio)
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Puntos del recorrido */}
       <div className="bg-white p-6 rounded shadow">
         <h2 className="text-lg font-semibold mb-4">Puntos del Recorrido</h2>
@@ -232,8 +358,6 @@ const SeguimientoServicio: React.FC = () => {
               idx === 0 ? service.form.fechaSol : puntos[idx - 1]!.salida!;
             const minLlegada = formatDateTimeLocal(minRawLlegada);
 
-            const minRawSalida = p.llegada || "";
-            const minSalida = minRawSalida && formatDateTimeLocal(minRawSalida);
 
             const etaDate = p.eta;
             const minArrivalRaw =
@@ -389,53 +513,6 @@ const SeguimientoServicio: React.FC = () => {
         </div>
       </div>
 
-      {/* Información del servicio asignado */}
-      <div className="bg-white p-6 rounded shadow">
-        <h2 className="text-lg font-semibold mb-4">Recursos Asignados</h2>
-        <div className="grid md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Chofer Asignado</label>
-            <input
-              type="text"
-              className="input w-full bg-gray-100"
-              value={service?.chofer || "Sin asignar"}
-              disabled
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Móvil Asignado</label>
-            <input
-              type="text"
-              className="input w-full bg-gray-100"
-              value={service?.movil || "Sin asignar"}
-              disabled
-            />
-          </div>
-        </div>
-        
-        {/* Mostrar selector de rampla solo si el móvil asignado es tipo "Tracto" */}
-        {service?.movil && mockMoviles.find(m => m.patente === service.movil)?.tipo === "Tracto" && (
-          <div className="max-w-md">
-            <label className="block text-sm font-medium mb-1">Rampla para Tracto</label>
-            <select
-              className="input w-full"
-              value={selectedRampla}
-              onChange={(e) => setSelectedRampla(Number(e.target.value))}
-            >
-              <option value={0}>— Seleccionar rampla —</option>
-              {mockRamplas.map((rampla) => (
-                <option key={rampla.id} value={rampla.id}>
-                  {rampla.patente} - {rampla.capacidad}t
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-gray-500 mt-1">
-              Selecciona la rampla que usará este vehículo tracto
-            </p>
-          </div>
-        )}
-      </div>
-
       {/* Botones */}
       <div className="flex justify-end gap-4">
         <button
@@ -457,23 +534,28 @@ const SeguimientoServicio: React.FC = () => {
               ? "bg-yellow-600 text-white hover:bg-yellow-700" 
               : "bg-blue-600 text-white hover:bg-blue-700"
           }`}
-          disabled={!puntos.every(p => p.llegada && p.salida)}
         >
           {calcularPendienteDevolucion(puntos) ? "Pasar a Revisar (⚠️ Container Pendiente)" : "Pasar a Revisar"}
         </button>
       </div>
 
       {/* Modal de confirmación */}
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)}>
+      <Modal 
+        isOpen={showModal} 
+        onClose={() => setShowModal(false)}
+        onConfirm={confirmarCompletar}
+        confirmText="Confirmar"
+        cancelText="Cancelar"
+      >
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">
-            ¿Confirmar pasar servicio a revisión?
+            ¿Confirmar pasar servicio a validación?
           </h2>
           {calcularPendienteDevolucion(puntos) ? (
             <div className="bg-yellow-50 border border-yellow-200 p-3 rounded">
               <p className="text-yellow-800 font-medium mb-2">⚠️ Container Pendiente de Devolución</p>
               <p className="text-yellow-700">
-                El servicio pasará a <strong>En revisión</strong> pero el container aún no ha sido devuelto. 
+                El servicio pasará a <strong>Por validar</strong> pero el container aún no ha sido devuelto. 
                 Esto debe resolverse antes de poder completar totalmente el servicio.
               </p>
             </div>
@@ -483,20 +565,6 @@ const SeguimientoServicio: React.FC = () => {
               será enviado a comercial para revisión final.
             </p>
           )}
-          <div className="flex justify-end gap-4">
-            <button
-              onClick={() => setShowModal(false)}
-              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={confirmarCompletar}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-            >
-              Confirmar
-            </button>
-          </div>
         </div>
       </Modal>
     </div>

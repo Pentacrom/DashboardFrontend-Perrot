@@ -125,6 +125,7 @@ const NuevoServicio: React.FC = () => {
         fechaSol: new Date(found.form.fechaSol),
         fechaIng: new Date(found.form.fechaIng),
         fechaFolio: new Date(found.form.fechaFolio),
+        eta: new Date(found.form.eta),
       });
       setPuntos(
         (found.puntos || []).map((p) => ({
@@ -142,7 +143,7 @@ const NuevoServicio: React.FC = () => {
   function upd<K extends keyof FormState>(key: K) {
     return (e: React.ChangeEvent<any>) => {
       let value: any = e.target.value;
-      if (key === "fechaSol" || key === "fechaIng" || key === "fechaFolio") {
+      if (key === "fechaSol" || key === "fechaIng" || key === "fechaFolio" || key === "eta") {
         value = new Date(value);
       } else if (e.target.type === "number" || typeof form[key] === "number") {
         value = Number(value);
@@ -193,7 +194,7 @@ const NuevoServicio: React.FC = () => {
   };
 
   const ZonasPortuarias = mockCatalogos.Lugares.filter(
-    (c) => c.tipo == "Zona Portuaria"
+    (c) => c.tipo == "Zona Portuaria" && !c.nombre.includes("Muelle")
   );
 
   const ambos = [...ZonasPortuarias, ...centrosFiltrados];
@@ -444,32 +445,16 @@ const NuevoServicio: React.FC = () => {
   function generarValoresDesdePuntos(puntos: Punto[]): ValorFactura[] {
     const hoy = new Date();
 
-    // 1) Genera todos los valores a partir de puntos
+    // 1) Genera todos los valores a partir de puntos - TODOS los valores deben estar en 0
     const detalles = puntos
       .map((p, i) => {
-        const def = valoresPorDefecto[p.accion];
         const accionItem = mockCatalogos.acciones.find(
           (a) => a.codigo === p.accion
         );
 
         if (!accionItem) return null;
 
-        // Si existe definición y cumple condición, usa sus valores
-        if (def && (!def.condicion || def.condicion(p))) {
-          return {
-            id: `auto-${i}`,
-            concepto: def.concepto,
-            montoVenta: def.montoVenta,
-            montoCosto: def.montoCosto,
-            impuesto: 0,
-            fechaEmision: hoy,
-            tipo: "costo" as const,
-            codigo: p.accion.toString(),
-            descuentoPorcentaje: [] as Descuento[],
-          } as ValorFactura;
-        }
-
-        // Si falla la condición (o no hay def), usa nombre de acción y ceros
+        // Usar nombre de acción y montos en 0 para todos los valores
         return {
           id: `auto-${i}`,
           concepto: accionItem.nombre,
@@ -514,6 +499,23 @@ const NuevoServicio: React.FC = () => {
     };
 
   const [showMenuIdx, setShowMenuIdx] = useState<number | null>(null);
+
+  // Cerrar menu cuando se hace click afuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showMenuIdx !== null) {
+        setShowMenuIdx(null);
+      }
+    };
+
+    if (showMenuIdx !== null) {
+      document.addEventListener('click', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [showMenuIdx]);
 
   return (
     <div className="p-6">
@@ -784,9 +786,9 @@ const NuevoServicio: React.FC = () => {
             <div>
               <label className="block text-sm font-medium">ETA *</label>
               <input
-                type="date"
+                type="datetime-local"
                 className="input"
-                value={formatDateOnly(form.eta)}
+                value={formatDateTimeLocal(form.eta)}
                 onChange={upd("eta")}
                 required
               />
@@ -985,7 +987,7 @@ const NuevoServicio: React.FC = () => {
                   className="cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setShowMenuIdx(idx);
+                    setShowMenuIdx(showMenuIdx === idx ? null : idx);
                   }}
                 />
               </div>

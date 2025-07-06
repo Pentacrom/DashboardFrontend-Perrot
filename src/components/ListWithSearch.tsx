@@ -33,10 +33,75 @@ import {
 // Import formatDateTime from format utils
 import { formatDateTime } from "../utils/format";
 
+// Función para formatear valores según el tipo de dato
+const formatCellValue = (
+  value: any,
+  column: Column<any>
+): string | React.ReactNode => {
+  // Manejar valores null, undefined o vacíos
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+
+  switch (column.dataType) {
+    case "currency":
+      const symbol = column.currencySymbol || "$";
+      const numValue = typeof value === "string" ? parseFloat(value) : value;
+      if (isNaN(numValue) || numValue === 0) return "-";
+      return `${symbol}${numValue.toLocaleString()}`;
+
+    case "temperature":
+      const unit = column.temperatureUnit || "C";
+      const tempValue = typeof value === "string" ? parseFloat(value) : value;
+      if (isNaN(tempValue)) return "-";
+      return `${tempValue}°${unit}`;
+
+    case "percentage":
+      const pctValue = typeof value === "string" ? parseFloat(value) : value;
+      if (isNaN(pctValue)) return "-";
+      return `${pctValue}%`;
+
+    case "lookup":
+      if (!column.lookupData) return value === 0 ? "-" : String(value);
+      const lookup = column.lookupData.find(
+        item => item.code === value || item.code === String(value)
+      );
+      return lookup ? lookup.name : (value === 0 ? "-" : String(value));
+
+    case "boolean":
+      return (
+        <input
+          type="checkbox"
+          checked={Boolean(value)}
+          disabled
+          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+        />
+      );
+
+    case "date":
+      if (value instanceof Date || (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value))) {
+        return formatDateTime(value);
+      }
+      return String(value);
+
+    case "number":
+      const numberValue = typeof value === "string" ? parseFloat(value) : value;
+      if (isNaN(numberValue) || numberValue === 0) return "-";
+      return numberValue.toLocaleString();
+
+    default:
+      return String(value);
+  }
+};
+
 export interface Column<T> {
   label: string;
   key: keyof T;
   sortable?: boolean;
+  dataType?: "text" | "number" | "currency" | "temperature" | "percentage" | "lookup" | "date" | "boolean";
+  lookupData?: Array<{ code: number | string; name: string }>;
+  currencySymbol?: string;
+  temperatureUnit?: "C" | "F";
 }
 
 export interface SearchFilter<T> {
@@ -858,12 +923,32 @@ function ListWithSearchInner<T extends Record<string, any>>(
                             typeof raw === "string" &&
                             /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(raw);
 
+                          // Usar la nueva función de formateo o el render personalizado de la columna
+                          let cellContent;
+                          if (col.render) {
+                            cellContent = col.render(raw, item);
+                          } else {
+                            cellContent = formatCellValue(raw, col);
+                          }
+
                           const displayValue =
                             isDateObj || isIsoString
                               ? formatDateTime(raw as any)
                               : String(raw);
 
-                          // Ahora aplicamos colorConfig o simplemente mostramos el valor
+                          // Si hay un render personalizado, usarlo directamente
+                          if (col.render) {
+                            return (
+                              <td
+                                key={col.key as string}
+                                className="px-6 py-4 whitespace-nowrap"
+                              >
+                                {cellContent}
+                              </td>
+                            );
+                          }
+
+                          // Ahora aplicamos colorConfig o simplemente mostramos el valor formateado
                           if (
                             colorConfig &&
                             colorConfig.mode === "cell" &&
@@ -881,18 +966,20 @@ function ListWithSearchInner<T extends Record<string, any>>(
                         px-2 inline-flex text-xs leading-5 font-semibold rounded-full
                       `}
                                 >
-                                  {displayValue}
+                                  {cellContent}
                                 </span>
                               </td>
                             );
                           }
 
+                          const isCheckbox = typeof cellContent === "object" && cellContent !== null;
+                          
                           return (
                             <td
                               key={col.key as string}
-                              className="px-6 py-4 whitespace-nowrap"
+                              className={`px-6 py-4 whitespace-nowrap ${isCheckbox ? "text-center" : ""}`}
                             >
-                              {displayValue}
+                              {cellContent}
                             </td>
                           );
                         })

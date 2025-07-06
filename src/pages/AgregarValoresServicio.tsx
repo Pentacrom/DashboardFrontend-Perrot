@@ -512,7 +512,7 @@ const AgregarValoresServicio: React.FC = () => {
         >
           Guardar
         </button>
-        {!isOperacion && (
+        {!isOperacion && payload.estado !== "Por validar" && (
           <button
             onClick={handleEnviar}
             disabled={valores.length === 0}

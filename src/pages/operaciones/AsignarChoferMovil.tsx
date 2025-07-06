@@ -9,6 +9,7 @@ import {
   mockMoviles,
   mockChoferes,
   mockRamplas,
+  getEmpresasTransporte,
 } from "../../utils/ServiceDrafts";
 
 
@@ -17,6 +18,7 @@ const AsignarChoferMovil: React.FC = () => {
   const navigate = useNavigate();
 
   const [service, setService] = useState<Payload | null>(null);
+  const [empresa, setEmpresa] = useState("");
   const [chofer, setChofer] = useState(0);
   const [movil, setMovil] = useState(0);
   const [rampla, setRampla] = useState(0);
@@ -43,8 +45,8 @@ const AsignarChoferMovil: React.FC = () => {
     (e: React.FormEvent) => {
       e.preventDefault();
       if (!service) return;
-      if (!chofer || !movil) {
-        alert("Debe seleccionar chofer y móvil.");
+      if (!empresa || !chofer || !movil) {
+        alert("Debe seleccionar empresa, chofer y móvil.");
         return;
       }
       
@@ -68,7 +70,7 @@ const AsignarChoferMovil: React.FC = () => {
       alert(`Chofer y móvil asignados. Servicio ${service.id} en Proceso.`);
       navigate("/comercial/ingresoServicios");
     },
-    [service, chofer, movil, rampla, navigate]
+    [service, empresa, chofer, movil, rampla, navigate]
   );
 
   if (loading) {
@@ -97,6 +99,10 @@ const AsignarChoferMovil: React.FC = () => {
 
   const selectedMovil = mockMoviles.find(m => m.id === movil);
   const isTracto = selectedMovil?.tipo === "Tracto";
+  
+  // Filtrar choferes y móviles por empresa seleccionada
+  const choferesFiltrados = empresa ? mockChoferes.filter(c => c.empresa === empresa) : [];
+  const movilesFiltrados = empresa ? mockMoviles.filter(m => m.empresa === empresa) : [];
 
   return (
     <div className="p-6 max-w-md mx-auto">
@@ -109,15 +115,38 @@ const AsignarChoferMovil: React.FC = () => {
         className="space-y-6 bg-white p-6 rounded shadow"
       >
         <div>
+          <label className="block text-sm font-medium mb-1">Empresa *</label>
+          <select
+            value={empresa}
+            onChange={(e) => {
+              setEmpresa(e.target.value);
+              setChofer(0);
+              setMovil(0);
+              setRampla(0);
+            }}
+            required
+            className="input w-full"
+          >
+            <option value="">— Seleccione empresa —</option>
+            {getEmpresasTransporte().map((emp) => (
+              <option key={emp} value={emp}>
+                {emp}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
           <label className="block text-sm font-medium mb-1">Chofer *</label>
           <select
             value={chofer}
             onChange={(e) => setChofer(Number(e.target.value))}
             required
+            disabled={!empresa}
             className="input w-full"
           >
             <option value={0}>— Seleccione chofer —</option>
-            {mockChoferes.map((chofer) => (
+            {choferesFiltrados.map((chofer) => (
               <option key={chofer.id} value={chofer.id}>
                 {chofer.nombre} - RUT: {chofer.rut}
               </option>
@@ -134,10 +163,11 @@ const AsignarChoferMovil: React.FC = () => {
               setRampla(0); // Reset rampla when changing vehicle
             }}
             required
+            disabled={!empresa}
             className="input w-full"
           >
             <option value={0}>— Seleccione móvil —</option>
-            {mockMoviles.map((movil) => (
+            {movilesFiltrados.map((movil) => (
               <option key={movil.id} value={movil.id}>
                 {movil.patente} - {movil.tipo} ({movil.capacidad}t)
               </option>

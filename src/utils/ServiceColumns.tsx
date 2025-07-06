@@ -1,6 +1,6 @@
 import React from "react";
 import { Column } from "../components/ListWithSearch";
-import { EstadoServicio, EstadoSeguimiento } from "./ServiceDrafts";
+import { EstadoServicio, EstadoSeguimiento, imoCategorias, mockCatalogos, estadoSeguimientoStyles } from "./ServiceDrafts";
 import { estadoStyles, badgeTextColor } from "../config/estadoConfig";
 import { formatCLP, formatDateTime } from "./format";
 import EstadoSeguimientoOval from "../components/EstadoSeguimientoOval";
@@ -16,6 +16,7 @@ export interface ServiceRow {
   estado: EstadoServicio;
   estadoSeguimiento: EstadoSeguimiento;
   pendienteDevolucion: boolean;
+  rowStyle: string; // Campo calculado para coloración de filas
   pais: string;
   tipoContenedor: string;
   kilos: number;
@@ -43,51 +44,73 @@ export interface ServiceRow {
 
 // Definición completa de todas las columnas posibles
 export const allServiceColumns: Column<ServiceRow>[] = [
-  { label: "ID", key: "id", sortable: true },
-  { label: "Cliente", key: "cliente", sortable: true },
-  { label: "Tipo Operación", key: "tipoOperacion", sortable: true },
-  { label: "Origen", key: "origen", sortable: true },
-  { label: "Destino", key: "destino", sortable: true },
-  { label: "Fecha", key: "fecha", sortable: true },
-  { label: "Tipo", key: "tipo", sortable: true },
+  { label: "ID", key: "id", sortable: true, dataType: "text" },
+  { label: "Cliente", key: "cliente", sortable: true, dataType: "text" },
+  { label: "Tipo Operación", key: "tipoOperacion", sortable: true, dataType: "text" },
+  { label: "Origen", key: "origen", sortable: true, dataType: "text" },
+  { label: "Destino", key: "destino", sortable: true, dataType: "text" },
+  { label: "Fecha", key: "fecha", sortable: true, dataType: "date" },
+  { label: "Tipo", key: "tipo", sortable: true, dataType: "text" },
   {
     label: "Estado",
     key: "estado",
     sortable: true,
+    dataType: "text",
   },
-  { label: "País", key: "pais", sortable: true },
-  { label: "Tipo Contenedor", key: "tipoContenedor", sortable: true },
-  { label: "Kilos", key: "kilos", sortable: true },
+  { label: "País", key: "pais", sortable: true, dataType: "text" },
+  { label: "Tipo Contenedor", key: "tipoContenedor", sortable: true, dataType: "text" },
+  { label: "Kilos", key: "kilos", sortable: true, dataType: "number" },
   {
     label: "Precio Carga",
     key: "precioCarga",
     sortable: true,
+    dataType: "currency",
+    currencySymbol: "$",
   },
-  { label: "Temperatura", key: "temperatura", sortable: true },
-  { label: "Guía Despacho", key: "guiaDeDespacho", sortable: true },
-  { label: "Tarjetón", key: "tarjeton", sortable: true },
-  { label: "Nro Contenedor", key: "nroContenedor", sortable: true },
-  { label: "Sello", key: "sello", sortable: true },
-  { label: "Nave", key: "nave", sortable: true },
-  { label: "Observación", key: "observacion", sortable: true },
-  { label: "Interchange", key: "interchange", sortable: true },
-  { label: "ODV", key: "odv", sortable: true },
-  { label: "IMO Cargo", key: "imoCargo", sortable: true },
-  { label: "IMO Categoría", key: "imoCategoria", sortable: true },
-  { label: "Tipo Servicio", key: "tipoServicio", sortable: true },
-  { label: "Folio", key: "folio", sortable: true },
-  { label: "Fecha Folio", key: "fechaFolio", sortable: true },
-  { label: "ETA", key: "eta", sortable: true },
-  { label: "Ejecutivo", key: "ejecutivo", sortable: true },
-  { label: "Estado Seguimiento", key: "estadoSeguimiento", sortable: true },
-  { label: "Chofer", key: "chofer", sortable: true },
-  { label: "Móvil", key: "movil", sortable: true },
+  { 
+    label: "Temperatura", 
+    key: "temperatura", 
+    sortable: true, 
+    dataType: "temperature",
+    temperatureUnit: "C",
+  },
+  { label: "Guía Despacho", key: "guiaDeDespacho", sortable: true, dataType: "text" },
+  { label: "Tarjetón", key: "tarjeton", sortable: true, dataType: "text" },
+  { label: "Nro Contenedor", key: "nroContenedor", sortable: true, dataType: "text" },
+  { label: "Sello", key: "sello", sortable: true, dataType: "text" },
+  { 
+    label: "Nave", 
+    key: "nave", 
+    sortable: true, 
+    dataType: "lookup",
+    lookupData: mockCatalogos.navieras.map(nav => ({ code: nav.codigo, name: nav.nombre })),
+  },
+  { label: "Observación", key: "observacion", sortable: true, dataType: "text" },
+  { label: "Interchange", key: "interchange", sortable: true, dataType: "text" },
+  { label: "ODV", key: "odv", sortable: true, dataType: "text" },
+  { label: "IMO Cargo", key: "imoCargo", sortable: true, dataType: "boolean" },
+  { 
+    label: "IMO Categoría", 
+    key: "imoCategoria", 
+    sortable: true, 
+    dataType: "lookup",
+    lookupData: imoCategorias.map(cat => ({ code: cat.code, name: cat.label })),
+  },
+  { label: "Tipo Servicio", key: "tipoServicio", sortable: true, dataType: "number" },
+  { label: "Folio", key: "folio", sortable: true, dataType: "number" },
+  { label: "Fecha Folio", key: "fechaFolio", sortable: true, dataType: "date" },
+  { label: "ETA", key: "eta", sortable: true, dataType: "date" },
+  { label: "Ejecutivo", key: "ejecutivo", sortable: true, dataType: "text" },
+  { label: "Estado Seguimiento", key: "estadoSeguimiento", sortable: true, dataType: "text" },
+  { label: "Container Pendiente", key: "pendienteDevolucion", sortable: true, dataType: "boolean" },
+  { label: "Chofer", key: "chofer", sortable: true, dataType: "text" },
+  { label: "Móvil", key: "movil", sortable: true, dataType: "text" },
 ];
 
 // Configuraciones de columnas por defecto para cada página
 export const defaultColumnConfigs = {
   comercial: ["id", "cliente", "tipoOperacion", "origen", "destino", "fecha", "tipo", "estado", "estadoSeguimiento", "pais", "tipoContenedor", "precioCarga"] as Array<keyof ServiceRow>,
-  torreDeControl: ["id", "cliente", "origen", "destino", "fecha", "tipo", "estado", "estadoSeguimiento"] as Array<keyof ServiceRow>,
+  torreDeControl: ["id", "cliente", "origen", "destino", "fecha", "tipo", "estado", "estadoSeguimiento", "pendienteDevolucion"] as Array<keyof ServiceRow>,
   operaciones: ["id", "cliente", "origen", "destino", "fecha", "tipo", "precioCarga", "estado", "estadoSeguimiento"] as Array<keyof ServiceRow>,
 };
 
@@ -127,33 +150,41 @@ export const getServiceColumnsWithRender = (): Column<ServiceRow>[] => {
     if (col.key === "estadoSeguimiento") {
       return {
         ...col,
-        render: (value: EstadoSeguimiento) => (
-          <EstadoSeguimientoOval estado={value} />
+        render: (value: EstadoSeguimiento) => {
+          const styles = estadoSeguimientoStyles[value];
+          if (!styles) return value;
+          
+          return (
+            <span
+              className={`px-2 py-1 rounded-full text-xs font-medium border ${styles.bg} ${styles.text} ${styles.border}`}
+            >
+              {value}
+            </span>
+          );
+        },
+      };
+    }
+    if (col.key === "pendienteDevolucion") {
+      return {
+        ...col,
+        render: (value: boolean) => (
+          <div className="flex items-center justify-center gap-2">
+            <input
+              type="checkbox"
+              checked={value}
+              disabled
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            {value && (
+              <span 
+                className="flex items-center gap-1 px-2 py-1 bg-red-100 border border-red-500 text-red-800 rounded-full font-bold text-xs"
+                title="¡URGENTE! Container pendiente de devolución"
+              >
+                🚨 PENDIENTE
+              </span>
+            )}
+          </div>
         ),
-      };
-    }
-    if (col.key === "fecha" || col.key === "fechaFolio" || col.key === "eta") {
-      return {
-        ...col,
-        render: (value: string) => value ? formatDateTime(value) : "-",
-      };
-    }
-    if (col.key === "precioCarga") {
-      return {
-        ...col,
-        render: (value: number) => formatCLP(Number(value)),
-      };
-    }
-    if (col.key === "imoCargo") {
-      return {
-        ...col,
-        render: (value: boolean) => value ? "Sí" : "No",
-      };
-    }
-    if (col.key === "kilos" || col.key === "nave" || col.key === "folio" || col.key === "imoCategoria" || col.key === "tipoServicio") {
-      return {
-        ...col,
-        render: (value: number) => value === 0 ? "-" : value.toString(),
       };
     }
     return col;

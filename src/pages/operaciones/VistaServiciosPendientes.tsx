@@ -19,6 +19,7 @@ import {
   getServiceColumnsWithRender, 
   defaultColumnConfigs 
 } from "../../utils/ServiceColumns";
+import { payloadToRow } from "../../utils/ServiceUtils";
 import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
 import { AsignarChoferMovilModal } from "../operaciones/AsignarChoferMovilModal";
 import { Modal } from "../../components/Modal";
@@ -78,54 +79,8 @@ const VistaServiciosPendientes: React.FC = () => {
   };
 
   const loadData = () => {
-    const lookupEmpresa = (id: number) =>
-      mockCatalogos.empresas.find((e) => e.id === id)?.nombre || id.toString();
-    const lookupLugar = (id: number) =>
-      mockCatalogos.Lugares.find((l) => l.id === id)?.nombre || id.toString();
-    const lookupOp = (code: number) =>
-      mockCatalogos.Operación.find((o) => o.codigo === code)?.nombre ||
-      code.toString();
-
     const all = [...loadDrafts(), ...loadSent()];
-    const mapped: ServiceRow[] = all.map((p) => {
-      const f = p.form;
-      const paisName = mockCatalogos.Zona.find(z => z.codigo === f.pais)?.nombre || "";
-      const tipoContenedorName = mockCatalogos.Tipo_contenedor.find(tc => tc.codigo === f.tipoContenedor)?.nombre || "";
-
-      return {
-        id: p.id.toString(),
-        cliente: lookupEmpresa(f.cliente),
-        tipoOperacion: lookupOp(f.tipoOperacion),
-        origen: lookupLugar(f.origen),
-        destino: lookupLugar(f.destino),
-        fecha: f.fechaSol && f.fechaSol instanceof Date ? f.fechaSol.toISOString() : "",
-        tipo: lookupOp(f.tipoOperacion),
-        estado: p.estado,
-        pais: paisName,
-        tipoContenedor: tipoContenedorName,
-        kilos: f.kilos,
-        precioCarga: f.precioCarga,
-        temperatura: f.temperatura,
-        guiaDeDespacho: f.guiaDeDespacho,
-        tarjeton: f.tarjeton,
-        nroContenedor: f.nroContenedor,
-        sello: f.sello,
-        nave: f.nave,
-        observacion: f.observacion,
-        interchange: f.interchange,
-        odv: f.odv,
-        imoCargo: f.imoCargo,
-        imoCategoria: f.imoCategoria,
-        tipoServicio: f.tipoServicio,
-        folio: f.folio,
-        fechaFolio: f.fechaFolio && f.fechaFolio instanceof Date ? f.fechaFolio.toISOString() : "",
-        eta: f.eta && f.eta instanceof Date ? f.eta.toISOString() : "",
-        ejecutivo: f.ejecutivo || "",
-        chofer: p.chofer,
-        movil: p.movil,
-        raw: p,
-      };
-    });
+    const mapped: ServiceRow[] = all.map(payloadToRow);
     setRows(mapped);
   };
 
