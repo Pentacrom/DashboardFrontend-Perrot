@@ -23,6 +23,9 @@ const SeguimientoServicio: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [selectedRampla, setSelectedRampla] = useState<number>(0);
+  const [estadoSeguimiento, setEstadoSeguimiento] = useState<string>(
+    service?.estadoSeguimiento || ""
+  );
 
   // Extrae el primer segmento de la ruta
   const segments = location.pathname.split("/").filter(Boolean);
@@ -39,6 +42,7 @@ const SeguimientoServicio: React.FC = () => {
       if (!found) throw new Error("Servicio no encontrado");
       setService(found);
       setPuntos(found.puntos);
+      setEstadoSeguimiento(found.estadoSeguimiento || "");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar");
     } finally {
@@ -121,12 +125,13 @@ const SeguimientoServicio: React.FC = () => {
     const updated: Payload = { 
       ...service, 
       puntos,
-      pendienteDevolucion
+      pendienteDevolucion,
+      estadoSeguimiento
     };
     saveOrUpdateSent(updated);
     alert("Seguimiento guardado correctamente.");
     navigate(-1);
-  }, [service, puntos, navigate, calcularPendienteDevolucion]);
+  }, [service, puntos, estadoSeguimiento, navigate, calcularPendienteDevolucion]);
 
   const handleCompletar = () => {
     console.log("DEBUG - Iniciando handleCompletar");
@@ -208,7 +213,7 @@ const SeguimientoServicio: React.FC = () => {
       puntos,
       pendienteDevolucion,
       estado: "Por validar",
-      estadoSeguimiento: pendienteDevolucion ? "En revisión con pendientes" : "Completado"
+      estadoSeguimiento
     };
     
     console.log("DEBUG - Payload actualizado:", actualizado);
@@ -262,6 +267,44 @@ const SeguimientoServicio: React.FC = () => {
         <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full">
           Estado: {service.estado}
         </span>
+      </div>
+
+      {/* Estado de Seguimiento */}
+      <div className="bg-white p-4 rounded shadow">
+        <div className="max-w-md">
+          <label className="block text-sm font-medium mb-1">
+            Estado de Seguimiento
+          </label>
+          <select
+            className="input w-full"
+            value={estadoSeguimiento}
+            onChange={(e) => setEstadoSeguimiento(e.target.value)}
+          >
+            <option value="">— Seleccionar estado —</option>
+            <option value="Servicio terminado">Servicio terminado</option>
+            <option value="En Panne">En Panne</option>
+            <option value="En puerto">En puerto</option>
+            <option value="En Resguardo">En Resguardo</option>
+            <option value="En ruta a puerto">En ruta a puerto</option>
+            <option value="Espera de reprogramacion">Espera de reprogramación</option>
+            <option value="Finalizando otra operacion">Finalizando otra operación</option>
+            <option value="Falso flete">Falso flete</option>
+            <option value="Servicio cancelado">Servicio cancelado</option>
+            <option value="En almacen">En almacén</option>
+            <option value="Serv. terminado en alm.">Serv. terminado en alm.</option>
+            <option value="Unidad retirada">Unidad retirada</option>
+            <option value="Unidad a piso full">Unidad a piso full</option>
+            <option value="Asignacion pendiente">Asignación pendiente</option>
+            <option value="A la espera de horario">A la espera de horario</option>
+            <option value="En ruta a retirar">En ruta a retirar</option>
+            <option value="Posicionado para retirar">Posicionado para retirar</option>
+            <option value="Retirando">Retirando</option>
+            <option value="En ruta a cliente">En ruta a cliente</option>
+            <option value="En cliente">En cliente</option>
+            <option value="Descargado">Descargado</option>
+            <option value="En ruta a resguardo">En ruta a resguardo</option>
+          </select>
+        </div>
       </div>
 
       {/* Fecha de solicitud */}

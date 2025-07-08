@@ -122,7 +122,7 @@ const VistaServicios: React.FC = () => {
         onClick: () => navigate(`/detalle-servicio/${row.id}`),
       },
     ];
-    if (row.estado === "En Proceso") {
+    if (row.estado === "En Proceso" || row.estado === "Por validar") {
       opts.push({
         label: "Hacer seguimiento",
         onClick: () =>
