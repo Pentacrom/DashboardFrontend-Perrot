@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import ListWithSearch, { Column } from "../components/ListWithSearch";
+import ListWithSearch, { Column, SearchFilter } from "../components/ListWithSearch";
 
 interface Service {
   odv: string;
@@ -37,6 +37,11 @@ const columns: Column<Service>[] = [
   { label: "Fecha del Servicio", key: "fecha", sortable: true },
 ];
 
+const searchFilters: SearchFilter<Service>[] = [
+  { label: "Fecha Desde", key: "fecha", type: "date", comparator: "gte" },
+  { label: "Fecha Hasta", key: "fecha", type: "date", comparator: "lte" },
+];
+
 const ServiciosPorFacturar: React.FC = () => {
   const navigate = useNavigate();
 
@@ -54,10 +59,15 @@ const ServiciosPorFacturar: React.FC = () => {
       <ListWithSearch<Service>
         data={services}
         columns={columns}
+        searchFilters={searchFilters}
         filterTitle="Filtrar Servicios"
         onSearch={() => console.log("Buscando")}
-        showExcelButton={true}
         dropdownOptions={dropdownOptions}
+        globalSearch={{
+          enabled: true,
+          placeholder: "Ej: ODV:001, Cliente:Empresa A, Monto:15000, o texto libre",
+          highlightResults: true
+        }}
       />
     </div>
   );

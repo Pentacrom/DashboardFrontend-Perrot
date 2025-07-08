@@ -8,7 +8,9 @@ import {
   getImportBatches, 
   rollbackImportBatch,
   ImportBatch,
-  ImportValidationResult
+  ImportValidationResult,
+  ValidatedPayload,
+  FieldValidationError
 } from "../utils/ServiceExcelMapper";
 import { ServiceRow, getServiceColumnsWithRender } from "../utils/ServiceColumns";
 import { payloadToRow } from "../utils/ServiceUtils";
@@ -188,97 +190,133 @@ const ImportExportButtons: React.FC<ImportExportButtonsProps> = ({
         isOpen={importModalOpen}
         onClose={() => setImportModalOpen(false)}
         onConfirm={handleConfirmImport}
-        confirmText="Confirmar Importación"
+        confirmText="Importar Servicios Marcados"
         cancelText="Cancelar"
       >
         <h3 className="text-lg font-semibold mb-4">Vista Previa de Importación</h3>
-        <div className="mb-4">
-          <p><strong>Archivo:</strong> {batchInfo?.filename}</p>
-          <p><strong>Total de filas en archivo:</strong> {batchInfo?.rowCount}</p>
-          <p><strong>Servicios válidos para importar:</strong> {candidateRows.length}</p>
-          
-          {/* Resumen detallado de servicios a importar */}
-          {validationResult && validationResult.validPayloads.length > 0 && (
-            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
-              <p className="font-semibold text-green-800 mb-2">📋 Resumen de servicios a importar:</p>
-              {getServiceSummary(validationResult.validPayloads).map((summary: any, index: number) => (
-                <div key={index} className="text-sm text-green-700 mb-2 p-2 bg-white rounded border border-green-200">
-                  <div className="font-semibold">
-                    <strong>{summary.count}</strong> servicio{summary.count > 1 ? 's' : ''}
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1 mt-1">
-                    <div><strong>Cliente:</strong> {summary.cliente}</div>
-                    <div><strong>Operación:</strong> {summary.tipoOperacion}</div>
-                    <div><strong>Ejecutivo:</strong> {summary.ejecutivo}</div>
-                    <div><strong>País:</strong> {summary.pais}</div>
-                    <div className="md:col-span-2"><strong>Tipo Container:</strong> {summary.tipoContenedor}</div>
-                  </div>
-                  <div className="text-xs text-green-600 mt-1">
-                    <strong>IDs:</strong> {summary.ids.join(', ')}
-                  </div>
-                </div>
-              ))}
+        
+        {/* Leyenda de colores */}
+        <div className="mb-4 p-3 bg-gray-50 rounded">
+          <div className="flex flex-wrap gap-6 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+              <span>Se importarán ({validationResult?.validPayloads.filter(p => p.validationErrors.length === 0).length || 0} servicios)</span>
             </div>
-          )}
-          
-          {validationResult && validationResult.skippedCount > 0 && (
-            <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
-              <p className="font-semibold text-yellow-800">⚠️ Registros omitidos: {validationResult.skippedCount}</p>
-              
-              {validationResult.duplicateIds.length > 0 && (
-                <div className="mt-2">
-                  <p className="text-sm text-yellow-700">
-                    <strong>Servicios que ya existen en el sistema (IDs):</strong> {validationResult.duplicateIds.join(', ')}
-                  </p>
-                </div>
-              )}
-              
-              {validationResult.duplicatesInFile.length > 0 && (
-                <div className="mt-2">
-                  <p className="text-sm text-yellow-700">
-                    <strong>Servicios duplicados dentro del archivo (IDs):</strong> {validationResult.duplicatesInFile.join(', ')}
-                  </p>
-                </div>
-              )}
-              
-              <p className="text-sm text-yellow-600 mt-2">
-                Estos registros no se importarán para evitar conflictos.
-              </p>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+              <span>Con errores ({validationResult?.validPayloads.filter(p => p.validationErrors.length > 0).length || 0} servicios)</span>
             </div>
-          )}
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+              <span>No se importarán ({validationResult?.skippedCount || 0} servicios)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-yellow-200 rounded"></div>
+              <span>Celdas con datos faltantes</span>
+            </div>
+          </div>
         </div>
         
-        <div className="overflow-auto max-h-96 border border-gray-300 rounded">
+        {/* Tabla con scroll vertical */}
+        <div className="overflow-y-auto max-h-96 border border-gray-300 rounded">
           <table className="min-w-full table-auto border-collapse">
             <thead className="bg-gray-100 sticky top-0">
               <tr>
-                {getServiceColumnsWithRender().slice(0, 6).map((col) => (
-                  <th
-                    key={col.key as string}
-                    className="border px-2 py-1 text-left text-sm font-medium"
-                  >
-                    {col.label}
-                  </th>
-                ))}
+                <th className="border px-2 py-1 text-left text-sm font-medium">Estado</th>
+                <th className="border px-2 py-1 text-left text-sm font-medium">ID</th>
+                <th className="border px-2 py-1 text-left text-sm font-medium">Cliente</th>
+                <th className="border px-2 py-1 text-left text-sm font-medium">Operación</th>
+                <th className="border px-2 py-1 text-left text-sm font-medium">Contenedor</th>
+                <th className="border px-2 py-1 text-left text-sm font-medium">Origen</th>
+                <th className="border px-2 py-1 text-left text-sm font-medium">Destino</th>
+                <th className="border px-2 py-1 text-left text-sm font-medium">Observaciones</th>
               </tr>
             </thead>
             <tbody>
-              {candidateRows.slice(0, 10).map((row, i) => (
-                <tr key={i} className="hover:bg-gray-50">
-                  {getServiceColumnsWithRender().slice(0, 6).map((col) => (
-                    <td key={col.key as string} className="border px-2 py-1 text-sm">
-                      {String(row[col.key] || "")}
+              {/* Servicios válidos (verde) */}
+              {validationResult?.validPayloads.map((payload, i) => {
+                const hasErrors = payload.validationErrors.length > 0;
+                
+                // Funciones helper para verificar errores en campos específicos
+                const hasFieldError = (field: string) => payload.validationErrors.some(e => e.field === field);
+                const getFieldValue = (field: string) => {
+                  switch (field) {
+                    case 'cliente':
+                      return mockCatalogos.empresas.find(e => e.id === payload.form.cliente)?.nombre || '';
+                    case 'tipoOperacion':
+                      return mockCatalogos.Operación.find(o => o.codigo === payload.form.tipoOperacion)?.nombre || '';
+                    case 'origen':
+                      return mockCatalogos.Lugares.find(l => l.id === payload.form.origen)?.nombre || '';
+                    case 'destino':
+                      return mockCatalogos.Lugares.find(l => l.id === payload.form.destino)?.nombre || '';
+                    default:
+                      return '';
+                  }
+                };
+                
+                return (
+                  <tr key={`valid-${i}`} className="bg-green-50 hover:bg-green-100">
+                    <td className="border px-2 py-1 text-sm">
+                      <span className={`inline-block w-3 h-3 rounded-full ${hasErrors ? 'bg-yellow-500' : 'bg-green-500'}`}></span>
                     </td>
-                  ))}
-                </tr>
-              ))}
-              {candidateRows.length > 10 && (
-                <tr>
-                  <td colSpan={6} className="border px-2 py-1 text-sm text-gray-500 text-center">
-                    ... y {candidateRows.length - 10} servicios más
+                    <td className="border px-2 py-1 text-sm">{payload.id}</td>
+                    <td className={`border px-2 py-1 text-sm ${hasFieldError('cliente') ? 'bg-yellow-200' : ''}`}>
+                      {getFieldValue('cliente') || <span className="text-red-500">Falta dato</span>}
+                    </td>
+                    <td className={`border px-2 py-1 text-sm ${hasFieldError('tipoOperacion') ? 'bg-yellow-200' : ''}`}>
+                      {getFieldValue('tipoOperacion') || <span className="text-red-500">Falta dato</span>}
+                    </td>
+                    <td className="border px-2 py-1 text-sm">{payload.form.nroContenedor || '-'}</td>
+                    <td className={`border px-2 py-1 text-sm ${hasFieldError('origen') ? 'bg-yellow-200' : ''}`}>
+                      {getFieldValue('origen') || <span className="text-red-500">Falta dato</span>}
+                    </td>
+                    <td className={`border px-2 py-1 text-sm ${hasFieldError('destino') ? 'bg-yellow-200' : ''}`}>
+                      {getFieldValue('destino') || <span className="text-red-500">Falta dato</span>}
+                    </td>
+                    <td className="border px-2 py-1 text-sm">
+                      {hasErrors ? (
+                        <span className="text-red-500">
+                          {payload.validationErrors.length} error{payload.validationErrors.length > 1 ? 'es' : ''}
+                        </span>
+                      ) : (
+                        'OK'
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              
+              {/* Servicios omitidos (rojo) */}
+              {validationResult && validationResult.payloads.filter(p => 
+                [...validationResult.duplicateIds, ...validationResult.duplicatesInFile].includes(p.id)
+              ).map((payload, i) => (
+                <tr key={`skipped-${i}`} className="bg-red-50 hover:bg-red-100">
+                  <td className="border px-2 py-1 text-sm">
+                    <span className="inline-block w-3 h-3 bg-red-500 rounded-full"></span>
+                  </td>
+                  <td className="border px-2 py-1 text-sm">{payload.id}</td>
+                  <td className="border px-2 py-1 text-sm">
+                    {mockCatalogos.empresas.find(e => e.id === payload.form.cliente)?.nombre || 'N/A'}
+                  </td>
+                  <td className="border px-2 py-1 text-sm">
+                    {mockCatalogos.Operación.find(o => o.codigo === payload.form.tipoOperacion)?.nombre || 'N/A'}
+                  </td>
+                  <td className="border px-2 py-1 text-sm">{payload.form.nroContenedor || '-'}</td>
+                  <td className="border px-2 py-1 text-sm">
+                    {mockCatalogos.Lugares.find(l => l.id === payload.form.origen)?.nombre || 'N/A'}
+                  </td>
+                  <td className="border px-2 py-1 text-sm">
+                    {mockCatalogos.Lugares.find(l => l.id === payload.form.destino)?.nombre || 'N/A'}
+                  </td>
+                  <td className="border px-2 py-1 text-sm">
+                    <span className="text-red-600">
+                      {validationResult.duplicateIds.includes(payload.id) 
+                        ? 'Ya existe en el sistema' 
+                        : 'Duplicado en archivo'}
+                    </span>
                   </td>
                 </tr>
-              )}
+              ))}
             </tbody>
           </table>
         </div>

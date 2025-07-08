@@ -26,13 +26,6 @@ import { Modal } from "../../components/Modal";
 import ImportExportButtons from "../../components/ImportExportButtons";
 
 const searchFilters: SearchFilter<ServiceRow>[] = [
-  { label: "ID", key: "id", type: "text", placeholder: "Buscar ID" },
-  {
-    label: "Cliente",
-    key: "cliente",
-    type: "text",
-    placeholder: "Buscar cliente",
-  },
   { label: "Fecha Desde", key: "fecha", type: "date", comparator: "gte" },
   { label: "Fecha Hasta", key: "fecha", type: "date", comparator: "lte" },
 ];
@@ -165,6 +158,11 @@ const VistaServiciosPendientes: React.FC = () => {
         defaultSortKey="estado"
         defaultSortOrder="asc"
         preferencesKey="operaciones-servicios"
+        globalSearch={{
+          enabled: true,
+          placeholder: "Ej: ID:123, Cliente:empresa, Estado:Pendiente, o texto libre",
+          highlightResults: true
+        }}
       />
 
       <AsignarChoferMovilModal

@@ -58,6 +58,13 @@ const DetalleServicio: React.FC = () => {
 
   const handleCompletar = () => {
     if (!service) return;
+    
+    // Validar que el container no esté pendiente de devolución
+    if (service.pendienteDevolucion) {
+      alert("⚠️ No se puede completar el servicio porque el container está pendiente de devolución. Debe completarse la devolución del container antes de finalizar el servicio.");
+      return;
+    }
+    
     const confirmado = window.confirm(
       "¿Estás seguro que quieres completar el servicio? Esta acción cambiará el estado a 'Completado'."
     );
@@ -141,9 +148,16 @@ const DetalleServicio: React.FC = () => {
     <div className="p-6 space-y-8">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold">Detalle Servicio #{service.id}</h1>
-        <span className="px-4 py-2 bg-blue-100 text-blue-800 rounded-full font-medium">
-          {estado}
-        </span>
+        <div className="flex flex-col md:flex-row gap-2">
+          <span className="px-4 py-2 bg-blue-100 text-blue-800 rounded-full font-medium">
+            {estado}
+          </span>
+          {service.pendienteDevolucion && (
+            <span className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-full font-medium">
+              ⚠️ Container Pendiente
+            </span>
+          )}
+        </div>
       </header>
 
       {/* Información General */}

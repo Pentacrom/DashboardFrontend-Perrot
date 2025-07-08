@@ -1,12 +1,21 @@
 // src/pages/ImportExportServicios.tsx
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { loadDrafts, loadSent, saveOrUpdateSent, mockCatalogos, mockPaises, getNextId } from "../utils/ServiceDrafts";
 import { mapExcelRowToPayload } from "../utils/ServiceExcelMapper";
 import * as XLSX from "xlsx";
 import { Payload } from "../utils/ServiceDrafts";
+import { Modal } from "../components/Modal";
+
+interface ImportPreviewItem {
+  payload: Payload;
+  isExisting: boolean;
+  rowIndex: number;
+}
 
 export default function ImportExportServicios() {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [previewData, setPreviewData] = useState<ImportPreviewItem[]>([]);
 
   // Combina borradores y enviados para exportar
   const getAllServicios = (): Payload[] => {
@@ -99,7 +108,18 @@ export default function ImportExportServicios() {
     XLSX.writeFile(wb, "servicios_export.xlsx");
   };
 
-  // Importa desde Excel con formato de carga masiva
+  // Función para verificar si un servicio ya existe
+  const isServiceExisting = (payload: Payload): boolean => {
+    const allServices = getAllServicios();
+    return allServices.some(service => 
+      service.form.nroContenedor === payload.form.nroContenedor && 
+      service.form.nroContenedor !== "" &&
+      service.form.cliente === payload.form.cliente &&
+      service.form.tipoOperacion === payload.form.tipoOperacion
+    );
+  };
+
+  // Importa desde Excel con formato de carga masiva - con preview
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -111,20 +131,48 @@ export default function ImportExportServicios() {
       const ws = wb.Sheets[wb.SheetNames[0]!];
       const rows: any[] = XLSX.utils.sheet_to_json(ws!);
       
-      // Importar usando el mapper existente con el mapeo actualizado
-      rows.forEach((row) => {
+      // Procesar filas y preparar preview
+      const preview: ImportPreviewItem[] = [];
+      rows.forEach((row, index) => {
         try {
           const payload = mapExcelRowToPayload(row, getNextId());
-          saveOrUpdateSent(payload);
+          const isExisting = isServiceExisting(payload);
+          preview.push({
+            payload,
+            isExisting,
+            rowIndex: index + 1
+          });
         } catch (error) {
           console.error("Error procesando fila:", row, error);
         }
       });
-      alert(`Importación completada. ${rows.length} servicios procesados.`);
+      
+      setPreviewData(preview);
+      setShowImportModal(true);
+      
       // reset
       if (fileInputRef.current) fileInputRef.current.value = "";
     };
     reader.readAsArrayBuffer(file);
+  };
+
+  // Confirmar importación solo de servicios nuevos
+  const handleConfirmImport = () => {
+    const newServices = previewData.filter(item => !item.isExisting);
+    
+    newServices.forEach(item => {
+      try {
+        saveOrUpdateSent(item.payload);
+      } catch (error) {
+        console.error("Error guardando servicio:", error);
+      }
+    });
+    
+    const skippedCount = previewData.length - newServices.length;
+    alert(`Importación completada. ${newServices.length} servicios nuevos importados.${skippedCount > 0 ? ` ${skippedCount} servicios existentes omitidos.` : ''}`);
+    
+    setShowImportModal(false);
+    setPreviewData([]);
   };
 
   return (
@@ -147,6 +195,75 @@ export default function ImportExportServicios() {
           />
         </label>
       </div>
+      
+      {/* Modal de preview de importación */}
+      <Modal 
+        isOpen={showImportModal} 
+        onClose={() => setShowImportModal(false)}
+        onConfirm={handleConfirmImport}
+        confirmText="Importar Servicios Nuevos"
+        cancelText="Cancelar"
+      >
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">
+            Vista Previa de Importación
+          </h2>
+          
+          <div className="bg-gray-50 p-3 rounded">
+            <div className="flex gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-green-200 rounded"></div>
+                <span>Servicios nuevos ({previewData.filter(item => !item.isExisting).length})</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-red-200 rounded"></div>
+                <span>Servicios existentes ({previewData.filter(item => item.isExisting).length})</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="max-h-96 overflow-y-auto">
+            <table className="w-full border-collapse border border-gray-300">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="border border-gray-300 px-2 py-1 text-left">Fila</th>
+                  <th className="border border-gray-300 px-2 py-1 text-left">Cliente</th>
+                  <th className="border border-gray-300 px-2 py-1 text-left">Tipo Op.</th>
+                  <th className="border border-gray-300 px-2 py-1 text-left">Contenedor</th>
+                  <th className="border border-gray-300 px-2 py-1 text-left">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {previewData.map((item, index) => (
+                  <tr 
+                    key={index} 
+                    className={item.isExisting ? 'bg-red-50' : 'bg-green-50'}
+                  >
+                    <td className="border border-gray-300 px-2 py-1">{item.rowIndex}</td>
+                    <td className="border border-gray-300 px-2 py-1">
+                      {mockCatalogos.empresas.find(e => e.id === item.payload.form.cliente)?.nombre || 'N/A'}
+                    </td>
+                    <td className="border border-gray-300 px-2 py-1">
+                      {mockCatalogos.Operación.find(o => o.codigo === item.payload.form.tipoOperacion)?.nombre || 'N/A'}
+                    </td>
+                    <td className="border border-gray-300 px-2 py-1">
+                      {item.payload.form.nroContenedor || 'N/A'}
+                    </td>
+                    <td className="border border-gray-300 px-2 py-1">
+                      {item.isExisting ? 'Existente' : 'Nuevo'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          <div className="text-sm text-gray-600">
+            <p>• Los servicios en <span className="text-green-600 font-medium">verde</span> serán importados.</p>
+            <p>• Los servicios en <span className="text-red-600 font-medium">rojo</span> ya existen y serán omitidos.</p>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

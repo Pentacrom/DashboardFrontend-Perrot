@@ -53,13 +53,6 @@ const columns: Column<Service>[] = [
 ];
 
 const searchFilters: SearchFilter<Service>[] = [
-  { label: "ODV", key: "id", type: "text", placeholder: "Ingrese ODV" },
-  {
-    label: "Cliente",
-    key: "cliente",
-    type: "text",
-    placeholder: "Ingrese Cliente",
-  },
   { label: "Fecha Desde", key: "fecha", type: "date", comparator: "gte" },
   { label: "Fecha Hasta", key: "fecha", type: "date", comparator: "lte" },
 ];
@@ -90,6 +83,11 @@ const VistaServiciosPendientes: React.FC = () => {
       dropdownOptions={dropdownOptions}
       onDownloadExcel={() => alert("Descarga de Excel (stub)")}
       onSearch={() => alert("Buscar (stub)")}
+      globalSearch={{
+        enabled: true,
+        placeholder: "Ej: ID:001, Cliente:Empresa A, Fecha:2025-02-10, o texto libre",
+        highlightResults: true
+      }}
     />
   );
 };

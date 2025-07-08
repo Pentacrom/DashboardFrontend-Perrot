@@ -164,6 +164,7 @@ export interface Payload {
   valores?: ValorFactura[];
   chofer?: string;
   movil?: string;
+  rampla?: number; // ID de la rampla seleccionada
   descuentoServicioPorcentaje?: Descuento[];
   createdBy: string;
   importBatchId?: string; // Para rastrear lotes de importación

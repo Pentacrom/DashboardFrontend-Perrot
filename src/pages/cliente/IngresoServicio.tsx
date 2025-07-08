@@ -52,30 +52,8 @@ const columns: Column<Service>[] = [
 ];
 
 const searchFilters: SearchFilter<Service>[] = [
-  {
-    label: "ODV",
-    key: "id",
-    type: "text",
-    placeholder: "Buscar ODV",
-  },
-  {
-    label: "Cliente",
-    key: "cliente",
-    type: "text",
-    placeholder: "Buscar cliente",
-  },
-  {
-    label: "Origen",
-    key: "origen",
-    type: "text",
-    placeholder: "Buscar origen",
-  },
-  {
-    label: "Destino",
-    key: "destino",
-    type: "text",
-    placeholder: "Buscar destino",
-  },
+  { label: "Fecha Desde", key: "fecha", type: "date", comparator: "gte" },
+  { label: "Fecha Hasta", key: "fecha", type: "date", comparator: "lte" },
 ];
 
 const IngresoServicio: React.FC = () => {
@@ -121,6 +99,11 @@ const IngresoServicio: React.FC = () => {
         }
         onDownloadExcel={() => alert("Descarga de Excel (stub)")}
         onSearch={() => alert("Buscar (stub)")}
+        globalSearch={{
+          enabled: true,
+          placeholder: "Ej: ID:001, Cliente:Empresa A, Tipo:Transporte, o texto libre",
+          highlightResults: true
+        }}
       />
     </div>
   );

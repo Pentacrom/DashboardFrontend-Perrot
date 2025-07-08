@@ -43,6 +43,7 @@ const SeguimientoServicio: React.FC = () => {
       setService(found);
       setPuntos(found.puntos);
       setEstadoSeguimiento(found.estadoSeguimiento || "");
+      setSelectedRampla(found.rampla || 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar");
     } finally {
@@ -126,12 +127,13 @@ const SeguimientoServicio: React.FC = () => {
       ...service, 
       puntos,
       pendienteDevolucion,
-      estadoSeguimiento
+      estadoSeguimiento,
+      rampla: selectedRampla > 0 ? selectedRampla : undefined
     };
     saveOrUpdateSent(updated);
     alert("Seguimiento guardado correctamente.");
     navigate(-1);
-  }, [service, puntos, estadoSeguimiento, navigate, calcularPendienteDevolucion]);
+  }, [service, puntos, estadoSeguimiento, selectedRampla, navigate, calcularPendienteDevolucion]);
 
   const handleCompletar = () => {
     console.log("DEBUG - Iniciando handleCompletar");
@@ -213,7 +215,8 @@ const SeguimientoServicio: React.FC = () => {
       puntos,
       pendienteDevolucion,
       estado: "Por validar",
-      estadoSeguimiento
+      estadoSeguimiento,
+      rampla: selectedRampla > 0 ? selectedRampla : undefined
     };
     
     console.log("DEBUG - Payload actualizado:", actualizado);

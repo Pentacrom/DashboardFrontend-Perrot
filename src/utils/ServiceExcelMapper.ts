@@ -37,6 +37,8 @@ import {
   // Mapeo flexible de encabezados para diferentes formatos
   const HEADER_MAPPING: Record<string, string[]> = {
     ruta: ["ruta", "route"],
+    origen: ["origen", "origin", "lugar de retiro 1"],
+    destino: ["destino", "destination", "dirección de entrega", "direccion de entrega"],
     cliente: ["cliente", "customer", "empresa"],
     subCliente: ["sub cliente", "subclient", "sub client"],
     tipoOperacion: ["tipo de operacion", "operacion", "operation", "tipo operacion"],
@@ -89,6 +91,79 @@ import {
   }
   
   /**
+   * Valida los datos de un payload y devuelve errores de validación
+   */
+  function validatePayloadData(payload: Payload, originalRow: any): FieldValidationError[] {
+    const errors: FieldValidationError[] = [];
+    const form = payload.form;
+
+    // Validar cliente
+    if (!form.cliente || form.cliente === 0) {
+      errors.push({
+        field: 'cliente',
+        error: 'Cliente requerido',
+        value: findCellValue(originalRow, "cliente")
+      });
+    }
+
+    // Validar tipo de operación
+    if (!form.tipoOperacion || form.tipoOperacion === 0) {
+      errors.push({
+        field: 'tipoOperacion',
+        error: 'Tipo de operación requerido',
+        value: findCellValue(originalRow, "tipoOperacion")
+      });
+    }
+
+    // Validar origen
+    if (!form.origen || form.origen === 0) {
+      errors.push({
+        field: 'origen',
+        error: 'Origen requerido',
+        value: findCellValue(originalRow, "origen") || findCellValue(originalRow, "ruta")
+      });
+    }
+
+    // Validar destino
+    if (!form.destino || form.destino === 0) {
+      errors.push({
+        field: 'destino',
+        error: 'Destino requerido',
+        value: findCellValue(originalRow, "destino") || findCellValue(originalRow, "ruta")
+      });
+    }
+
+    // Validar país
+    if (!form.pais || form.pais === 0) {
+      errors.push({
+        field: 'pais',
+        error: 'País requerido',
+        value: findCellValue(originalRow, "pais")
+      });
+    }
+
+    // Validar tipo de contenedor
+    if (!form.tipoContenedor || form.tipoContenedor === 0) {
+      errors.push({
+        field: 'tipoContenedor',
+        error: 'Tipo de contenedor requerido',
+        value: findCellValue(originalRow, "tipoContenedor")
+      });
+    }
+
+    // Validar ejecutivo/createdBy
+    if (!payload.createdBy || payload.createdBy === 'importacion-excel') {
+      errors.push({
+        field: 'ejecutivo',
+        error: 'Ejecutivo requerido',
+        value: findCellValue(originalRow, "ejecutivo")
+      });
+    }
+
+    return errors;
+  }
+
+  /**
    * Mapea una fila del Excel a un Payload
    */
   export function mapExcelRowToPayload(row: any, nextId: number): Payload {
@@ -109,11 +184,23 @@ import {
     const clienteObj = findItemByName(mockCatalogos.empresas, clienteValue);
     const cliente = clienteObj?.id || 0;
   
-    const origenValue = findCellValue(row, "origen");
+    // Intentar obtener origen y destino de campos individuales primero
+    let origenValue = findCellValue(row, "origen");
+    let destinoValue = findCellValue(row, "destino");
+    
+    // Si no se encuentran, intentar parsear desde la ruta
+    if (!origenValue || !destinoValue) {
+      const rutaValue = findCellValue(row, "ruta");
+      if (rutaValue && rutaValue.includes('/')) {
+        const [rutaOrigen, rutaDestino] = rutaValue.split('/');
+        origenValue = origenValue || rutaOrigen?.trim();
+        destinoValue = destinoValue || rutaDestino?.trim();
+      }
+    }
+    
     const origenLugarObj = findItemByName(mockCatalogos.Lugares, origenValue);
     const origenLugar = origenLugarObj?.id || 0;
   
-    const destinoValue = findCellValue(row, "destino");
     const destinoLugarObj = findItemByName(mockCatalogos.Lugares, destinoValue);
     const destinoLugar = destinoLugarObj?.id || 0;
 
@@ -247,14 +334,31 @@ import {
   }
 
   /**
+   * Interfaz para errores de validación de campos
+   */
+  export interface FieldValidationError {
+    field: string;
+    error: string;
+    value: any;
+  }
+
+  /**
+   * Interfaz para payload con información de validación
+   */
+  export interface ValidatedPayload extends Payload {
+    validationErrors: FieldValidationError[];
+    isValid: boolean;
+  }
+
+  /**
    * Interfaz para el resultado de validación de importación
    */
   export interface ImportValidationResult {
-    payloads: Payload[];
+    payloads: ValidatedPayload[];
     batchInfo: { batchId: string; filename: string; rowCount: number };
     duplicateIds: number[];
     duplicatesInFile: number[];
-    validPayloads: Payload[];
+    validPayloads: ValidatedPayload[];
     skippedCount: number;
   }
 
@@ -269,46 +373,66 @@ import {
     
     const batchId = generateBatchId();
     
-    // Mapear todas las filas a payloads
-    const allPayloads = rows.map(row => {
+    // Mapear todas las filas a payloads con validación
+    const allPayloads: ValidatedPayload[] = rows.map(row => {
       const payload = mapExcelRowToPayload(row, getNextId());
       payload.importBatchId = batchId;
-      return payload;
+      
+      // Validar datos del payload
+      const validationErrors = validatePayloadData(payload, row);
+      const isValid = validationErrors.length === 0;
+      
+      return {
+        ...payload,
+        validationErrors,
+        isValid
+      } as ValidatedPayload;
     });
 
-    // Obtener IDs existentes en el sistema
+    // Obtener servicios existentes en el sistema
     const existingSent = loadSent() as Payload[];
     const existingDrafts = loadDrafts() as Payload[];
-    const existingIds = new Set([
-      ...existingSent.map((p: Payload) => p.id),
-      ...existingDrafts.map((p: Payload) => p.id)
-    ]);
+    const allExistingServices = [...existingSent, ...existingDrafts];
+    
+    // Función para crear una clave única basada en los datos del servicio
+    const createServiceKey = (payload: Payload): string => {
+      const form = payload.form;
+      // Usar múltiples campos para crear una clave única más robusta
+      const contenedor = form.nroContenedor || 'sin-contenedor';
+      const fecha = form.fechaSol ? new Date(form.fechaSol).toISOString().split('T')[0] : 'sin-fecha';
+      return `${form.cliente}-${form.tipoOperacion}-${contenedor}-${form.origen}-${form.destino}-${fecha}`;
+    };
+    
+    // Crear conjunto de claves existentes
+    const existingKeys = new Set(
+      allExistingServices.map(service => createServiceKey(service))
+    );
 
-    // Detectar duplicados con datos existentes
+    // Detectar duplicados
     const duplicateIds: number[] = [];
     const duplicatesInFile: number[] = [];
-    const fileIds = new Set<number>();
+    const fileKeys = new Set<string>();
     
     // Validar duplicados
-    const validPayloads: Payload[] = [];
+    const validPayloads: ValidatedPayload[] = [];
     
     for (const payload of allPayloads) {
-      const payloadId = payload.id;
+      const serviceKey = createServiceKey(payload);
       
-      // Verificar si ya existe en el sistema
-      if (existingIds.has(payloadId)) {
-        duplicateIds.push(payloadId);
+      // Verificar si ya existe en el sistema (usando datos del servicio, no ID)
+      if (existingKeys.has(serviceKey)) {
+        duplicateIds.push(payload.id);
         continue;
       }
       
       // Verificar si está duplicado dentro del archivo
-      if (fileIds.has(payloadId)) {
-        duplicatesInFile.push(payloadId);
+      if (fileKeys.has(serviceKey)) {
+        duplicatesInFile.push(payload.id);
         continue;
       }
       
       // Si no hay duplicados, agregar a válidos
-      fileIds.add(payloadId);
+      fileKeys.add(serviceKey);
       validPayloads.push(payload);
     }
 
@@ -387,12 +511,16 @@ import {
       
       switch (field) {
         case 'Ruta':
-          return payload.id?.toString() || '';
+          const origenObj = mockCatalogos.Lugares.find(lugar => lugar.id === form.origen);
+          const destinoObj = mockCatalogos.Lugares.find(lugar => lugar.id === form.destino);
+          const origenNombre = origenObj?.nombre || '';
+          const destinoNombre = destinoObj?.nombre || '';
+          return origenNombre && destinoNombre ? `${origenNombre}/${destinoNombre}` : '';
         case 'Tipo de Operacion':
           const tipoOp = mockCatalogos.Operación.find(op => op.codigo === form.tipoOperacion);
           return tipoOp?.nombre || '';
         case 'Ejecutivo':
-          return form.ejecutivo || '';
+          return payload.createdBy || '';
         case 'Cliente':
           const cliente = mockCatalogos.empresas.find(emp => emp.id === form.cliente);
           return cliente?.nombre || '';

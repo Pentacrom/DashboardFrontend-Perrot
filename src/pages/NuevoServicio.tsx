@@ -355,6 +355,19 @@ const NuevoServicio: React.FC = () => {
         alert("Debes definir al menos 2 puntos.");
         return;
       }
+      
+      // Validar que todos los puntos tengan lugar y acción seleccionados
+      for (let i = 0; i < puntos.length; i++) {
+        const punto = puntos[i];
+        if (!punto.idLugar || punto.idLugar === 0) {
+          alert(`El punto ${i + 1} debe tener un lugar seleccionado.`);
+          return;
+        }
+        if (!punto.accion || punto.accion === 0) {
+          alert(`El punto ${i + 1} debe tener una acción seleccionada.`);
+          return;
+        }
+      }
       if (form.imoCargo && form.imoCategoria === 0) {
         alert("Si marcaste Cargo IMO, debes elegir categoría (1–9).");
         return;
@@ -384,7 +397,7 @@ const NuevoServicio: React.FC = () => {
           id: newId,
           form,
           puntos,
-          estado: "Sin Asignar",
+          estado: "Pendiente",
           valores,
           createdBy,
         });
@@ -398,7 +411,7 @@ const NuevoServicio: React.FC = () => {
       const hasChofer = Boolean((existing as Payload).chofer);
       const hasMovil = Boolean((existing as Payload).movil);
       const estadoFinal: Payload["estado"] =
-        hasChofer && hasMovil ? "En Proceso" : "Sin Asignar";
+        hasChofer && hasMovil ? "En Proceso" : "Pendiente";
 
       saveOrUpdateSent({
         id: newId,
@@ -420,6 +433,19 @@ const NuevoServicio: React.FC = () => {
 
   // Handler para Guardar borrador
   const handleGuardar = useCallback(() => {
+    // Validar que todos los puntos tengan lugar y acción seleccionados
+    for (let i = 0; i < puntos.length; i++) {
+      const punto = puntos[i];
+      if (!punto.idLugar || punto.idLugar === 0) {
+        alert(`El punto ${i + 1} debe tener un lugar seleccionado.`);
+        return;
+      }
+      if (!punto.accion || punto.accion === 0) {
+        alert(`El punto ${i + 1} debe tener una acción seleccionada.`);
+        return;
+      }
+    }
+    
     const newId = idService ?? getNextId();
     const existing = idService
       ? loadSent().find((s) => s.id === newId) ||
@@ -698,11 +724,12 @@ const NuevoServicio: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium">Naviera</label>
+              <label className="block text-sm font-medium">Naviera *</label>
               <select
                 className="input"
                 value={form.nave}
                 onChange={upd("nave")}
+                required
               >
                 <option value={0}>—</option>
                 {opt(mockCatalogos.navieras)}

@@ -28,19 +28,8 @@ import ImportExportButtons from "../../components/ImportExportButtons";
 
 // Definición de filtros de búsqueda
 const searchFilters: SearchFilter<ServiceRow>[] = [
-  { label: "ID", key: "id", type: "text", placeholder: "Buscar ID" },
-  {
-    label: "Origen",
-    key: "origen",
-    type: "text",
-    placeholder: "Buscar origen",
-  },
-  {
-    label: "Destino",
-    key: "destino",
-    type: "text",
-    placeholder: "Buscar destino",
-  },
+  { label: "Fecha Desde", key: "fecha", type: "date", comparator: "gte" },
+  { label: "Fecha Hasta", key: "fecha", type: "date", comparator: "lte" },
 ];
 
 // Filtros de casillas
@@ -167,6 +156,11 @@ const IngresoServicio: React.FC = () => {
           mode: "row",
         }}
         preferencesKey="comercial-servicios"
+        globalSearch={{
+          enabled: true,
+          placeholder: "Ej: ID:123, Cliente:empresa, Estado:Pendiente, o texto libre",
+          highlightResults: true
+        }}
       />
     </div>
   );

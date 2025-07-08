@@ -22,13 +22,6 @@ import { estadoStyles, badgeTextColor } from "../../config/estadoConfig";
 import ImportExportButtons from "../../components/ImportExportButtons";
 
 const searchFilters: SearchFilter<ServiceRow>[] = [
-  { label: "ID", key: "id", type: "text", placeholder: "Buscar ID" },
-  {
-    label: "Cliente",
-    key: "cliente",
-    type: "text",
-    placeholder: "Buscar cliente",
-  },
   { label: "Fecha Desde", key: "fecha", type: "date", comparator: "gte" },
   { label: "Fecha Hasta", key: "fecha", type: "date", comparator: "lte" },
 ];
@@ -195,6 +188,11 @@ const VistaServicios: React.FC = () => {
         defaultSortKey="pendienteDevolucion"
         defaultSortOrder="asc"
         preferencesKey="torreDeControl-servicios"
+        globalSearch={{
+          enabled: true,
+          placeholder: "Ej: ID:123, Cliente:empresa, Estado:En Proceso, o texto libre",
+          highlightResults: true
+        }}
       />
     </div>
   );

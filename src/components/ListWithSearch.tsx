@@ -33,6 +33,20 @@ import {
 // Import formatDateTime from format utils
 import { formatDateTime } from "../utils/format";
 
+// Función para resaltar texto encontrado
+const highlightText = (text: string, searchTerm: string): React.ReactNode => {
+  if (!searchTerm.trim()) return text;
+  
+  const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  const parts = text.split(regex);
+  
+  return parts.map((part, index) => 
+    regex.test(part) ? (
+      <mark key={index} className="bg-yellow-200 font-semibold">{part}</mark>
+    ) : part
+  );
+};
+
 // Función para formatear valores según el tipo de dato
 const formatCellValue = (
   value: any,
@@ -102,6 +116,7 @@ export interface Column<T> {
   lookupData?: Array<{ code: number | string; name: string }>;
   currencySymbol?: string;
   temperatureUnit?: "C" | "F";
+  render?: (value: any, item: T) => React.ReactNode;
 }
 
 export interface SearchFilter<T> {
@@ -110,6 +125,13 @@ export interface SearchFilter<T> {
   type: "text" | "date";
   placeholder?: string;
   comparator?: "gte" | "lte";
+}
+
+export interface GlobalSearchConfig<T> {
+  enabled: boolean;
+  placeholder?: string;
+  searchableColumns?: Array<keyof T>; // Columnas específicas para buscar
+  highlightResults?: boolean;
 }
 
 export interface CheckboxFilterGroup<T> {
@@ -138,7 +160,7 @@ export interface ListWithSearchProps<T> {
   data: T[];
   columns?: Column<T>[];
   defaultVisibleColumns?: Array<keyof T>;
-  searchFilters?: SearchFilter<T>[];
+  searchFilters?: SearchFilter<T>[]; // Mantenido para compatibilidad pero no usado
   checkboxFilterGroups?: CheckboxFilterGroup<T>[];
   defaultCheckboxSelections?: Partial<Record<keyof T, string[]>>;
   onDownloadExcel?: () => void;
@@ -160,6 +182,7 @@ export interface ListWithSearchProps<T> {
   defaultSortOrder?: "asc" | "desc";
   preferencesKey?: string;
   buttons?: ListButton[]; // Botones de vista general
+  globalSearch?: GlobalSearchConfig<T>; // Nueva configuración de búsqueda inteligente
 }
 
 export interface ListPreferences<T> {
@@ -167,9 +190,11 @@ export interface ListPreferences<T> {
   itemsPerPage: number;
   sortKey: keyof T | "";
   sortOrder: "asc" | "desc";
-  searchValues: Record<string, string>;
+  searchValues: Record<string, string>; // Mantenido para compatibilidad
   checkboxValues: Record<string, string[]>;
   columnOrder: Array<keyof T>;
+  globalSearchValue?: string; // Ahora contiene la búsqueda inteligente
+  globalSearchColumn?: keyof T | "all";
 }
 
 export interface ListWithSearchHandles<T> {
@@ -243,7 +268,7 @@ function ListWithSearchInner<T extends Record<string, any>>(
   const {
     data,
     columns,
-    searchFilters = [],
+    searchFilters = [], // Mantenido para compatibilidad pero no usado
     checkboxFilterGroups = [],
     onSearch,
     searchButtonDisabled = false,
@@ -258,7 +283,8 @@ function ListWithSearchInner<T extends Record<string, any>>(
     defaultSortOrder,
     defaultCheckboxSelections,
     preferencesKey,
-    buttons
+    buttons,
+    globalSearch
   } = props;
 
   // Construir lista completa de columnas
@@ -485,6 +511,52 @@ function ListWithSearchInner<T extends Record<string, any>>(
     return defaultSortOrder ?? "asc";
   });
 
+  // Estados para búsqueda inteligente
+  const [smartSearchValue, setSmartSearchValue] = useState<string>(() => {
+    if (preferencesKey) {
+      const stored = localStorage.getItem(preferencesKey);
+      if (stored) {
+        try {
+          return (JSON.parse(stored) as ListPreferences<T>).globalSearchValue || "";
+        } catch { }
+      }
+    }
+    return "";
+  });
+
+  const [showSearchHelp, setShowSearchHelp] = useState(false);
+
+  // Función para parsear la búsqueda inteligente
+  const parseSmartSearch = (searchValue: string): { field: keyof T | "all", value: string } => {
+    const trimmed = searchValue.trim();
+    if (!trimmed) return { field: "all", value: "" };
+    
+    const colonIndex = trimmed.indexOf(':');
+    if (colonIndex === -1) {
+      // Si no hay ":", buscar en todos los campos
+      return { field: "all", value: trimmed };
+    }
+    
+    const fieldName = trimmed.substring(0, colonIndex).trim().toLowerCase();
+    const searchTerm = trimmed.substring(colonIndex + 1).trim();
+    
+    // Buscar la columna que coincida con el nombre del campo
+    const matchingColumn = allColumns.find(col => {
+      const colLabel = col.label.toLowerCase();
+      const colKey = String(col.key).toLowerCase();
+      return colLabel === fieldName || colKey === fieldName || colLabel.includes(fieldName);
+    });
+    
+    return {
+      field: matchingColumn ? matchingColumn.key : "all",
+      value: searchTerm
+    };
+  };
+
+  // Parsear la búsqueda actual
+  const { field: globalSearchColumn, value: globalSearchValue } = parseSmartSearch(smartSearchValue);
+
+
   const handleSort = (key: keyof T) => {
     if (sortKey === key) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -504,22 +576,38 @@ function ListWithSearchInner<T extends Record<string, any>>(
   const filteredData = useMemo(() => {
     let filtered = data;
 
-    searchFilters.forEach((filter) => {
+    // Aplicar filtros de fecha
+    searchFilters.filter(f => f.type === 'date').forEach((filter) => {
       const value = searchValues[filter.key as string];
       if (value) {
         filtered = filtered.filter((item) => {
           const itemValue = item[filter.key];
-          if (filter.type === "date") {
-            if (filter.comparator === "lte") {
-              return new Date(itemValue).getTime() <= new Date(value).getTime();
+          try {
+            const itemDate = new Date(itemValue);
+            const filterDate = new Date(value);
+            
+            // Validar que ambas fechas sean válidas
+            if (isNaN(itemDate.getTime()) || isNaN(filterDate.getTime())) {
+              return false;
             }
-            return new Date(itemValue).getTime() >= new Date(value).getTime();
+            
+            // Normalizar fechas a medianoche para comparación por día
+            const itemDateOnly = new Date(itemDate.getFullYear(), itemDate.getMonth(), itemDate.getDate());
+            const filterDateOnly = new Date(filterDate.getFullYear(), filterDate.getMonth(), filterDate.getDate());
+            
+            if (filter.comparator === "lte") {
+              return itemDateOnly.getTime() <= filterDateOnly.getTime();
+            }
+            return itemDateOnly.getTime() >= filterDateOnly.getTime();
+          } catch (error) {
+            console.warn('Error parsing date for filter:', error);
+            return false;
           }
-          return String(itemValue).toLowerCase().includes(value.toLowerCase());
         });
       }
     });
 
+    // Aplicar filtros de checkbox
     checkboxFilterGroups.forEach((group) => {
       const key = group.key as string;
       const selected = checkboxValues[key] ?? [];
@@ -532,8 +620,88 @@ function ListWithSearchInner<T extends Record<string, any>>(
       }
     });
 
+    // Aplicar búsqueda inteligente solo si está habilitada
+    if (globalSearch?.enabled && globalSearchValue.trim()) {
+      const searchTerm = globalSearchValue.toLowerCase();
+      const searchableColumns = globalSearch.searchableColumns || allColumns.map(c => c.key);
+      
+      filtered = filtered.filter((item) => {
+        let hasMatch = false;
+
+        if (globalSearchColumn === "all") {
+          // Buscar en todas las columnas especificadas
+          searchableColumns.forEach(columnKey => {
+            const cellValue = formatCellValue(item[columnKey], 
+              allColumns.find(c => c.key === columnKey) || { key: columnKey, label: String(columnKey) }
+            );
+            const valueStr = typeof cellValue === 'string' ? cellValue : String(cellValue);
+            
+            if (valueStr.toLowerCase().includes(searchTerm)) {
+              hasMatch = true;
+            }
+          });
+        } else {
+          // Buscar solo en la columna específica
+          const cellValue = formatCellValue(item[globalSearchColumn], 
+            allColumns.find(c => c.key === globalSearchColumn) || { key: globalSearchColumn, label: String(globalSearchColumn) }
+          );
+          const valueStr = typeof cellValue === 'string' ? cellValue : String(cellValue);
+          
+          if (valueStr.toLowerCase().includes(searchTerm)) {
+            hasMatch = true;
+          }
+        }
+
+        return hasMatch;
+      });
+    }
+
     return filtered;
-  }, [data, searchFilters, searchValues, checkboxFilterGroups, checkboxValues]);
+  }, [data, searchFilters, searchValues, checkboxFilterGroups, checkboxValues, globalSearch, globalSearchValue, globalSearchColumn, allColumns]);
+
+  // Calcular matches para resaltado en un useMemo separado
+  const globalSearchMatches = useMemo(() => {
+    if (!globalSearch?.enabled || !globalSearchValue.trim()) {
+      return new Map<number, Set<keyof T>>();
+    }
+
+    const newMatches = new Map<number, Set<keyof T>>();
+    const searchTerm = globalSearchValue.toLowerCase();
+    const searchableColumns = globalSearch.searchableColumns || allColumns.map(c => c.key);
+
+    filteredData.forEach((item, index) => {
+      const matchingFields = new Set<keyof T>();
+      const originalIndex = data.indexOf(item);
+
+      if (globalSearchColumn === "all") {
+        searchableColumns.forEach(columnKey => {
+          const cellValue = formatCellValue(item[columnKey], 
+            allColumns.find(c => c.key === columnKey) || { key: columnKey, label: String(columnKey) }
+          );
+          const valueStr = typeof cellValue === 'string' ? cellValue : String(cellValue);
+          
+          if (valueStr.toLowerCase().includes(searchTerm)) {
+            matchingFields.add(columnKey);
+          }
+        });
+      } else {
+        const cellValue = formatCellValue(item[globalSearchColumn], 
+          allColumns.find(c => c.key === globalSearchColumn) || { key: globalSearchColumn, label: String(globalSearchColumn) }
+        );
+        const valueStr = typeof cellValue === 'string' ? cellValue : String(cellValue);
+        
+        if (valueStr.toLowerCase().includes(searchTerm)) {
+          matchingFields.add(globalSearchColumn);
+        }
+      }
+
+      if (matchingFields.size > 0) {
+        newMatches.set(originalIndex, matchingFields);
+      }
+    });
+
+    return newMatches;
+  }, [filteredData, globalSearch, globalSearchValue, globalSearchColumn, allColumns, data]);
 
   // Ordenar datos
   const sortedData = useMemo(() => {
@@ -586,6 +754,8 @@ function ListWithSearchInner<T extends Record<string, any>>(
       searchValues,
       checkboxValues,
       columnOrder,
+      globalSearchValue: smartSearchValue,
+      globalSearchColumn: smartSearchValue ? globalSearchColumn : "all",
     }),
     updatePreferences: (newPrefs: Partial<ListPreferences<T>>) => {
       newPrefs.visibleKeys && setVisibleKeys(newPrefs.visibleKeys);
@@ -595,6 +765,8 @@ function ListWithSearchInner<T extends Record<string, any>>(
       newPrefs.searchValues && setSearchValues(newPrefs.searchValues);
       newPrefs.checkboxValues && setCheckboxValues(newPrefs.checkboxValues);
       newPrefs.columnOrder && setColumnOrder(newPrefs.columnOrder);
+      newPrefs.globalSearchValue !== undefined && setGlobalSearchValue(newPrefs.globalSearchValue);
+      newPrefs.globalSearchColumn !== undefined && setGlobalSearchColumn(newPrefs.globalSearchColumn);
     },
   }));
 
@@ -611,6 +783,8 @@ function ListWithSearchInner<T extends Record<string, any>>(
       searchValues,
       checkboxValues,
       columnOrder,
+      globalSearchValue: smartSearchValue,
+      globalSearchColumn: smartSearchValue ? globalSearchColumn : "all",
     };
     console.log("🔖 Guardando prefs:", preferencesKey, prefs);
     localStorage.setItem(preferencesKey, JSON.stringify(prefs));
@@ -622,6 +796,8 @@ function ListWithSearchInner<T extends Record<string, any>>(
     searchValues,
     checkboxValues,
     columnOrder,
+    globalSearchValue,
+    globalSearchColumn,
     preferencesKey,
   ]);
 
@@ -659,8 +835,9 @@ function ListWithSearchInner<T extends Record<string, any>>(
   const extraColumnVisible = headerDropdownVisible || customButtonsProvided;
 
   const showFiltersContainer =
-    (searchFilters && searchFilters.length > 0) ||
-    (checkboxFilterGroups && checkboxFilterGroups.length > 0);
+    (searchFilters && searchFilters.filter(f => f.type === 'date').length > 0) ||
+    (checkboxFilterGroups && checkboxFilterGroups.length > 0) ||
+    (globalSearch?.enabled);
 
   return (
     <div className="p-6 relative max-w-full">
@@ -670,9 +847,74 @@ function ListWithSearchInner<T extends Record<string, any>>(
 
       {showFiltersContainer && (
         <div className="bg-gray-100 p-4 rounded mb-6 drop-shadow-sm">
-          {searchFilters.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-              {searchFilters.map((filter) => (
+          {/* Búsqueda inteligente */}
+          {globalSearch?.enabled && (
+            <div className="mb-4 p-3 bg-white rounded border">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Búsqueda inteligente
+                  </label>
+                  <button
+                    onClick={() => setShowSearchHelp(!showSearchHelp)}
+                    className="text-blue-500 hover:text-blue-700 text-sm underline"
+                  >
+                    ¿Cómo usar?
+                  </button>
+                </div>
+                
+                {showSearchHelp && (
+                  <div className="bg-blue-50 p-3 rounded border border-blue-200 text-sm">
+                    <p className="font-medium text-blue-800 mb-2">Sintaxis de búsqueda:</p>
+                    <ul className="text-blue-700 space-y-1">
+                      <li>• <strong>Campo:valor</strong> - Buscar "valor" en el campo específico</li>
+                      <li>• <strong>ID:123</strong> - Buscar el ID 123</li>
+                      <li>• <strong>Cliente:empresa</strong> - Buscar "empresa" en la columna Cliente</li>
+                      <li>• <strong>texto</strong> - Buscar "texto" en todas las columnas</li>
+                    </ul>
+                    <p className="mt-2 text-xs text-blue-600">
+                      Campos disponibles: {allColumns.map(c => c.label).join(', ')}
+                    </p>
+                  </div>
+                )}
+                
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={smartSearchValue}
+                      onChange={(e) => setSmartSearchValue(e.target.value)}
+                      placeholder="Ej: ID:123, Cliente:empresa, o solo texto para buscar en todo"
+                      className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  {smartSearchValue && (
+                    <button
+                      onClick={() => setSmartSearchValue("")}
+                      className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+                    >
+                      Limpiar
+                    </button>
+                  )}
+                </div>
+                
+                {smartSearchValue && (
+                  <div className="text-xs text-gray-600">
+                    {globalSearchColumn === "all" ? (
+                      <span>Buscando "{globalSearchValue}" en <strong>todas las columnas</strong></span>
+                    ) : (
+                      <span>Buscando "{globalSearchValue}" en la columna <strong>{allColumns.find(c => c.key === globalSearchColumn)?.label}</strong></span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Filtros de fecha */}
+          {searchFilters.filter(f => f.type === 'date').length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              {searchFilters.filter(f => f.type === 'date').map((filter) => (
                 <div key={filter.key as string}>
                   <label className="block text-sm font-medium text-gray-700">
                     {filter.label}
@@ -936,6 +1178,17 @@ function ListWithSearchInner<T extends Record<string, any>>(
                               ? formatDateTime(raw as any)
                               : String(raw);
 
+                          // Aplicar resaltado de búsqueda global si está habilitado
+                          const shouldHighlight = globalSearch?.enabled && 
+                            globalSearch.highlightResults && 
+                            globalSearchValue.trim() && 
+                            globalSearchMatches.get(data.indexOf(item))?.has(col.key);
+
+                          let finalCellContent = cellContent;
+                          if (shouldHighlight && typeof cellContent === 'string') {
+                            finalCellContent = highlightText(cellContent, globalSearchValue);
+                          }
+
                           // Si hay un render personalizado, usarlo directamente
                           if (col.render) {
                             return (
@@ -943,7 +1196,7 @@ function ListWithSearchInner<T extends Record<string, any>>(
                                 key={col.key as string}
                                 className="px-6 py-4 whitespace-nowrap"
                               >
-                                {cellContent}
+                                {finalCellContent}
                               </td>
                             );
                           }
@@ -966,20 +1219,20 @@ function ListWithSearchInner<T extends Record<string, any>>(
                         px-2 inline-flex text-xs leading-5 font-semibold rounded-full
                       `}
                                 >
-                                  {cellContent}
+                                  {finalCellContent}
                                 </span>
                               </td>
                             );
                           }
 
-                          const isCheckbox = typeof cellContent === "object" && cellContent !== null;
+                          const isCheckbox = typeof finalCellContent === "object" && finalCellContent !== null;
                           
                           return (
                             <td
                               key={col.key as string}
                               className={`px-6 py-4 whitespace-nowrap ${isCheckbox ? "text-center" : ""}`}
                             >
-                              {cellContent}
+                              {finalCellContent}
                             </td>
                           );
                         })
