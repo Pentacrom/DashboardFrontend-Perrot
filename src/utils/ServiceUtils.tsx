@@ -28,7 +28,7 @@ export function payloadToRow(p: Payload): ServiceRow {
   row.destino = getNameFromCatalog(mockCatalogos.Lugares, form.destino, `Lugar ID: ${form.destino}`);
   row.pais = getNameFromCatalog(mockPaises, form.pais, `País ID: ${form.pais}`);
   row.fecha = form.fechaSol;
-  row.tipo = getNameFromCatalog(mockCatalogos.Tipo_contenedor, form.tipoContenedor, `Container ID: ${form.tipoContenedor}`);
+  row.tipo = form.tipoServicio === 1 ? 'Directo' : form.tipoServicio === 2 ? 'Indirecto' : 'No definido';
   row.tipoContenedor = getNameFromCatalog(mockCatalogos.Tipo_contenedor, form.tipoContenedor, `Container ID: ${form.tipoContenedor}`);
   row.kilos = form.kilos;
   row.precioCarga = form.precioCarga;

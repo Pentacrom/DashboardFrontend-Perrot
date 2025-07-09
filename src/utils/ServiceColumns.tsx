@@ -51,7 +51,7 @@ export const allServiceColumns: Column<ServiceRow>[] = [
   { label: "Origen", key: "origen", sortable: true, dataType: "text" },
   { label: "Destino", key: "destino", sortable: true, dataType: "text" },
   { label: "Fecha", key: "fecha", sortable: true, dataType: "date" },
-  { label: "Tipo", key: "tipo", sortable: true, dataType: "text" },
+  { label: "Tipo Servicio", key: "tipo", sortable: true, dataType: "text" },
   {
     label: "Estado",
     key: "estado",

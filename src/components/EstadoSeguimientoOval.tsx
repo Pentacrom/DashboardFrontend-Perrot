@@ -3,7 +3,7 @@ import React from 'react';
 import { EstadoSeguimiento, estadoSeguimientoStyles } from '../utils/ServiceDrafts';
 
 interface EstadoSeguimientoOvalProps {
-  estado: EstadoSeguimiento;
+  estado: EstadoSeguimiento | null | undefined | string;
   className?: string;
 }
 
@@ -11,11 +11,15 @@ export const EstadoSeguimientoOval: React.FC<EstadoSeguimientoOvalProps> = ({
   estado, 
   className = "" 
 }) => {
-  const styles = estadoSeguimientoStyles[estado];
+  // Normalizar el estado - si es null, undefined, o cadena vacía, usar "Sin iniciar"
+  const estadoNormalizado = estado || "Sin iniciar";
+  
+  const styles = estadoSeguimientoStyles[estadoNormalizado as EstadoSeguimiento];
   
   // Debug: Log estados que no tienen estilos definidos
   if (!styles) {
-    console.warn(`EstadoSeguimientoOval: No hay estilos definidos para el estado: "${estado}"`);
+    console.warn(`EstadoSeguimientoOval: No hay estilos definidos para el estado: "${estadoNormalizado}"`);
+    console.warn(`Estado original:`, estado);
     console.warn(`Estados disponibles:`, Object.keys(estadoSeguimientoStyles));
   }
   
@@ -34,7 +38,7 @@ export const EstadoSeguimientoOval: React.FC<EstadoSeguimientoOvalProps> = ({
           ${defaultStyles.bg} ${defaultStyles.text} ${defaultStyles.border}
         `}
       >
-        {estado}
+        {estadoNormalizado}
       </div>
     </div>
   );
