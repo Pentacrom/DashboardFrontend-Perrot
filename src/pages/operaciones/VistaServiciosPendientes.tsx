@@ -13,6 +13,8 @@ import {
   Payload,
   Descuento,
   mockCatalogos,
+  marcarCorreoEnviado,
+  desmarcarCorreoEnviado,
 } from "../../utils/ServiceDrafts";
 import { 
   ServiceRow, 
@@ -45,6 +47,16 @@ const VistaServiciosPendientes: React.FC = () => {
   };
   const closeConfirm = () => setConfirmId(null);
 
+  // Funciones para gestionar el correo
+  const handleMarcarCorreoEnviado = (servicioId: number) => {
+    marcarCorreoEnviado(servicioId);
+    loadData(); // Recargar datos para actualizar la vista
+  };
+
+  const handleDesmarcarCorreoEnviado = (servicioId: number) => {
+    desmarcarCorreoEnviado(servicioId);
+    loadData(); // Recargar datos para actualizar la vista
+  };
 
   const confirmFalsoFlete = () => {
     if (!confirmId) return;
@@ -90,6 +102,20 @@ const VistaServiciosPendientes: React.FC = () => {
         onClick: () => navigate(`/detalle-servicio/${idStr}`),
       },
     ];
+    
+    // Opciones de correo
+    if (row.correoEnviado) {
+      opts.push({
+        label: "✉️ Marcar correo como no enviado",
+        onClick: () => handleDesmarcarCorreoEnviado(idNum),
+      });
+    } else {
+      opts.push({
+        label: "✅ Marcar correo como enviado",
+        onClick: () => handleMarcarCorreoEnviado(idNum),
+      });
+    }
+    
     if (row.estado === "Sin Asignar")
       opts.push({
         label: "Asignar chofer y móvil",
@@ -133,7 +159,7 @@ const VistaServiciosPendientes: React.FC = () => {
 
       <ListWithSearch<ServiceRow>
         data={rows}
-        columns={getServiceColumnsWithRender()}
+        columns={getServiceColumnsWithRender(true)}
         defaultVisibleColumns={defaultColumnConfigs.operaciones}
         searchFilters={searchFilters}
         dropdownOptions={dropdownOptions as DropdownOptionsType<ServiceRow>}

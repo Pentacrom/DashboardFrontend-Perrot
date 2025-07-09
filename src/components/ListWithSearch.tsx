@@ -112,6 +112,7 @@ export interface Column<T> {
   label: string;
   key: keyof T;
   sortable?: boolean;
+  locked?: boolean; // Nueva propiedad para bloquear columnas
   dataType?: "text" | "number" | "currency" | "temperature" | "percentage" | "lookup" | "date" | "boolean";
   lookupData?: Array<{ code: number | string; name: string }>;
   currencySymbol?: string;
@@ -223,6 +224,7 @@ function SortableColumnHeader<T>({
     isDragging,
   } = useSortable({
     id: column.key as string,
+    disabled: column.locked, // Deshabilitar drag para columnas bloqueadas
   });
 
   const style = {
@@ -238,16 +240,25 @@ function SortableColumnHeader<T>({
       {...attributes}
       className={`cursor-pointer px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase ${
         column.sortable ? "hover:text-gray-700" : ""
-      } ${isDragging ? "bg-gray-200" : ""}`}
+      } ${isDragging ? "bg-gray-200" : ""} ${column.locked ? "bg-gray-50" : ""}`}
     >
       <div className="flex items-center justify-between">
-        <span
-          {...listeners}
-          className="mr-2 cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
-          title="Arrastra para reordenar"
-        >
-          ⋮⋮
-        </span>
+        {column.locked ? (
+          <span
+            className="mr-2 text-gray-300"
+            title="Columna bloqueada"
+          >
+            🔒
+          </span>
+        ) : (
+          <span
+            {...listeners}
+            className="mr-2 cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
+            title="Arrastra para reordenar"
+          >
+            ⋮⋮
+          </span>
+        )}
         <div
           className={`flex-1 flex items-center ${column.sortable ? 'cursor-pointer' : ''}`}
           onClick={() => column.sortable && onSort(column.key)}
@@ -719,20 +730,52 @@ function ListWithSearchInner<T extends Record<string, any>>(
     return [...filteredData].sort((a, b) => {
       const aVal = a[sortKey];
       const bVal = b[sortKey];
-      if (
-        sortKey === "fecha" &&
-        typeof aVal === "string" &&
-        typeof bVal === "string"
-      ) {
-        const diff = new Date(aVal).getTime() - new Date(bVal).getTime();
+      
+      // Manejar valores nulos/undefined
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return sortOrder === "asc" ? 1 : -1;
+      if (bVal == null) return sortOrder === "asc" ? -1 : 1;
+      
+      // Encontrar la columna para determinar el tipo de dato
+      const column = allColumns.find(col => col.key === sortKey);
+      
+      // Sorting por tipo de dato
+      if (column?.dataType === "date" || sortKey === "fecha") {
+        const aDate = new Date(aVal);
+        const bDate = new Date(bVal);
+        const diff = aDate.getTime() - bDate.getTime();
         return sortOrder === "asc" ? diff : -diff;
       }
-      if (typeof aVal === "string" && typeof bVal === "string") {
-        return sortOrder === "asc"
-          ? aVal.localeCompare(bVal)
-          : bVal.localeCompare(aVal);
+      
+      if (column?.dataType === "number" || column?.dataType === "currency" || 
+          column?.dataType === "temperature" || column?.dataType === "percentage") {
+        const aNum = Number(aVal) || 0;
+        const bNum = Number(bVal) || 0;
+        return sortOrder === "asc" ? aNum - bNum : bNum - aNum;
       }
-      return 0;
+      
+      if (column?.dataType === "boolean") {
+        const aBool = Boolean(aVal);
+        const bBool = Boolean(bVal);
+        if (aBool === bBool) return 0;
+        return sortOrder === "asc" ? 
+          (aBool ? 1 : -1) : (aBool ? -1 : 1);
+      }
+      
+      if (column?.dataType === "lookup" && column.lookupData) {
+        const aLookup = column.lookupData.find(item => item.code === aVal);
+        const bLookup = column.lookupData.find(item => item.code === bVal);
+        const aText = aLookup?.name || String(aVal);
+        const bText = bLookup?.name || String(bVal);
+        return sortOrder === "asc" ? 
+          aText.localeCompare(bText) : bText.localeCompare(aText);
+      }
+      
+      // Por defecto, sorting como string
+      const aStr = String(aVal).toLowerCase();
+      const bStr = String(bVal).toLowerCase();
+      return sortOrder === "asc" ? 
+        aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
     });
   }, [filteredData, sortKey, sortOrder, customSortOrder]);
 
@@ -1034,15 +1077,21 @@ function ListWithSearchInner<T extends Record<string, any>>(
                 {allColumns.map((col) => (
                   <label
                     key={col.key as string}
-                    className="inline-flex items-center text-sm text-gray-700"
+                    className={`inline-flex items-center text-sm ${
+                      col.locked ? "text-gray-400" : "text-gray-700"
+                    }`}
                   >
                     <input
                       type="checkbox"
                       checked={visibleKeys.includes(col.key)}
-                      onChange={() => toggleVisible(col.key)}
+                      onChange={() => !col.locked && toggleVisible(col.key)}
+                      disabled={col.locked}
                       className="h-4 w-4 text-blue-600"
                     />
-                    <span className="ml-1">{col.label}</span>
+                    <span className="ml-1">
+                      {col.label}
+                      {col.locked && " 🔒"}
+                    </span>
                   </label>
                 ))}
               </div>

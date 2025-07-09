@@ -40,7 +40,7 @@ import {
     origen: ["origen", "origin", "lugar de retiro 1"],
     destino: ["destino", "destination", "dirección de entrega", "direccion de entrega"],
     cliente: ["cliente", "customer", "empresa"],
-    subCliente: ["sub cliente", "subclient", "sub client"],
+    subCliente: ["sub cliente", "subclient", "sub client", "subcliente"],
     tipoOperacion: ["tipo de operacion", "operacion", "operation", "tipo operacion"],
     ejecutivo: ["ejecutivo", "executive", "vendedor", "sales"],
     direccionEntrega: ["dirección de entrega", "direccion entrega", "delivery address"],
@@ -207,6 +207,10 @@ import {
     const navieraValue = findCellValue(row, "naviera");
     const navieraObj = findItemByName(mockCatalogos.navieras, navieraValue);
     const naviera = navieraObj?.codigo || 0;
+    
+    const naveValue = findCellValue(row, "nave");
+    const naveObj = findItemByName(mockCatalogos.naves, naveValue);
+    const nave = naveObj?.id || 0;
   
     const opName = tipoOperacionObj?.nombre.toLowerCase();
   
@@ -234,7 +238,8 @@ import {
       tarjeton: findCellValue(row, "tarjeton"),
       nroContenedor: findCellValue(row, "nroContenedor"),
       sello: findCellValue(row, "sello"),
-      nave: naviera,
+      naviera: naviera,
+      nave: nave,
       observacion: findCellValue(row, "observacion"),
       interchange: "",
       rcNoDevolucion: 0,
@@ -508,6 +513,12 @@ import {
     function getPayloadValue(row: any, field: string): string {
       const payload = row.raw || row;
       const form = payload.form || {};
+      const puntos = payload.puntos || [];
+      
+      // Obtener el tipo de operación
+      const tipoOperacion = mockCatalogos.Operación.find(op => op.codigo === form.tipoOperacion);
+      const esExportacion = tipoOperacion?.nombre.toLowerCase() === "exportación";
+      const esImportacion = tipoOperacion?.nombre.toLowerCase() === "importación";
       
       switch (field) {
         case 'Ruta':
@@ -525,10 +536,23 @@ import {
           const cliente = mockCatalogos.empresas.find(emp => emp.id === form.cliente);
           return cliente?.nombre || '';
         case 'Sub Cliente':
-          return ''; // Este campo no está mapeado actualmente
+          // Subcliente es el Centro elegido en el origen o destino
+          const origenCentro = mockCatalogos.Lugares.find(lugar => lugar.id === form.origen && lugar.tipo === 'Centro');
+          const destinoCentro = mockCatalogos.Lugares.find(lugar => lugar.id === form.destino && lugar.tipo === 'Centro');
+          return origenCentro?.nombre || destinoCentro?.nombre || '';
         case 'Dirección de entrega':
-          const destino = mockCatalogos.Lugares.find(lugar => lugar.id === form.destino);
-          return destino?.nombre || '';
+          // Lugar del último punto cuya acción involucra dejar la carga
+          // (vaciar container, dejar container cargado, o dejar carga)
+          const ultimoPuntoEntrega = [...puntos].reverse().find(p => 
+            p.accion === 4 ||  // dejar container cargado
+            p.accion === 7 ||  // vaciar container
+            p.accion === 12    // dejar carga
+          );
+          if (ultimoPuntoEntrega) {
+            const lugar = mockCatalogos.Lugares.find(lugar => lugar.id === ultimoPuntoEntrega.idLugar);
+            return lugar?.nombre || '';
+          }
+          return '';
         case 'Referencia':
           return form.observacion || '';
         case 'Reserva':
@@ -536,16 +560,22 @@ import {
         case 'Zona':
           return ''; // Este campo no está mapeado actualmente
         case 'Zona Portuaria':
-          return ''; // Este campo no está mapeado actualmente
+          // Zona portuaria es el origen en importación, y destino en exportación
+          const zonaPortuaria = esImportacion ? 
+            mockCatalogos.Lugares.find(lugar => lugar.id === form.origen) :
+            mockCatalogos.Lugares.find(lugar => lugar.id === form.destino);
+          return zonaPortuaria?.nombre || '';
         case 'Pais':
           const pais = mockPaises.find(p => p.codigo === form.pais);
           return pais?.nombre || '';
         case 'ETA_STACKING':
           return form.eta ? formatDateTime(form.eta) : '';
         case 'Naviera':
-          return ''; // Este campo no está mapeado actualmente
+          const naviera = mockCatalogos.navieras.find(n => n.codigo === form.naviera);
+          return naviera?.nombre || '';
         case 'Nave':
-          return ''; // Este campo no está mapeado actualmente
+          const nave = mockCatalogos.naves.find(n => n.id === form.nave);
+          return nave?.nombre || '';
         case 'Tipo':
           const tipoCont = mockCatalogos.Tipo_contenedor.find(tipo => tipo.codigo === form.tipoContenedor);
           return tipoCont?.nombre || '';
@@ -556,17 +586,58 @@ import {
         case 'Condición':
           return ''; // Este campo no está mapeado actualmente
         case 'Lugar de Retiro 1':
-          const origen = mockCatalogos.Lugares.find(lugar => lugar.id === form.origen);
-          return origen?.nombre || '';
+          // Primer punto cuya acción sea retirar container (vacío o cargado) o carga
+          const puntoRetiro1 = puntos.find(p => 
+            p.accion === 1 ||  // retirar container vacío
+            p.accion === 2 ||  // retirar container cargado
+            p.accion === 11    // retirar carga
+          );
+          if (puntoRetiro1) {
+            const lugar = mockCatalogos.Lugares.find(lugar => lugar.id === puntoRetiro1.idLugar);
+            return lugar?.nombre || '';
+          }
+          return '';
         case 'Fecha de Retiro 1':
-          return form.fechaSol ? formatDateTime(form.fechaSol) : '';
+          // Fecha del primer punto de retiro
+          const puntoRetiro1Fecha = puntos.find(p => 
+            p.accion === 1 ||  // retirar container vacío
+            p.accion === 2 ||  // retirar container cargado
+            p.accion === 11    // retirar carga
+          );
+          return puntoRetiro1Fecha?.eta ? formatDateTime(puntoRetiro1Fecha.eta) : '';
         case 'Lugar de Retiro 2':
-          return ''; // Este campo no está mapeado actualmente
+          // Solo si hay un retiro de container vacío seguido de llenar container
+          const retiroVacio = puntos.find(p => p.accion === 1); // retirar container vacío
+          if (retiroVacio) {
+            // Buscar el punto donde se llena el container después del retiro vacío
+            const indiceRetiroVacio = puntos.indexOf(retiroVacio);
+            const puntoLlenar = puntos.slice(indiceRetiroVacio + 1).find(p => p.accion === 6);
+            if (puntoLlenar) {
+              const lugar = mockCatalogos.Lugares.find(lugar => lugar.id === puntoLlenar.idLugar);
+              return lugar?.nombre || '';
+            }
+          }
+          return '';
         case 'Fecha de Retiro 2':
-          return ''; // Este campo no está mapeado actualmente
+          // Fecha del punto donde se llena el container (solo si hay retiro de container vacío)
+          const retiroVacioFecha = puntos.find(p => p.accion === 1); // retirar container vacío
+          if (retiroVacioFecha) {
+            const indiceRetiroVacio = puntos.indexOf(retiroVacioFecha);
+            const puntoLlenar = puntos.slice(indiceRetiroVacio + 1).find(p => p.accion === 6);
+            return puntoLlenar?.eta ? formatDateTime(puntoLlenar.eta) : '';
+          }
+          return '';
         case 'Lugar de Devolución / Puerto de embarque':
-          const lugarDev = mockCatalogos.Lugares.find(lugar => lugar.id === form.destino);
-          return lugarDev?.nombre || '';
+          // Último punto donde se deja el container (vacío o cargado), no carga suelta
+          const ultimoPuntoDevolucion = [...puntos].reverse().find(p => 
+            p.accion === 3 ||  // dejar container vacío
+            p.accion === 4     // dejar container cargado
+          );
+          if (ultimoPuntoDevolucion) {
+            const lugar = mockCatalogos.Lugares.find(lugar => lugar.id === ultimoPuntoDevolucion.idLugar);
+            return lugar?.nombre || '';
+          }
+          return '';
         case 'Tarjeton':
           return form.tarjeton || '';
         case 'Maquina':
@@ -574,6 +645,13 @@ import {
         case 'Guia':
           return form.guiaDeDespacho || '';
         case 'Fecha de Presentación':
+          // Fecha del punto donde se deja la carga específicamente
+          const ultimoPuntoPresentacion = [...puntos].reverse().find(p => 
+            p.accion === 12    // dejar carga
+          );
+          if (ultimoPuntoPresentacion?.eta) {
+            return formatDateTime(ultimoPuntoPresentacion.eta);
+          }
           return form.fechaIng ? formatDateTime(form.fechaIng) : '';
         default:
           return '';

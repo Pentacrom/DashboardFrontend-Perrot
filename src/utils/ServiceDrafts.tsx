@@ -6,6 +6,14 @@ export interface Item {
   nombre: string;
 }
 
+export interface Nave {
+  id: number;
+  nombre: string;
+  naviera: number; // ID de la naviera padre
+  capacidad: number;
+  tipo: string;
+}
+
 export interface GrupoLugar {
   id: number;
   nombre: string;
@@ -37,6 +45,7 @@ export interface Catalogos {
   proveedores_extras: Item[];
   grupoCliente: Item[];
   navieras: Item[];
+  naves: Nave[];
 }
 
 export interface Centro {
@@ -75,6 +84,7 @@ export interface FormState {
   tarjeton: string;
   nroContenedor: string;
   sello: string;
+  naviera: number;
   nave: number;
   observacion: string;
   interchange: string;
@@ -161,6 +171,7 @@ export interface Payload {
   estado: EstadoServicio;
   estadoSeguimiento: EstadoSeguimiento;
   pendienteDevolucion: boolean;
+  correoEnviado?: boolean; // Para rastrear si se envió el correo de notificación
   valores?: ValorFactura[];
   chofer?: string;
   movil?: string;
@@ -316,6 +327,57 @@ export const mockCatalogos: Catalogos = {
     { codigo: 13, nombre: "CSAV" },
     { codigo: 14, nombre: "ARKAS LINE" },
     { codigo: 15, nombre: "CCNI" },
+  ],
+  naves: [
+    // Naves de MAERSK (naviera 1)
+    { id: 1, nombre: "MAERSK SEALAND", naviera: 1, capacidad: 15000, tipo: "Container" },
+    { id: 2, nombre: "MAERSK ESSEX", naviera: 1, capacidad: 18000, tipo: "Container" },
+    { id: 3, nombre: "MAERSK BOSTON", naviera: 1, capacidad: 14000, tipo: "Container" },
+    
+    // Naves de MSC (naviera 2)
+    { id: 4, nombre: "MSC MICHIGAN", naviera: 2, capacidad: 19000, tipo: "Container" },
+    { id: 5, nombre: "MSC DANIT", naviera: 2, capacidad: 16000, tipo: "Container" },
+    { id: 6, nombre: "MSC LUCINDA", naviera: 2, capacidad: 15500, tipo: "Container" },
+    
+    // Naves de CMA CGM (naviera 3)
+    { id: 7, nombre: "CMA CGM CHILE", naviera: 3, capacidad: 17000, tipo: "Container" },
+    { id: 8, nombre: "CMA CGM VALPARAISO", naviera: 3, capacidad: 16500, tipo: "Container" },
+    { id: 9, nombre: "CMA CGM ANDES", naviera: 3, capacidad: 15800, tipo: "Container" },
+    
+    // Naves de COSCO SHIPPING (naviera 4)
+    { id: 10, nombre: "COSCO SHIPPING ARIES", naviera: 4, capacidad: 20000, tipo: "Container" },
+    { id: 11, nombre: "COSCO SHIPPING TAURUS", naviera: 4, capacidad: 18500, tipo: "Container" },
+    { id: 12, nombre: "COSCO SHIPPING GEMINI", naviera: 4, capacidad: 17500, tipo: "Container" },
+    
+    // Naves de HAPAG-LLOYD (naviera 5)
+    { id: 13, nombre: "HAPAG EXPRESS", naviera: 5, capacidad: 16000, tipo: "Container" },
+    { id: 14, nombre: "HAPAG PACIFIC", naviera: 5, capacidad: 15000, tipo: "Container" },
+    { id: 15, nombre: "HAPAG ATLANTIC", naviera: 5, capacidad: 14500, tipo: "Container" },
+    
+    // Naves de ONE (naviera 6)
+    { id: 16, nombre: "ONE INNOVATION", naviera: 6, capacidad: 18000, tipo: "Container" },
+    { id: 17, nombre: "ONE INSPIRATION", naviera: 6, capacidad: 17000, tipo: "Container" },
+    { id: 18, nombre: "ONE INTEGRATION", naviera: 6, capacidad: 16500, tipo: "Container" },
+    
+    // Naves de EVERGREEN (naviera 7)
+    { id: 19, nombre: "EVER GIVEN", naviera: 7, capacidad: 20000, tipo: "Container" },
+    { id: 20, nombre: "EVER GOLDEN", naviera: 7, capacidad: 18500, tipo: "Container" },
+    { id: 21, nombre: "EVER GENIUS", naviera: 7, capacidad: 17000, tipo: "Container" },
+    
+    // Naves de YANG MING (naviera 8)
+    { id: 22, nombre: "YM EXCELLENCE", naviera: 8, capacidad: 15000, tipo: "Container" },
+    { id: 23, nombre: "YM EFFICIENCY", naviera: 8, capacidad: 14500, tipo: "Container" },
+    { id: 24, nombre: "YM ENLIGHTENMENT", naviera: 8, capacidad: 16000, tipo: "Container" },
+    
+    // Naves de ZIM (naviera 9)
+    { id: 25, nombre: "ZIM SHEFFIELD", naviera: 9, capacidad: 13000, tipo: "Container" },
+    { id: 26, nombre: "ZIM SINGAPORE", naviera: 9, capacidad: 12500, tipo: "Container" },
+    { id: 27, nombre: "ZIM SAVANNAH", naviera: 9, capacidad: 13500, tipo: "Container" },
+    
+    // Naves de PIL PACIFIC (naviera 10)
+    { id: 28, nombre: "PIL PACIFIC", naviera: 10, capacidad: 12000, tipo: "Container" },
+    { id: 29, nombre: "PIL PACIFICO", naviera: 10, capacidad: 11500, tipo: "Container" },
+    { id: 30, nombre: "PIL PANAMA", naviera: 10, capacidad: 12500, tipo: "Container" },
   ],
 };
 
@@ -574,6 +636,25 @@ export function saveOrUpdateSent(payload: Payload): void {
   if (idx >= 0) sent[idx] = payload;
   else sent.push(payload);
   localStorage.setItem(STORAGE.enviados, JSON.stringify(sent));
+}
+
+/** Funciones para gestionar el estado del correo */
+export function marcarCorreoEnviado(servicioId: number): void {
+  const sent = loadSent();
+  const idx = sent.findIndex((p) => p.id === servicioId);
+  if (idx >= 0) {
+    sent[idx].correoEnviado = true;
+    localStorage.setItem(STORAGE.enviados, JSON.stringify(sent));
+  }
+}
+
+export function desmarcarCorreoEnviado(servicioId: number): void {
+  const sent = loadSent();
+  const idx = sent.findIndex((p) => p.id === servicioId);
+  if (idx >= 0) {
+    sent[idx].correoEnviado = false;
+    localStorage.setItem(STORAGE.enviados, JSON.stringify(sent));
+  }
 }
 
 /** Migra todas las fechas existentes a formato HH:mm dd/MM/yyyy */

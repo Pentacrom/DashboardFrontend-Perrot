@@ -16,6 +16,7 @@ export interface ServiceRow {
   estado: EstadoServicio;
   estadoSeguimiento: EstadoSeguimiento;
   pendienteDevolucion: boolean;
+  correoEnviado: boolean; // Para rastrear si se envió el correo de notificación
   rowStyle: string; // Campo calculado para coloración de filas
   pais: string;
   tipoContenedor: string;
@@ -44,7 +45,7 @@ export interface ServiceRow {
 
 // Definición completa de todas las columnas posibles
 export const allServiceColumns: Column<ServiceRow>[] = [
-  { label: "ID", key: "id", sortable: true, dataType: "text" },
+  { label: "ID", key: "id", sortable: true, dataType: "text", locked: true },
   { label: "Cliente", key: "cliente", sortable: true, dataType: "text" },
   { label: "Tipo Operación", key: "tipoOperacion", sortable: true, dataType: "text" },
   { label: "Origen", key: "origen", sortable: true, dataType: "text" },
@@ -115,11 +116,12 @@ export const defaultColumnConfigs = {
 };
 
 // Función para obtener columnas con render personalizado
-export const getServiceColumnsWithRender = (): Column<ServiceRow>[] => {
+export const getServiceColumnsWithRender = (showEmailReminder: boolean = false): Column<ServiceRow>[] => {
   return allServiceColumns.map(col => {
     if (col.key === "id") {
       return {
         ...col,
+        locked: true,
         render: (value: string, row: ServiceRow) => (
           <div className="flex items-center gap-2">
             <span>{value}</span>
@@ -129,6 +131,14 @@ export const getServiceColumnsWithRender = (): Column<ServiceRow>[] => {
                 title="Pendiente devolución de container"
               >
                 ⚠️
+              </span>
+            )}
+            {showEmailReminder && !row.correoEnviado && (
+              <span 
+                className="text-orange-600 font-bold text-lg" 
+                title="Recordatorio: Enviar correo de notificación"
+              >
+                ✉️
               </span>
             )}
           </div>
@@ -150,18 +160,9 @@ export const getServiceColumnsWithRender = (): Column<ServiceRow>[] => {
     if (col.key === "estadoSeguimiento") {
       return {
         ...col,
-        render: (value: EstadoSeguimiento) => {
-          const styles = estadoSeguimientoStyles[value];
-          if (!styles) return value;
-          
-          return (
-            <span
-              className={`px-2 py-1 rounded-full text-xs font-medium border ${styles.bg} ${styles.text} ${styles.border}`}
-            >
-              {value}
-            </span>
-          );
-        },
+        render: (value: EstadoSeguimiento) => (
+          <EstadoSeguimientoOval estado={value} />
+        ),
       };
     }
     if (col.key === "pendienteDevolucion") {

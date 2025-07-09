@@ -13,12 +13,25 @@ export const EstadoSeguimientoOval: React.FC<EstadoSeguimientoOvalProps> = ({
 }) => {
   const styles = estadoSeguimientoStyles[estado];
   
+  // Debug: Log estados que no tienen estilos definidos
+  if (!styles) {
+    console.warn(`EstadoSeguimientoOval: No hay estilos definidos para el estado: "${estado}"`);
+    console.warn(`Estados disponibles:`, Object.keys(estadoSeguimientoStyles));
+  }
+  
+  // Si no tiene estilos definidos, usar estilo por defecto
+  const defaultStyles = styles || { 
+    bg: "bg-gray-100", 
+    text: "text-gray-800", 
+    border: "border-gray-300" 
+  };
+  
   return (
     <div className={`inline-flex items-center ${className}`}>
       <div 
         className={`
           px-3 py-1 rounded-full text-xs font-medium border
-          ${styles.bg} ${styles.text} ${styles.border}
+          ${defaultStyles.bg} ${defaultStyles.text} ${defaultStyles.border}
         `}
       >
         {estado}

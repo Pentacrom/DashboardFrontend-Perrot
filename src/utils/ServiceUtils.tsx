@@ -54,6 +54,7 @@ export function payloadToRow(p: Payload): ServiceRow {
   row.estado = p.estado;
   row.estadoSeguimiento = p.estadoSeguimiento || 'Sin iniciar';
   row.pendienteDevolucion = p.pendienteDevolucion || false;
+  row.correoEnviado = p.correoEnviado || false; // Por defecto no se ha enviado el correo
   row.createdBy = p.createdBy;
 
   if (p.chofer !== undefined) {

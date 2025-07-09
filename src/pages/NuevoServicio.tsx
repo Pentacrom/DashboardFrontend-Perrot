@@ -52,6 +52,7 @@ const NuevoServicio: React.FC = () => {
     tarjeton: "",
     nroContenedor: "",
     sello: "",
+    naviera: 0,
     nave: 0,
     observacion: "",
     interchange: "",
@@ -138,6 +139,18 @@ const NuevoServicio: React.FC = () => {
       // pendienteDevolucion se maneja automáticamente en el seguimiento
     }
   }, [paramId, drafts]);
+
+  // Efecto para resetear la nave cuando cambie la naviera
+  useEffect(() => {
+    if (form.naviera !== 0 && form.nave !== 0) {
+      // Verificar si la nave actual pertenece a la naviera seleccionada
+      const naveActual = mockCatalogos.naves.find(nave => nave.id === form.nave);
+      if (naveActual && naveActual.naviera !== form.naviera) {
+        // Resetear la nave si no pertenece a la naviera seleccionada
+        setForm(f => ({ ...f, nave: 0 }));
+      }
+    }
+  }, [form.naviera, form.nave]);
 
   // Actualización de campos del formulario
   function upd<K extends keyof FormState>(key: K) {
@@ -459,8 +472,13 @@ const NuevoServicio: React.FC = () => {
       form,
       puntos,
       estado: estadoToUse,
-      estadoSeguimiento: "Sin iniciar",
-      pendienteDevolucion: false, // Siempre inicia en false
+      estadoSeguimiento: existing?.estadoSeguimiento ?? "Sin iniciar",
+      pendienteDevolucion: existing?.pendienteDevolucion ?? false,
+      valores: existing?.valores, // Preservar valores existentes
+      chofer: existing?.chofer, // Preservar chofer existente
+      movil: existing?.movil, // Preservar móvil existente
+      rampla: existing?.rampla, // Preservar rampla existente
+      descuentoServicioPorcentaje: existing?.descuentoServicioPorcentaje, // Preservar descuentos
       createdBy,
     });
     alert(`Guardado servicio N° ${newId}.`);
@@ -727,13 +745,36 @@ const NuevoServicio: React.FC = () => {
               <label className="block text-sm font-medium">Naviera *</label>
               <select
                 className="input"
-                value={form.nave}
-                onChange={upd("nave")}
+                value={form.naviera}
+                onChange={upd("naviera")}
                 required
               >
                 <option value={0}>—</option>
                 {opt(mockCatalogos.navieras)}
               </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Nave *</label>
+              <select
+                className="input"
+                value={form.nave}
+                onChange={upd("nave")}
+                required
+              >
+                <option value={0}>—</option>
+                {mockCatalogos.naves
+                  .filter(nave => form.naviera === 0 || nave.naviera === form.naviera)
+                  .map(nave => (
+                    <option key={nave.id} value={nave.id}>
+                      {nave.nombre}
+                    </option>
+                  ))}
+              </select>
+              {form.naviera === 0 && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Selecciona una naviera primero para ver las naves disponibles
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium">
@@ -1163,7 +1204,7 @@ const NuevoServicio: React.FC = () => {
 
         {/* Botones Enviar y Guardar */}
         <div className="flex gap-4">
-          {isComercial && (
+          {isComercial && mostrarEstado() === "Pendiente" && (
             <button
               type="submit"
               className="px-4 py-2 bg-blue-600 text-white rounded"
