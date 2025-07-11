@@ -103,7 +103,7 @@ export interface FormState {
 export type EstadoServicio =
   | "Pendiente"
   | "En Proceso"
-  | "Por facturar"
+  | "Validado"
   | "Completado"
   | "Sin Asignar"
   | "Falso Flete"

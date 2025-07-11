@@ -403,6 +403,7 @@ const NuevoServicio: React.FC = () => {
         drafts.find((d) => d.id === newId);
       const hasValores = Boolean((existing as Payload)?.valores?.length);
       const createdBy = userName;
+      form.ejecutivo = createdBy;
 
       if (!hasValores) {
         const valores = generarValoresDesdePuntos(puntos);
@@ -466,6 +467,7 @@ const NuevoServicio: React.FC = () => {
       : null;
     const estadoToUse = existing?.estado ?? "Pendiente";
     const createdBy = existing?.createdBy || userName;
+    form.ejecutivo = createdBy;
 
     saveOrUpdateSent({
       id: newId,

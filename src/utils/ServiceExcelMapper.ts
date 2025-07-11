@@ -41,14 +41,14 @@ import {
     destino: ["destino", "destination", "dirección de entrega", "direccion de entrega"],
     cliente: ["cliente", "customer", "empresa"],
     subCliente: ["sub cliente", "subclient", "sub client", "subcliente"],
-    tipoOperacion: ["tipo de operacion", "operacion", "operation", "tipo operacion"],
+    tipoOperacion: ["tipo de operacion", "operacion", "operation", "tipo operacion", "tipo de operación"],
     ejecutivo: ["ejecutivo", "executive", "vendedor", "sales"],
-    direccionEntrega: ["dirección de entrega", "direccion entrega", "delivery address"],
+    direccionEntrega: ["dirección de entrega", "direccion entrega", "delivery address", "direccion de entrega"],
     referencia: ["referencia", "reference", "ref"],
     reserva: ["reserva", "reservation"],
     zona: ["zona", "zone"],
-    zonaPortuaria: ["zona portuaria", "port zone"],
-    pais: ["pais", "country"],
+    zonaPortuaria: ["zona portuaria", "port zone", "zona portuaria"],
+    pais: ["pais", "country", "país"],
     etaStacking: ["eta_stacking", "eta stacking", "eta"],
     naviera: ["naviera", "shipping line"],
     nave: ["nave", "vessel"],
@@ -60,11 +60,11 @@ import {
     fechaRetiro1: ["fecha de retiro 1", "fecha retiro 1", "pickup date 1"],
     lugarRetiro2: ["lugar de retiro 2", "lugar retiro 2", "pickup place 2"],
     fechaRetiro2: ["fecha de retiro 2", "fecha retiro 2", "pickup date 2"],
-    lugarDevolucion: ["lugar de devolucion", "puerto de embarque", "devolucion", "return place"],
-    tarjeton: ["tarjeton", "ticket"],
-    maquina: ["maquina", "machine"],
-    guiaDeDespacho: ["guia", "guia despacho", "guia de despacho", "dispatch guide"],
-    fechaPresentacion: ["fecha de presentacion", "fecha presentacion", "presentation date"]
+    lugarDevolucion: ["lugar de devolucion", "puerto de embarque", "devolucion", "return place", "lugar de devolución", "lugar de devolución / puerto de embarque"],
+    tarjeton: ["tarjeton", "ticket", "tarjetón"],
+    maquina: ["maquina", "machine", "máquina"],
+    guiaDeDespacho: ["guia", "guia despacho", "guia de despacho", "dispatch guide", "guía"],
+    fechaPresentacion: ["fecha de presentacion", "fecha presentacion", "presentation date", "fecha de presentación"]
   };
 
   // Función para encontrar el valor de una celda usando mapeo flexible
@@ -92,72 +92,281 @@ import {
   
   /**
    * Valida los datos de un payload y devuelve errores de validación
+   * Campos obligatorios: ruta (origen y destino válidos), tipo de operación, ejecutivo, 
+   * cliente, dirección de entrega, país, ETA, naviera, nave, tipo, 
+   * lugar de retiro 1, fecha de retiro 1, lugar de devolución, fecha de presentación
    */
   function validatePayloadData(payload: Payload, originalRow: any): FieldValidationError[] {
     const errors: FieldValidationError[] = [];
     const form = payload.form;
+    const puntos = payload.puntos || [];
 
-    // Validar cliente
-    if (!form.cliente || form.cliente === 0) {
-      errors.push({
-        field: 'cliente',
-        error: 'Cliente requerido',
-        value: findCellValue(originalRow, "cliente")
-      });
-    }
-
-    // Validar tipo de operación
-    if (!form.tipoOperacion || form.tipoOperacion === 0) {
-      errors.push({
-        field: 'tipoOperacion',
-        error: 'Tipo de operación requerido',
-        value: findCellValue(originalRow, "tipoOperacion")
-      });
-    }
-
-    // Validar origen
+    // 1. Validar RUTA (origen y destino válidos en base de datos)
     if (!form.origen || form.origen === 0) {
       errors.push({
         field: 'origen',
-        error: 'Origen requerido',
-        value: findCellValue(originalRow, "origen") || findCellValue(originalRow, "ruta")
+        error: 'Ruta: Origen requerido y debe existir en base de datos',
+        value: findCellValue(originalRow, "origen") || findCellValue(originalRow, "ruta") || findCellValue(originalRow, "lugarRetiro1")
       });
+    } else {
+      // Verificar que el origen existe en la base de datos
+      const origenExists = mockCatalogos.Lugares.find(l => l.id === form.origen);
+      if (!origenExists) {
+        errors.push({
+          field: 'origen',
+          error: 'Ruta: Origen no existe en base de datos',
+          value: findCellValue(originalRow, "origen") || findCellValue(originalRow, "ruta")
+        });
+      }
     }
 
-    // Validar destino
     if (!form.destino || form.destino === 0) {
       errors.push({
         field: 'destino',
-        error: 'Destino requerido',
-        value: findCellValue(originalRow, "destino") || findCellValue(originalRow, "ruta")
+        error: 'Ruta: Destino requerido y debe existir en base de datos',
+        value: findCellValue(originalRow, "destino") || findCellValue(originalRow, "ruta") || findCellValue(originalRow, "direccionEntrega")
+      });
+    } else {
+      // Verificar que el destino existe en la base de datos
+      const destinoExists = mockCatalogos.Lugares.find(l => l.id === form.destino);
+      if (!destinoExists) {
+        errors.push({
+          field: 'destino',
+          error: 'Ruta: Destino no existe en base de datos',
+          value: findCellValue(originalRow, "destino") || findCellValue(originalRow, "ruta")
+        });
+      }
+    }
+
+    // 2. Validar TIPO DE OPERACIÓN (obligatorio)
+    if (!form.tipoOperacion || form.tipoOperacion === 0) {
+      errors.push({
+        field: 'tipoOperacion',
+        error: 'Tipo de operación requerido y debe existir en catálogo',
+        value: findCellValue(originalRow, "tipoOperacion")
+      });
+    } else {
+      const tipoOpExists = mockCatalogos.Operación.find(op => op.codigo === form.tipoOperacion);
+      if (!tipoOpExists) {
+        errors.push({
+          field: 'tipoOperacion',
+          error: 'Tipo de operación no existe en catálogo',
+          value: findCellValue(originalRow, "tipoOperacion")
+        });
+      }
+    }
+
+    // 3. Validar EJECUTIVO (obligatorio, no usar valores por defecto)
+    const ejecutivoValue = findCellValue(originalRow, "ejecutivo");
+    if (!ejecutivoValue || ejecutivoValue.trim() === '' || payload.createdBy === 'importacion-excel') {
+      errors.push({
+        field: 'ejecutivo',
+        error: 'Ejecutivo requerido, no se aceptan valores vacíos',
+        value: ejecutivoValue
       });
     }
 
-    // Validar país
+    // 4. Validar CLIENTE (obligatorio y debe existir)
+    if (!form.cliente || form.cliente === 0) {
+      errors.push({
+        field: 'cliente',
+        error: 'Cliente requerido y debe existir en base de datos',
+        value: findCellValue(originalRow, "cliente")
+      });
+    } else {
+      const clienteExists = mockCatalogos.empresas.find(e => e.id === form.cliente);
+      if (!clienteExists) {
+        errors.push({
+          field: 'cliente',
+          error: 'Cliente no existe en base de datos',
+          value: findCellValue(originalRow, "cliente")
+        });
+      }
+    }
+
+    // 5. Validar DIRECCIÓN DE ENTREGA (verificar en puntos)
+    const direccionEntregaValue = findCellValue(originalRow, "direccionEntrega");
+    if (!direccionEntregaValue || direccionEntregaValue.trim() === '') {
+      errors.push({
+        field: 'direccionEntrega',
+        error: 'Dirección de entrega requerida',
+        value: direccionEntregaValue
+      });
+    }
+
+    // 6. Validar PAÍS (obligatorio y debe existir)
     if (!form.pais || form.pais === 0) {
       errors.push({
         field: 'pais',
-        error: 'País requerido',
+        error: 'País requerido y debe existir en catálogo',
         value: findCellValue(originalRow, "pais")
       });
+    } else {
+      const paisExists = mockPaises.find(p => p.codigo === form.pais);
+      if (!paisExists) {
+        errors.push({
+          field: 'pais',
+          error: 'País no existe en catálogo',
+          value: findCellValue(originalRow, "pais")
+        });
+      }
     }
 
-    // Validar tipo de contenedor
+    // 7. Validar ETA (obligatorio y válido)
+    const etaValue = findCellValue(originalRow, "etaStacking") || findCellValue(originalRow, "eta");
+    if (!etaValue || etaValue.trim() === '') {
+      errors.push({
+        field: 'eta',
+        error: 'ETA requerido',
+        value: etaValue
+      });
+    } else {
+      const etaDate = new Date(etaValue);
+      if (isNaN(etaDate.getTime())) {
+        errors.push({
+          field: 'eta',
+          error: 'ETA debe ser una fecha válida',
+          value: etaValue
+        });
+      }
+    }
+
+    // 8. Validar NAVIERA (obligatorio y debe existir)
+    if (!form.naviera || form.naviera === 0) {
+      errors.push({
+        field: 'naviera',
+        error: 'Naviera requerida y debe existir en catálogo',
+        value: findCellValue(originalRow, "naviera")
+      });
+    } else {
+      const navieraExists = mockCatalogos.navieras.find(n => n.codigo === form.naviera);
+      if (!navieraExists) {
+        errors.push({
+          field: 'naviera',
+          error: 'Naviera no existe en catálogo',
+          value: findCellValue(originalRow, "naviera")
+        });
+      }
+    }
+
+    // 9. Validar NAVE (obligatorio y debe existir)
+    if (!form.nave || form.nave === 0) {
+      errors.push({
+        field: 'nave',
+        error: 'Nave requerida y debe existir en catálogo',
+        value: findCellValue(originalRow, "nave")
+      });
+    } else {
+      const naveExists = mockCatalogos.naves.find(n => n.id === form.nave);
+      if (!naveExists) {
+        errors.push({
+          field: 'nave',
+          error: 'Nave no existe en catálogo',
+          value: findCellValue(originalRow, "nave")
+        });
+      } else if (form.naviera && naveExists.naviera !== form.naviera) {
+        errors.push({
+          field: 'nave',
+          error: 'Nave no pertenece a la naviera seleccionada',
+          value: findCellValue(originalRow, "nave")
+        });
+      }
+    }
+
+    // 10. Validar TIPO (Tipo de contenedor, obligatorio)
     if (!form.tipoContenedor || form.tipoContenedor === 0) {
       errors.push({
         field: 'tipoContenedor',
-        error: 'Tipo de contenedor requerido',
+        error: 'Tipo de contenedor requerido y debe existir en catálogo',
         value: findCellValue(originalRow, "tipoContenedor")
       });
+    } else {
+      const tipoExists = mockCatalogos.Tipo_contenedor.find(t => t.codigo === form.tipoContenedor);
+      if (!tipoExists) {
+        errors.push({
+          field: 'tipoContenedor',
+          error: 'Tipo de contenedor no existe en catálogo',
+          value: findCellValue(originalRow, "tipoContenedor")
+        });
+      }
     }
 
-    // Validar ejecutivo/createdBy
-    if (!payload.createdBy || payload.createdBy === 'importacion-excel') {
+    // 11. Validar LUGAR DE RETIRO 1 (obligatorio)
+    const lugarRetiro1Value = findCellValue(originalRow, "lugarRetiro1");
+    if (!lugarRetiro1Value || lugarRetiro1Value.trim() === '') {
       errors.push({
-        field: 'ejecutivo',
-        error: 'Ejecutivo requerido',
-        value: findCellValue(originalRow, "ejecutivo")
+        field: 'lugarRetiro1',
+        error: 'Lugar de retiro 1 requerido',
+        value: lugarRetiro1Value
       });
+    } else {
+      // Verificar que existe en catálogo
+      const lugarExists = findItemByName(mockCatalogos.Lugares, lugarRetiro1Value);
+      if (!lugarExists) {
+        errors.push({
+          field: 'lugarRetiro1',
+          error: 'Lugar de retiro 1 no existe en base de datos',
+          value: lugarRetiro1Value
+        });
+      }
+    }
+
+    // 12. Validar FECHA DE RETIRO 1 (obligatorio)
+    const fechaRetiro1Value = findCellValue(originalRow, "fechaRetiro1");
+    if (!fechaRetiro1Value || fechaRetiro1Value.trim() === '') {
+      errors.push({
+        field: 'fechaRetiro1',
+        error: 'Fecha de retiro 1 requerida',
+        value: fechaRetiro1Value
+      });
+    } else {
+      const fechaRetiro1Date = new Date(fechaRetiro1Value);
+      if (isNaN(fechaRetiro1Date.getTime())) {
+        errors.push({
+          field: 'fechaRetiro1',
+          error: 'Fecha de retiro 1 debe ser una fecha válida',
+          value: fechaRetiro1Value
+        });
+      }
+    }
+
+    // 13. Validar LUGAR DE DEVOLUCIÓN (obligatorio)
+    const lugarDevolucionValue = findCellValue(originalRow, "lugarDevolucion");
+    if (!lugarDevolucionValue || lugarDevolucionValue.trim() === '') {
+      errors.push({
+        field: 'lugarDevolucion',
+        error: 'Lugar de devolución requerido',
+        value: lugarDevolucionValue
+      });
+    } else {
+      // Verificar que existe en catálogo
+      const lugarExists = findItemByName(mockCatalogos.Lugares, lugarDevolucionValue);
+      if (!lugarExists) {
+        errors.push({
+          field: 'lugarDevolucion',
+          error: 'Lugar de devolución no existe en base de datos',
+          value: lugarDevolucionValue
+        });
+      }
+    }
+
+    // 14. Validar FECHA DE PRESENTACIÓN (obligatorio)
+    const fechaPresentacionValue = findCellValue(originalRow, "fechaPresentacion");
+    if (!fechaPresentacionValue || fechaPresentacionValue.trim() === '') {
+      errors.push({
+        field: 'fechaPresentacion',
+        error: 'Fecha de presentación requerida',
+        value: fechaPresentacionValue
+      });
+    } else {
+      const fechaPresentacionDate = new Date(fechaPresentacionValue);
+      if (isNaN(fechaPresentacionDate.getTime())) {
+        errors.push({
+          field: 'fechaPresentacion',
+          error: 'Fecha de presentación debe ser una fecha válida',
+          value: fechaPresentacionValue
+        });
+      }
     }
 
     return errors;
@@ -166,59 +375,76 @@ import {
   /**
    * Mapea una fila del Excel a un Payload
    */
-  export function mapExcelRowToPayload(row: any, nextId: number): Payload {
-    // Usar mapeo flexible de encabezados
+  export function mapExcelRowToPayload(row: any, nextId: number, currentUser?: string): Payload {
+    // VALIDACIÓN ESTRICTA: No usar valores por defecto para campos obligatorios
     const tipoOperacionValue = findCellValue(row, "tipoOperacion");
-    const tipoOperacionObj = findItemByName(mockCatalogos.Operación, tipoOperacionValue);
+    const tipoOperacionObj = tipoOperacionValue && tipoOperacionValue.trim() !== '' ? findItemByName(mockCatalogos.Operación, tipoOperacionValue) : null;
     const tipoOperacion = tipoOperacionObj?.codigo || 0;
   
     const paisValue = findCellValue(row, "pais");
-    const paisObj = findItemByName(mockPaises, paisValue);
+    const paisObj = paisValue && paisValue.trim() !== '' ? findItemByName(mockPaises, paisValue) : null;
     const pais = paisObj?.codigo || 0;
   
     const tipoContenedorValue = findCellValue(row, "tipoContenedor");
-    const tipoContObj = findItemByName(mockCatalogos.Tipo_contenedor, tipoContenedorValue);
+    const tipoContObj = tipoContenedorValue && tipoContenedorValue.trim() !== '' ? findItemByName(mockCatalogos.Tipo_contenedor, tipoContenedorValue) : null;
     const tipoContenedor = tipoContObj?.codigo || 0;
   
+    // Cliente - VALIDACIÓN ESTRICTA: No usar valores por defecto
     const clienteValue = findCellValue(row, "cliente");
-    const clienteObj = findItemByName(mockCatalogos.empresas, clienteValue);
+    const clienteObj = clienteValue && clienteValue.trim() !== '' ? findItemByName(mockCatalogos.empresas, clienteValue) : null;
     const cliente = clienteObj?.id || 0;
   
-    // Intentar obtener origen y destino de campos individuales primero
+    // Obtener origen y destino sin usar valores por defecto - VALIDACIÓN ESTRICTA
     let origenValue = findCellValue(row, "origen");
     let destinoValue = findCellValue(row, "destino");
     
-    // Si no se encuentran, intentar parsear desde la ruta
-    if (!origenValue || !destinoValue) {
+    // Si no se encuentran, intentar parsear desde la ruta SOLO si los campos están completamente vacíos
+    if ((!origenValue || origenValue.trim() === '') || (!destinoValue || destinoValue.trim() === '')) {
       const rutaValue = findCellValue(row, "ruta");
       if (rutaValue && rutaValue.includes('/')) {
         const [rutaOrigen, rutaDestino] = rutaValue.split('/');
-        origenValue = origenValue || rutaOrigen?.trim();
-        destinoValue = destinoValue || rutaDestino?.trim();
+        if (!origenValue || origenValue.trim() === '') {
+          origenValue = rutaOrigen?.trim() || '';
+        }
+        if (!destinoValue || destinoValue.trim() === '') {
+          destinoValue = rutaDestino?.trim() || '';
+        }
       }
     }
     
-    const origenLugarObj = findItemByName(mockCatalogos.Lugares, origenValue);
+    // Solo buscar si el valor existe y no está vacío - NO usar valores por defecto
+    const origenLugarObj = origenValue && origenValue.trim() !== '' ? findItemByName(mockCatalogos.Lugares, origenValue) : null;
     const origenLugar = origenLugarObj?.id || 0;
   
-    const destinoLugarObj = findItemByName(mockCatalogos.Lugares, destinoValue);
+    const destinoLugarObj = destinoValue && destinoValue.trim() !== '' ? findItemByName(mockCatalogos.Lugares, destinoValue) : null;
     const destinoLugar = destinoLugarObj?.id || 0;
 
+    // Naviera y Nave - VALIDACIÓN ESTRICTA: No usar valores por defecto
     const navieraValue = findCellValue(row, "naviera");
-    const navieraObj = findItemByName(mockCatalogos.navieras, navieraValue);
+    const navieraObj = navieraValue && navieraValue.trim() !== '' ? findItemByName(mockCatalogos.navieras, navieraValue) : null;
     const naviera = navieraObj?.codigo || 0;
     
     const naveValue = findCellValue(row, "nave");
-    const naveObj = findItemByName(mockCatalogos.naves, naveValue);
+    const naveObj = naveValue && naveValue.trim() !== '' ? findItemByName(mockCatalogos.naves, naveValue) : null;
     const nave = naveObj?.id || 0;
   
     const opName = tipoOperacionObj?.nombre.toLowerCase();
   
     const lugarDevolucionId = opName === "importación" ? origenLugar : destinoLugar;
   
-    // Usar mapeo flexible para todos los campos
-    const etaValue = findCellValue(row, "eta");
-    const etaDate = etaValue ? new Date(etaValue) : new Date();
+    // ETA - VALIDACIÓN ESTRICTA: No usar fecha actual por defecto
+    const etaValue = findCellValue(row, "etaStacking") || findCellValue(row, "eta");
+    let etaDate: Date;
+    if (etaValue && etaValue.trim() !== '') {
+      etaDate = new Date(etaValue);
+      // Si la fecha no es válida, usar una fecha mínima para que falle la validación
+      if (isNaN(etaDate.getTime())) {
+        etaDate = new Date(0);
+      }
+    } else {
+      // No hay ETA proporcionado - usar fecha mínima para que falle la validación
+      etaDate = new Date(0);
+    }
     
     const form: FormState = {
       grupoCliente: 0,
@@ -251,7 +477,7 @@ import {
       folio: nextId,
       fechaFolio: new Date(),
       eta: etaDate,
-      ejecutivo: findCellValue(row, "ejecutivo")
+      ejecutivo: currentUser || findCellValue(row, "ejecutivo").trim() || "usuario-importacion"
     };
   
     const puntos: Punto[] = [
@@ -277,7 +503,7 @@ import {
       estado: "Pendiente",
       estadoSeguimiento: "Sin iniciar",
       pendienteDevolucion: false,
-      createdBy: findCellValue(row, "ejecutivo") || "importacion-excel"
+      createdBy: findCellValue(row, "ejecutivo").trim() || "importacion-excel"
     };
   }
   
@@ -364,13 +590,14 @@ import {
     duplicateIds: number[];
     duplicatesInFile: number[];
     validPayloads: ValidatedPayload[];
+    rejectedRows: ValidatedPayload[];
     skippedCount: number;
   }
 
   /**
    * Importa un archivo Excel de carga masiva y devuelve un array de Payload con validación de duplicados.
    */
-  export async function importCargaMasivaFile(file: File): Promise<ImportValidationResult> {
+  export async function importCargaMasivaFile(file: File, currentUser?: string): Promise<ImportValidationResult> {
     const data = await file.arrayBuffer();
     const workbook = XLSX.read(data, { type: "array" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]!];
@@ -418,11 +645,18 @@ import {
     const duplicatesInFile: number[] = [];
     const fileKeys = new Set<string>();
     
-    // Validar duplicados
+    // Validar duplicados y errores
     const validPayloads: ValidatedPayload[] = [];
+    const rejectedRows: ValidatedPayload[] = [];
     
     for (const payload of allPayloads) {
       const serviceKey = createServiceKey(payload);
+      
+      // Si tiene errores de validación, rechazar directamente
+      if (payload.validationErrors.length > 0) {
+        rejectedRows.push(payload);
+        continue;
+      }
       
       // Verificar si ya existe en el sistema (usando datos del servicio, no ID)
       if (existingKeys.has(serviceKey)) {
@@ -436,7 +670,7 @@ import {
         continue;
       }
       
-      // Si no hay duplicados, agregar a válidos
+      // Solo agregar a válidos si no hay errores ni duplicados
       fileKeys.add(serviceKey);
       validPayloads.push(payload);
     }
@@ -453,7 +687,8 @@ import {
       duplicateIds: Array.from(new Set(duplicateIds)),
       duplicatesInFile: Array.from(new Set(duplicatesInFile)),
       validPayloads,
-      skippedCount: duplicateIds.length + duplicatesInFile.length
+      rejectedRows: rejectedRows || [], // Agregar filas rechazadas por errores de validación
+      skippedCount: duplicateIds.length + duplicatesInFile.length + rejectedRows.length
     };
   }
 

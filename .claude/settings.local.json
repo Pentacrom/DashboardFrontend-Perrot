@@ -4,7 +4,9 @@
       "Bash(grep:*)",
       "Bash(npm run dev:*)",
       "Bash(rm:*)",
-      "Bash(npm start)"
+      "Bash(npm start)",
+      "Bash(sed:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": []
   }

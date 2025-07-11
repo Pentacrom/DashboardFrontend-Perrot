@@ -1,5 +1,5 @@
 // src/components/ImportExportButtons.tsx
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useContext } from "react";
 import { Modal } from "./Modal";
 import { 
   importCargaMasivaFile, 
@@ -8,13 +8,12 @@ import {
   getImportBatches, 
   rollbackImportBatch,
   ImportBatch,
-  ImportValidationResult,
-  ValidatedPayload,
-  FieldValidationError
+  ImportValidationResult
 } from "../utils/ServiceExcelMapper";
-import { ServiceRow, getServiceColumnsWithRender } from "../utils/ServiceColumns";
+import { ServiceRow } from "../utils/ServiceColumns";
 import { payloadToRow } from "../utils/ServiceUtils";
 import { mockCatalogos, mockPaises } from "../utils/ServiceDrafts";
+import { AuthContext } from "../context/AuthContext";
 
 interface ImportExportButtonsProps {
   data: ServiceRow[];
@@ -26,6 +25,7 @@ const ImportExportButtons: React.FC<ImportExportButtonsProps> = ({
   onDataUpdate
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { userName } = useContext(AuthContext);
   
   // Estados para importación
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -91,7 +91,7 @@ const ImportExportButtons: React.FC<ImportExportButtonsProps> = ({
     if (!file) return;
     
     try {
-      const result = await importCargaMasivaFile(file);
+      const result = await importCargaMasivaFile(file, userName);
       const validRows = result.validPayloads.map(payloadToRow) as unknown as ServiceRow[];
       setCandidateRows(validRows);
       setBatchInfo(result.batchInfo);
@@ -109,14 +109,38 @@ const ImportExportButtons: React.FC<ImportExportButtonsProps> = ({
     if (!batchInfo || !validationResult) return;
     
     try {
-      const payloads = candidateRows.map(row => row.raw);
+      // Solo importar servicios válidos
+      const validRows = candidateRows.filter(row => 
+        validationResult.validPayloads.some(vp => vp.id === Number(row.id))
+      );
+      const payloads = validRows.map(row => row.raw);
+      
+      if (payloads.length === 0) {
+        alert('No hay servicios válidos para importar.');
+        return;
+      }
+      
       confirmImport(payloads, batchInfo);
-      onDataUpdate([...data, ...candidateRows]);
+      onDataUpdate([...data, ...validRows]);
+      
+      // Mostrar resumen de importación
+      const rejectedCount = validationResult.rejectedRows?.length || 0;
+      const duplicateCount = validationResult.duplicateIds.length + validationResult.duplicatesInFile.length;
+      
+      let message = `Importación completada:\n`;
+      message += `✅ ${payloads.length} servicios importados exitosamente\n`;
+      if (rejectedCount > 0) {
+        message += `❌ ${rejectedCount} servicios rechazados por errores de validación\n`;
+      }
+      if (duplicateCount > 0) {
+        message += `⚠️ ${duplicateCount} servicios omitidos por duplicados\n`;
+      }
+      
       setCandidateRows([]);
       setBatchInfo(null);
       setValidationResult(null);
       setImportModalOpen(false);
-      alert(`Importación exitosa: ${candidateRows.length} servicios agregados`);
+      alert(message);
     } catch (error) {
       alert(`Error al confirmar importación: ${error}`);
     }
@@ -200,22 +224,40 @@ const ImportExportButtons: React.FC<ImportExportButtonsProps> = ({
           <div className="flex flex-wrap gap-6 text-sm">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <span>Se importarán ({validationResult?.validPayloads.filter(p => p.validationErrors.length === 0).length || 0} servicios)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-              <span>Con errores ({validationResult?.validPayloads.filter(p => p.validationErrors.length > 0).length || 0} servicios)</span>
+              <span>Se importarán ({validationResult?.validPayloads.length || 0} servicios)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-              <span>No se importarán ({validationResult?.skippedCount || 0} servicios)</span>
+              <span>Rechazados por errores ({validationResult?.rejectedRows?.length || 0} servicios)</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-yellow-200 rounded"></div>
-              <span>Celdas con datos faltantes</span>
+              <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+              <span>Duplicados ({(validationResult?.duplicateIds.length || 0) + (validationResult?.duplicatesInFile.length || 0)} servicios)</span>
             </div>
           </div>
         </div>
+        
+        {/* Resumen detallado de errores */}
+        {validationResult?.rejectedRows && validationResult.rejectedRows.length > 0 && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded">
+            <h4 className="font-semibold text-red-800 mb-2">Filas rechazadas ({validationResult.rejectedRows.length}):</h4>
+            <div className="max-h-32 overflow-y-auto text-sm text-red-700">
+              {validationResult.rejectedRows.map((payload, idx) => (
+                <div key={idx} className="mb-2 p-2 bg-white rounded border">
+                  <div className="font-medium">Fila {idx + 1} (ID: {payload.id}):</div>
+                  <ul className="ml-4 list-disc">
+                    {payload.validationErrors.map((error, errIdx) => (
+                      <li key={errIdx} className="text-xs">
+                        <span className="font-medium">{error.field}:</span> {error.error}
+                        {error.value && <span className="text-gray-600"> (Valor: "{error.value}")</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         
         {/* Tabla con scroll vertical */}
         <div className="overflow-y-auto max-h-96 border border-gray-300 rounded">
@@ -235,10 +277,6 @@ const ImportExportButtons: React.FC<ImportExportButtonsProps> = ({
             <tbody>
               {/* Servicios válidos (verde) */}
               {validationResult?.validPayloads.map((payload, i) => {
-                const hasErrors = payload.validationErrors.length > 0;
-                
-                // Funciones helper para verificar errores en campos específicos
-                const hasFieldError = (field: string) => payload.validationErrors.some(e => e.field === field);
                 const getFieldValue = (field: string) => {
                   switch (field) {
                     case 'cliente':
@@ -257,42 +295,104 @@ const ImportExportButtons: React.FC<ImportExportButtonsProps> = ({
                 return (
                   <tr key={`valid-${i}`} className="bg-green-50 hover:bg-green-100">
                     <td className="border px-2 py-1 text-sm">
-                      <span className={`inline-block w-3 h-3 rounded-full ${hasErrors ? 'bg-yellow-500' : 'bg-green-500'}`}></span>
+                      <span className="inline-block w-3 h-3 rounded-full bg-green-500"></span>
                     </td>
                     <td className="border px-2 py-1 text-sm">{payload.id}</td>
-                    <td className={`border px-2 py-1 text-sm ${hasFieldError('cliente') ? 'bg-yellow-200' : ''}`}>
-                      {getFieldValue('cliente') || <span className="text-red-500">Falta dato</span>}
-                    </td>
-                    <td className={`border px-2 py-1 text-sm ${hasFieldError('tipoOperacion') ? 'bg-yellow-200' : ''}`}>
-                      {getFieldValue('tipoOperacion') || <span className="text-red-500">Falta dato</span>}
-                    </td>
-                    <td className="border px-2 py-1 text-sm">{payload.form.nroContenedor || '-'}</td>
-                    <td className={`border px-2 py-1 text-sm ${hasFieldError('origen') ? 'bg-yellow-200' : ''}`}>
-                      {getFieldValue('origen') || <span className="text-red-500">Falta dato</span>}
-                    </td>
-                    <td className={`border px-2 py-1 text-sm ${hasFieldError('destino') ? 'bg-yellow-200' : ''}`}>
-                      {getFieldValue('destino') || <span className="text-red-500">Falta dato</span>}
+                    <td className="border px-2 py-1 text-sm">
+                      {getFieldValue('cliente')}
                     </td>
                     <td className="border px-2 py-1 text-sm">
-                      {hasErrors ? (
-                        <span className="text-red-500">
-                          {payload.validationErrors.length} error{payload.validationErrors.length > 1 ? 'es' : ''}
-                        </span>
-                      ) : (
-                        'OK'
-                      )}
+                      {getFieldValue('tipoOperacion')}
+                    </td>
+                    <td className="border px-2 py-1 text-sm">{payload.form.nroContenedor || '-'}</td>
+                    <td className="border px-2 py-1 text-sm">
+                      {getFieldValue('origen')}
+                    </td>
+                    <td className="border px-2 py-1 text-sm">
+                      {getFieldValue('destino')}
+                    </td>
+                    <td className="border px-2 py-1 text-sm">
+                      <span className="text-green-600">Válido</span>
                     </td>
                   </tr>
                 );
               })}
               
-              {/* Servicios omitidos (rojo) */}
+              {/* Servicios rechazados por errores (rojo) */}
+              {validationResult?.rejectedRows?.map((payload, i) => {
+                const getFieldValue = (field: string) => {
+                  switch (field) {
+                    case 'cliente':
+                      const clienteNombre = mockCatalogos.empresas.find(e => e.id === payload.form.cliente)?.nombre;
+                      if (clienteNombre) return clienteNombre;
+                      // Si no encuentra el nombre, mostrar el valor original del error
+                      const clienteError = payload.validationErrors.find(e => e.field === 'cliente');
+                      return clienteError?.value || 'Sin datos';
+                    case 'tipoOperacion':
+                      const tipoOpNombre = mockCatalogos.Operación.find(o => o.codigo === payload.form.tipoOperacion)?.nombre;
+                      if (tipoOpNombre) return tipoOpNombre;
+                      const tipoOpError = payload.validationErrors.find(e => e.field === 'tipoOperacion');
+                      return tipoOpError?.value || 'Sin datos';
+                    case 'origen':
+                      const origenNombre = mockCatalogos.Lugares.find(l => l.id === payload.form.origen)?.nombre;
+                      if (origenNombre) return origenNombre;
+                      const origenError = payload.validationErrors.find(e => e.field === 'origen');
+                      return origenError?.value || 'Sin datos';
+                    case 'destino':
+                      const destinoNombre = mockCatalogos.Lugares.find(l => l.id === payload.form.destino)?.nombre;
+                      if (destinoNombre) return destinoNombre;
+                      const destinoError = payload.validationErrors.find(e => e.field === 'destino');
+                      return destinoError?.value || 'Sin datos';
+                    default:
+                      return '';
+                  }
+                };
+                
+                const hasFieldError = (field: string) => payload.validationErrors.some(e => e.field === field);
+                
+                return (
+                  <tr key={`rejected-${i}`} className="bg-red-50 hover:bg-red-100">
+                    <td className="border px-2 py-1 text-sm">
+                      <span className="inline-block w-3 h-3 bg-red-500 rounded-full"></span>
+                    </td>
+                    <td className="border px-2 py-1 text-sm">{payload.id}</td>
+                    <td className={`border px-2 py-1 text-sm ${hasFieldError('cliente') ? 'bg-yellow-200' : ''}`}>
+                      {getFieldValue('cliente') || <span className="text-red-500">Error</span>}
+                    </td>
+                    <td className={`border px-2 py-1 text-sm ${hasFieldError('tipoOperacion') ? 'bg-yellow-200' : ''}`}>
+                      {getFieldValue('tipoOperacion') || <span className="text-red-500">Error</span>}
+                    </td>
+                    <td className="border px-2 py-1 text-sm">{payload.form.nroContenedor || '-'}</td>
+                    <td className={`border px-2 py-1 text-sm ${hasFieldError('origen') || hasFieldError('lugarRetiro1') ? 'bg-yellow-200' : ''}`}>
+                      {getFieldValue('origen') || <span className="text-red-500">Error</span>}
+                    </td>
+                    <td className={`border px-2 py-1 text-sm ${hasFieldError('destino') || hasFieldError('direccionEntrega') ? 'bg-yellow-200' : ''}`}>
+                      {getFieldValue('destino') || <span className="text-red-500">Error</span>}
+                    </td>
+                    <td className="border px-2 py-1 text-sm">
+                      <div className="text-red-600 text-xs">
+                        <div className="font-semibold">{payload.validationErrors.length} error{payload.validationErrors.length > 1 ? 'es' : ''}:</div>
+                        {payload.validationErrors.slice(0, 3).map((error, idx) => (
+                          <div key={idx} className="truncate" title={error.error}>
+                            • {error.error}
+                          </div>
+                        ))}
+                        {payload.validationErrors.length > 3 && (
+                          <div className="text-gray-500">... y {payload.validationErrors.length - 3} más</div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              
+              {/* Servicios duplicados (naranja) */}
               {validationResult && validationResult.payloads.filter(p => 
                 [...validationResult.duplicateIds, ...validationResult.duplicatesInFile].includes(p.id)
               ).map((payload, i) => (
-                <tr key={`skipped-${i}`} className="bg-red-50 hover:bg-red-100">
+                <tr key={`duplicate-${i}`} className="bg-orange-50 hover:bg-orange-100">
                   <td className="border px-2 py-1 text-sm">
-                    <span className="inline-block w-3 h-3 bg-red-500 rounded-full"></span>
+                    <span className="inline-block w-3 h-3 bg-orange-500 rounded-full"></span>
                   </td>
                   <td className="border px-2 py-1 text-sm">{payload.id}</td>
                   <td className="border px-2 py-1 text-sm">
@@ -309,7 +409,7 @@ const ImportExportButtons: React.FC<ImportExportButtonsProps> = ({
                     {mockCatalogos.Lugares.find(l => l.id === payload.form.destino)?.nombre || 'N/A'}
                   </td>
                   <td className="border px-2 py-1 text-sm">
-                    <span className="text-red-600">
+                    <span className="text-orange-600">
                       {validationResult.duplicateIds.includes(payload.id) 
                         ? 'Ya existe en el sistema' 
                         : 'Duplicado en archivo'}

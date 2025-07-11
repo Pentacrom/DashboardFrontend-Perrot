@@ -13,6 +13,8 @@ import {
   Cliente,
   imoCategorias,
   mockPaises,
+  EstadoSeguimiento,
+  EstadoServicio,
 } from "../utils/ServiceDrafts";
 import { formatCLP, formatFechaISO } from "../utils/format";
 
@@ -57,26 +59,32 @@ const DetalleServicio: React.FC = () => {
   }, [id]);
 
   const handleCompletar = () => {
-    if (!service) return;
-    
-    // Validar que el container no esté pendiente de devolución
-    if (service.pendienteDevolucion) {
-      alert("⚠️ No se puede completar el servicio porque el container está pendiente de devolución. Debe completarse la devolución del container antes de finalizar el servicio.");
-      return;
-    }
-    
-    const confirmado = window.confirm(
-      "¿Estás seguro que quieres completar el servicio? Esta acción cambiará el estado a 'Completado'."
-    );
-    if (!confirmado) return;
-    const actualizado: Payload = {
-      ...service,
-      estado: "Completado",
-    };
-    saveOrUpdateSent(actualizado);
-    alert("Servicio marcado como Completado.");
-    navigate(-1);
+  if (!service) return;
+
+  let nuevoEstado : EstadoServicio = "Completado";
+  let mensaje = "Servicio marcado como Completado.";
+
+  if (service.pendienteDevolucion) {
+    nuevoEstado = "Validado";
+    mensaje =
+      "⚠️ Servicio pasó a estado validado";
+  }
+
+  const confirmado = window.confirm(
+    `¿Estás seguro que quieres ${nuevoEstado === "Completado" ? "completar" : "validar"} el servicio?`
+  );
+  if (!confirmado) return;
+
+  const actualizado: Payload = {
+    ...service,
+    estado: nuevoEstado,
   };
+
+  saveOrUpdateSent(actualizado);
+  alert(mensaje);
+  navigate(-1);
+};
+
 
   if (loading) {
     return (
@@ -358,11 +366,10 @@ const DetalleServicio: React.FC = () => {
             return (
               <div
                 key={i}
-                className={`p-4 rounded-lg border-l-4 ${
-                  isLate
+                className={`p-4 rounded-lg border-l-4 ${isLate
                     ? "border-red-400 bg-red-50"
                     : "border-blue-400 bg-blue-50"
-                }`}
+                  }`}
               >
                 <h3 className="font-black mb-2">Punto {i + 1}</h3>
                 <div className="grid grid-cols-2 text-left gap-2">
@@ -403,12 +410,15 @@ const DetalleServicio: React.FC = () => {
       </section>
 
       <div className="flex gap-4 mt-4">
-        {service.estado === "Por validar" && (
+        {(service.estado === "Por validar" || service.estado === "Validado") && (
           <button
             onClick={handleCompletar}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className={`px-4 py-2 text-white rounded hover:${service.pendienteDevolucion
+                ? "bg-green-600"
+                : "bg-blue-700"
+              } ${service.pendienteDevolucion ? "bg-green-500" : "bg-blue-600"}`}
           >
-            Completar Servicio
+            {service.pendienteDevolucion ? "Validar Servicio" : "Completar Servicio"}
           </button>
         )}
         <button
