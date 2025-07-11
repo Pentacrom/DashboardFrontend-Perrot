@@ -1204,7 +1204,7 @@ const NuevoServicio: React.FC = () => {
 
         {/* Botones Enviar y Guardar */}
         <div className="flex gap-4">
-          {isComercial && mostrarEstado() === "Pendiente" && (
+          {isComercial && (
             <button
               type="submit"
               className="px-4 py-2 bg-blue-600 text-white rounded"
